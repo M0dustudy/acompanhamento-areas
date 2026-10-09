@@ -71,6 +71,9 @@ button,.pdfbtn{touch-action:manipulation}
 </style></head><body><div class="w"><div class="brand"><div class="brandmark">◈</div><div><h1>VITRA</h1><div class="brandline">Inteligência e Rastreabilidade da Uva</div><div class="brandkicker">SISTEMA DE CONTROLE DE QUALIDADE</div></div></div><div class="cards" id="cards"></div><div class="panel" id="panel"></div></div>
 <script>
 const groups={acomp:["101B","302A","303A","107B","109B","109A","110A","110B","202A","211A","102B","307A","307B","306A","306B","303B","301A","301B"],colh:["106B","107A","203B"],pausa:["211B"],fim:["202B","108A","108B","203A"]};
+// Ordenação numérica das áreas em todos os status, sem alterar os registros.
+const compararAreas=(a,b)=>Number(a.match(/^\d+/)?.[0]||0)-Number(b.match(/^\d+/)?.[0]||0)||a.localeCompare(b,"pt-BR",{numeric:true});
+Object.values(groups).forEach(areas=>areas.sort(compararAreas));
 const labels={acomp:"🌿 AVALIAÇÕES DE CAMPO",colh:"🟢 ÁREAS EM COLHEITA",pausa:"⏸️ ÁREAS PAUSADAS",fim:"✅ ÁREAS FINALIZADAS"};
 const A={
 "101B":{"v":"Arra 15","f":"26/10","c":[["21 dias","Campesita 60% · Extra A 30% · Extra 10% · 🎯 Potencial Geral de Exportação 80% (60% Campesita + 20% da Extra A)","Grande quantidade de cachos com presença de bagas duras."]]},
