@@ -164,7 +164,7 @@ function dataTitulacao(s){
 function titulacoesOrdenadas(a){return (a.t||[]).slice().sort((x,y)=>dataTitulacao(x[0])-dataTitulacao(y[0]))}
 function dataRecepcao(rotulo){
  const s=String(rotulo||"");
- const m=s.match(/(\\d{1,2})\\/(\\d{1,2})(?:\\/(\\d{4}))?/);
+ const m=s.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
  if(!m)return -1;
  const dia=+m[1],mes=+m[2],ano=+(m[3]||2026);
  const dt=new Date(ano,mes-1,dia);
