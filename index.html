@@ -153,7 +153,8 @@ function pred(x){
   const target=lines.find(y=>y.toLowerCase().startsWith(name.toLowerCase()+":"));
   const b=target && target.match(/Brix\s*([0-9]+(?:,[0-9]+)?)/i);
   return `<div class=pred><small>⭐ BRIX DA COLORAÇÃO PREDOMINANTE</small>${name}${b?` — ${b[1]} Brix`:""}</div>`;
-}function tabs(x,k,z){return !x?"":`<div class=chips>${x.map((q,i)=>`<button class="${i==z?'on':''}" onclick="sel('${k}',${i})">${q[0]}</button>`).join("")}</div>`}
+}function dataCompletaChip(s){return /^\d{1,2}\/\d{1,2}$/.test(String(s))?s+"/2026":s}
+function tabs(x,k,z){return !x?"":`<div class=chips>${x.map((q,i)=>`<button class="${i==z?'on':''}" onclick="sel('${k}',${i})">${k==="t"?dataCompletaChip(q[0]):q[0]}</button>`).join("")}</div>`}
 function dataTitulacao(s){
  const m=String(s||"").match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
  if(!m)return -1;
@@ -161,7 +162,7 @@ function dataTitulacao(s){
  const dt=new Date(ano,mes-1,d);
  return dt.getFullYear()===ano&&dt.getMonth()===mes-1&&dt.getDate()===d?dt.getTime():-1;
 }
-function titulacoesOrdenadas(a){return (a.t||[]).slice().sort((x,y)=>dataTitulacao(x[0])-dataTitulacao(y[0]))}
+function titulacoesOrdenadas(a){return (a.t||[]).slice().sort((x,y)=>dataTitulacao(y[0])-dataTitulacao(x[0]))}
 function dataRecepcao(rotulo){
  const s=String(rotulo||"");
  const m=s.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
@@ -171,7 +172,7 @@ function dataRecepcao(rotulo){
  return dt.getFullYear()===ano&&dt.getMonth()===mes-1&&dt.getDate()===dia?dt.getTime():-1;
 }
 function recepcoesOrdenadas(a){return (a.r||[]).slice().sort((x,y)=>dataRecepcao(y[0])-dataRecepcao(x[0]))}
-function latest(){let a=A[ar]||{};ci=Number.isInteger(a.fieldPdfEvaluationIndex)?a.fieldPdfEvaluationIndex:Math.max(0,(a.c||[]).length-1);ti=Math.max(0,titulacoesOrdenadas(a).length-1);ri=0}
+function latest(){let a=A[ar]||{};ci=Number.isInteger(a.fieldPdfEvaluationIndex)?a.fieldPdfEvaluationIndex:Math.max(0,(a.c||[]).length-1);ti=0;ri=0}
 function sel(k,i){if(k=="c")ci=i;if(k=="t")ti=i;if(k=="r")ri=i;render()}let areaSearch="";
 function markMain(k){document.querySelectorAll(".card[data-main]").forEach(x=>x.classList.toggle("active",x.dataset.main===k))}function ps(s){stockOpen=false;stockDetail=false;stockEvidence=false;areaSearch="";st=s;ar=groups[s][0]||null;if(ar)latest();markMain(s);render();void 0}
 function areaMatches(q){q=q.trim().toLowerCase();const out=[];Object.keys(groups).forEach(k=>groups[k].forEach(x=>{const a=A[x]||{};const hay=[x,a.v,a.f,labels[k],a.note].join(" ").toLowerCase();if(!q||hay.includes(q))out.push({x,k})}));return out}
