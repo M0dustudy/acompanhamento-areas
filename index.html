@@ -366,7 +366,7 @@ let stockOpen=false,stockDetail=false,stockEvidence=false,stockGroup="",stockLot
 function toggleStock(){stockVisibleLimit=12;stockOpen=true;stockDetail=false;stockFilter="all";stockSearch="";st=null;ar=null;markMain("stock");renderStock();void 0}
 function setStockFilter(f){stockVisibleLimit=12;stockFilter=f;stockDetail=false;stockGroup="";stockLot="";stockReport="";renderStock()}function setStockSearch(q){stockSearch=q;stockDetail=false;if(q.trim())stockFilter="all";updateStockResults()}
 function stockDateValue(s){const m=String(s||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);return m?Number(m[3])*10000+Number(m[2])*100+Number(m[1]):0}
-function stockGroups(){const m=new Map();stockData.forEach(x=>{const key=x.group+" | "+x.date+" | Lote "+x.lot+" | "+x.class+" | "+x.id;m.set(key,[x])});return [...m.entries()].sort((a,b)=>stockDateValue(b[1][0].date)-stockDateValue(a[1][0].date))}
+function stockGroups(){const m=new Map();stockData.forEach(x=>{const key=x.producer+" | "+x.variety+" | "+x.date+" | Lote "+x.lot+" | "+x.class+" | "+x.id;m.set(key,[x])});return [...m.entries()].sort((a,b)=>stockDateValue(b[1][0].date)-stockDateValue(a[1][0].date))}
 function toggleStockDetail(g){stockGroup=g;stockDetail=true;const rows=stockData.filter(x=>x.group===g);stockLot=rows[0].lot;stockReport=rows[0].id;renderStock()}
 function chooseLot(l){stockLot=l;const x=stockData.find(r=>r.group===stockGroup&&r.lot===l);if(x)stockReport=x.id;renderStock()}
 function chooseReport(id){stockReport=id;renderStock()}function closeStockDetail(){stockDetail=false;stockGroup="";stockLot="";stockReport="";renderStock();requestAnimationFrame(()=>document.querySelector("#stockSearch")?.focus())}
