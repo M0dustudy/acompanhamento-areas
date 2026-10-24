@@ -217,6 +217,36 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}body{min-width:0!important
 
 /* Centralização dos cabeçalhos das seções de cada área (Campo, Titulação e Recepção) */
 .premium-area-card .area-information>.area-column>h3{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;gap:8px!important}
+</style><style>
+/* VITRA: apresentação consistente de titulação, Brix e recepção; sem modificar registros */
+.premium-area-card .tit-column,.premium-area-card .reception-column{min-width:0}
+.premium-area-card .tit-column>.body,.premium-area-card .reception-column>.body{padding:14px!important;line-height:1.65;color:#243c2e}
+.premium-area-card .tit-column>.body>.line{padding:11px 12px;margin:0 0 8px;border:1px solid #e3ece6;border-radius:11px;background:#f8fbf9;font-size:13px;line-height:1.55}
+.premium-area-card .tit-column>.body>.line:last-of-type{margin-bottom:13px}
+.premium-area-card .reception-column .recep-class{gap:10px;margin:4px 0 17px}
+.premium-area-card .reception-column .recep-stat{border:1px solid #dcebe1;background:linear-gradient(145deg,#f5faf6,#eaf5ed);border-radius:13px;padding:13px 12px;min-width:0}
+.premium-area-card .reception-column .recep-stat span{font-size:11px;letter-spacing:.01em;color:#54705d}
+.premium-area-card .reception-column .recep-stat strong{font-size:clamp(19px,5vw,25px);color:#14583a;line-height:1.3}
+.premium-area-card .reception-column .recep-title{margin:15px 0 9px;color:#3e624b;font-size:11px;letter-spacing:.045em}
+.premium-area-card .reception-column .recep-brix{gap:8px;margin:0 0 14px}
+.premium-area-card .reception-column .recep-brix-row{background:#fff;border:1px solid #e1eae3;border-radius:11px;padding:11px 12px;align-items:center;gap:8px}
+.premium-area-card .reception-column .recep-brix-row span{color:#50695a;font-size:12px}
+.premium-area-card .reception-column .recep-brix-row strong{color:#1b5137;font-size:14px}
+.premium-area-card .reception-column .recep-pred{border:1px solid #d9e9dd;border-radius:12px;background:#f0f8f2;padding:12px;margin:12px 0}
+.premium-area-card .reception-column .campodanos{border-radius:13px;margin:16px 0 0;line-height:1.65}
+.premium-area-card .ruasdetail{overflow:hidden;max-width:100%;border:1px solid #dce9df;border-radius:14px;background:#fff;margin:14px 0 4px;box-shadow:0 4px 14px rgba(21,67,43,.045)}
+.premium-area-card .ruasdetail summary{display:flex;align-items:center;justify-content:space-between;gap:8px;list-style:none;padding:13px 12px;background:#edf6ef;color:#235a3b;font-size:12px;line-height:1.4}
+.premium-area-card .ruasdetail summary::-webkit-details-marker{display:none}
+.premium-area-card .ruasdetail summary:before{content:"▸";flex:0 0 auto;font-size:13px;transition:transform .2s}
+.premium-area-card .ruasdetail[open] summary:before{transform:rotate(90deg)}
+.premium-area-card .ruascount{float:none;flex:0 0 auto;font-size:10px;white-space:nowrap}
+.premium-area-card .ruasinfo{padding:12px 13px;color:#63766a;background:#fafcfb}
+.premium-area-card .ruasscroll{overflow-x:auto;max-width:100%;margin:0 10px 8px;border-radius:10px;-webkit-overflow-scrolling:touch}
+.premium-area-card .ruastable{min-width:410px;font-size:11px}
+.premium-area-card .ruastable th{font-size:10px;padding:11px 10px}
+.premium-area-card .ruastable td{padding:11px 10px}
+.premium-area-card .ruasfoot{padding:10px 12px 13px;font-size:10px}
+@media(max-width:600px){.premium-area-card .tit-column>.body,.premium-area-card .reception-column>.body{padding:12px!important}.premium-area-card .reception-column .recep-stat{padding:11px 10px}.premium-area-card .ruasdetail summary{flex-wrap:wrap}.premium-area-card .ruastable{min-width:390px}}
 </style></head><body><div class="vitra-shell"><aside class="vitra-sidebar"><div class="sidebar-logo" onclick="showHome()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHome()}" aria-label="Voltar à visão geral"><span class="sidebar-monogram" aria-hidden="true">V</span><div><strong>VITRA</strong><small>QUALIDADE & RASTREABILIDADE</small></div></div><div class="sidebar-label">NAVEGAÇÃO</div><nav class="cards" id="cards" aria-label="Módulos do VITRA"></nav><div class="sidebar-foot">CONTROLE DE QUALIDADE <small>Precisão, histórico e confiança.</small></div></aside><main class="vitra-main"><div class="vitra-hero"><div class="hero-content"><span class="hero-eyebrow">VITRA • INTELIGÊNCIA E RASTREABILIDADE DA UVA</span><h1>Excelência em cada detalhe.</h1><p>Dados confiáveis, decisões precisas e rastreabilidade em cada etapa.</p></div><div class="hero-seal" aria-hidden="true"><span>V</span><small>VITRA</small></div></div><div class="vitra-kpis" id="vitraKpis"></div><div class="panel" id="panel"><section class="vitra-home" id="vitraHome"><div class="home-welcome"><span class="home-overline">VITRA • PAINEL DE CONTROLE</span><h2>Seu trabalho, em uma visão clara.</h2><p>Selecione um dos indicadores acima para consultar as avaliações e acompanhar cada etapa com precisão.</p></div></section></div><footer class="vitra-footer">VITRA <span>•</span> Inteligência e Rastreabilidade da Uva</footer></main></div>
 <script>
 const groups={"acomp":["101A","102A","101B","303A","110A","110B","307A","307B","306A","306B","303B","301A","301B","109A"],"colh":["102B"],"pausa":["211B","302A","211A"],"fim":["202A","202B","108A","108B","203A","107A","107B","203B","106B","109B"]};
