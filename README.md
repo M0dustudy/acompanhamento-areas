@@ -7,8 +7,11 @@ Dashboard de acompanhamento das áreas de uva e controle de qualidade.
 O conteúdo da avaliação, e não apenas o nome do arquivo, determina se um relatório é novo ou duplicado.
 
 - **Nome automático do Clicq** (por exemplo, `AVALIACAO_DE_ESTOQUE_EM_CAMARA_FRIA_-_FOR.CQ.-1792596800968-pt_BR.pdf`): preservar o nome original.
-- **Nome genérico** (por exemplo, `aplicação145879.pdf`, ou um nome manual com `FOR.CQ.068 - 1`): após ler o PDF e identificar a data **da avaliação**, usar `ESTOQUE_AAAA-MM-DD_FOR-CQ068_NNN.pdf`, onde `NNN` é um sequencial **livre para aquela data e formulário**, conferido no repositório antes de gravar.
+- **Nome genérico ou repetido** (por exemplo, `aplicação145879.pdf`, `FOR.CQ.068 - 1.pdf` ou similares): **obrigatoriamente conferir o PDF no chat ANTES de o usuário enviá-lo ao GitHub** e informar o nome exclusivo recomendado no padrão `ESTOQUE_AAAA-MM-DD_DOC_NUMERODORELATORIO_LOTE_NUMERODOLOTE.pdf`, com base na data da avaliação, no identificador do relatório e no(s) lote(s) registrados no próprio documento. Exemplo real: `ESTOQUE_2026-10-22_DOC_92956762_LOTE_28189.pdf`. Para vários lotes declarados, incluir os números identificáveis em um nome seguro, preservando a relação de cada lote no cadastro. **Nunca usar a data de envio no lugar da avaliação.**
 - `FOR.CQ.068` identifica o **modelo do formulário**, não um relatório específico. Os sufixos `.1`, `.2` em nomes manuais não comprovam que os documentos são diferentes.
+- **Conferência obrigatória antes do envio:** verificar se o nome sugerido já existe no GitHub, se o número de relatório já consta no estoque e se o conteúdo equivale a uma avaliação existente. Informar imediatamente ao usuário o **nome exato para renomear** e o motivo, sem exigir renomeação dos arquivos com nomes automáticos exclusivos do Clicq.
+- **Nunca sobrescrever:** quando o nome já existir ou houver dúvida sobre lote/identificador, interromper o procedimento, revisar e propor outro nome seguro. Arquivo repetido não gera avaliação nova. Não remover, sobrescrever ou renomear documentos já publicados para abrir espaço para outro.
+- **Dados insuficientes:** se o número de relatório ou lote estiver ausente/ilegível, avisar antes do envio e usar uma identificação exclusiva somente após comprovar a identidade e ausência de colisão. Não inventar dados para compor nomes.
 - **Nunca renomear automaticamente PDFs antigos**. Renomeações de documentos publicados exigem atualizar e verificar todos os vínculos de visualização e download.
 - Antes de cadastrar, conferir data e horário da avaliação, produtor/área, variedade, lote, mercado, classificação, pallets e identificação do relatório. Usar o hash SHA-256 para identificar arquivos binariamente idênticos quando possível; hashes diferentes não provam que sejam avaliações diferentes.
 - Se o conteúdo for igual a uma avaliação já cadastrada, **não criar registro duplicado**, mesmo que o nome do arquivo seja diferente. Se houver dúvida sobre a identidade, suspender o cadastro e solicitar confirmação.
@@ -18,7 +21,7 @@ O conteúdo da avaliação, e não apenas o nome do arquivo, determina se um rel
 
 ### Procedimento de entrada
 
-Relatórios enviados no chat ou adicionados manualmente ao GitHub podem chegar com qualquer nome. A padronização e o cadastro são realizados **quando uma atualização do VITRA for solicitada**, após consultar a versão atual do repositório. A simples inclusão de um PDF no GitHub não dispara cadastro automático.
+**Novo procedimento obrigatório para documentos com nomes genéricos:** assim que o usuário enviar um PDF no chat, analisar data da avaliação, relatório, produtor/área e lote(s); consultar o GitHub e o cadastro para evitar colisão e duplicidade; **informar o novo nome ao usuário antes de ele colocar o arquivo no GitHub**. Depois de o usuário confirmar o upload, conferir o nome e o conteúdo hospedados e cadastrar/vincular apenas avaliações novas. Relatórios com nomes automáticos e exclusivos podem manter o nome original. A simples inclusão de um PDF no GitHub não dispara cadastro automático.
 
 ### Regra crítica de disponibilidade
 
