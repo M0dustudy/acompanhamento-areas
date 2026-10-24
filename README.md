@@ -2,6 +2,16 @@
 
 Dashboard de acompanhamento das áreas de uva e controle de qualidade.
 
+## Separação obrigatória: nome do arquivo × apresentação no VITRA
+
+O nome padronizado `ESTOQUE_AAAA-MM-DD_DOC_..._LOTE_....pdf` é um **identificador técnico exclusivo para armazenamento no GitHub e para os links do PDF original**. Ele **não é o título, nome ou classificação da avaliação no VITRA**.
+
+- **Na interface do VITRA**, manter a nomenclatura e a apresentação já estabelecidas: **produtor ou área, variedade, data da avaliação, lote e resultado**. As demais informações continuam organizadas nos detalhes conforme o documento.
+- **No GitHub**, o campo do caminho/nome do arquivo poderá mudar exclusivamente para impedir colisões, sempre com o vínculo correto entre avaliação e PDF.
+- Renomear um arquivo não deve modificar produtor/área, variedade, lote, mercado, classificação, status, medições, título de card nem qualquer outro dado original da avaliação.
+- Nunca exibir o nome técnico do PDF como título do card nem incluir sequências como `DOC_92956762` ou `ESTOQUE_2026...` na nomenclatura visível do estoque.
+- Havendo renomeação segura de um PDF hospedado, atualizar **somente suas referências técnicas de arquivo e os links** associados, preservando todo o histórico e verificando a visualização e o download.
+
 ## Regra obrigatória: identificação de PDFs de estoque
 
 O conteúdo da avaliação, e não apenas o nome do arquivo, determina se um relatório é novo ou duplicado.
