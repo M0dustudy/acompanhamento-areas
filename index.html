@@ -445,7 +445,7 @@ function renderRecepcaoClassificacao(cl,details){
   notes.map(x=>'<div class="recep-detail-note">'+esc(x)+'</div>').join("")+
   (!stats&&!brix.length&&!notes.length&&!predominance?'<div class="muted">Dados não informados.</div>':'')
 }
-function formatRatioDisplay(v){const raw=String(v??"").trim();if(!/^[-+]?\d+(?:[,.]\d+)?$/.test(raw))return raw;const n=Number(raw.replace(",","."));return Number.isFinite(n)?n.toFixed(2).replace(".",","):raw}
+function formatRatioDisplay(v){const raw=String(v??"").trim();if(!/^[-+]?\d+(?:[,.]\d+)?$/.test(raw))return raw;return raw}
 function split(x){
  const lines=String(x||"").split("|").map(v=>v.trim()).filter(Boolean);
  return lines.map(line=>{
