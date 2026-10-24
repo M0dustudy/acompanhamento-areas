@@ -11,6 +11,8 @@ Pasta oficial dos PDFs originais das avaliações de estoque em câmara fria do 
 3. Informar o **nome exclusivo exato** para o usuário renomear **antes de publicar no GitHub**.
 4. Após o envio, verificar a presença e integridade do PDF e vincular apenas os relatórios novos ao VITRA.
 
+**Atenção — nome técnico, não nome de exibição:** a padronização abaixo vale **somente para o arquivo armazenado no GitHub e seu vínculo de PDF**. No VITRA, manter os nomes habituais de produtor/área e variedade e a identificação por data, lote e resultado. Nunca mostrar esse nome técnico como título da avaliação nem modificar resultados, classificações ou histórico por causa de uma renomeação.
+
 **Padrão dos nomes genéricos:**
 
 `ESTOQUE_AAAA-MM-DD_DOC_NUMERODORELATORIO_LOTE_NUMERODOLOTE.pdf`
