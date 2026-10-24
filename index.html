@@ -508,7 +508,7 @@ function corMaturacao(x){
 function botaoArea(x){const b=corMaturacao(x);return '<button class="'+(x===ar?'on ':'')+(b?b.classe:'')+'" '+(b?'title="'+esc(b.cor+' · '+b.valor.toLocaleString("pt-BR")+' °Brix · mínimo '+b.minimo)+'" ':'')+'onclick="pa(\''+x+'\')">'+x+'</button>'}
 
 const areaSelections={};
-function areaSelection(code){if(!areaSelections[code]){const a=A[code]||{};areaSelections[code]={c:Number.isInteger(a.fieldPdfEvaluationIndex)?a.fieldPdfEvaluationIndex:Math.max(0,(a.c||[]).length-1),t:0,r:0}}return areaSelections[code]}
+function areaSelection(code){if(!areaSelections[code]){const a=A[code]||{};areaSelections[code]={c:(a.fieldPdfHistory?.[Math.max(0,(a.c||[]).length-1)]?Math.max(0,(a.c||[]).length-1):(Number.isInteger(a.fieldPdfEvaluationIndex)?a.fieldPdfEvaluationIndex:Math.max(0,(a.c||[]).length-1))),t:0,r:0}}return areaSelections[code]}
 function areaTab(code,kind,index){areaSelection(code)[kind]=index;render();const el=document.getElementById("area-"+code);if(el)el.scrollIntoView({block:"nearest"})}
 function areaTabs(code,items,kind,selected){if(!items||!items.length)return "";return '<div class="chips area-history-tabs">'+items.map((item,i)=>'<button class="'+(i===selected?'on':'')+'" onclick="areaTab(\''+code+'\',\''+kind+'\','+i+')">'+esc(kind==="t"?dataCompletaChip(item[0]):item[0])+'</button>').join("")+'</div>'}
 function areaStatusLabel(k){return {acomp:"EM ACOMPANHAMENTO",colh:"EM COLHEITA",pausa:"COLHEITA PAUSADA",fim:"FINALIZADA"}[k]||""}
