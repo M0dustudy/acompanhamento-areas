@@ -1,20 +1,27 @@
 # 📷 Fotos / Variedades
 
-**Pasta oficial e única das imagens das variedades de uva do VITRA.**
+Esta é a **pasta oficial e única** de imagens das variedades de uva utilizadas pelo VITRA.
 
-Envie as fotos reais **diretamente nesta pasta** (não crie outra subpasta). Os arquivos SVG abaixo já existem e são imagens genéricas temporárias usadas pelo site.
+## Organização
 
-| Variedade | Nome sugerido para a nova foto |
+- **[`png/`](./png/)** — coloque aqui as fotografias reais em PNG, uma por variedade.
+- **[`svg/`](./svg/)** — ilustrações genéricas de reserva. O VITRA recorre a elas automaticamente quando ainda não existe foto PNG da variedade.
+
+## Nomes padronizados das fotos PNG
+
+| Variedade | Nome do arquivo em `png/` |
 | --- | --- |
-| ARRA 15 | `arra-15.jpg` |
-| Sugar Crisp | `sugar-crisp.jpg` |
-| BRS Vitória | `brs-vitoria.jpg` |
-| Sweet Globe | `sweet-globe.jpg` |
-| Autumn Crisp | `autumn-crisp.jpg` |
-| Itum 9 | `itum-9.jpg` |
-| BRS Ísis | `brs-isis.jpg` |
-| Arra Cherry / Cherry Crush (ARD 36) | `arra-cherry.jpg` |
+| ARRA 15 | `arra-15.png` |
+| Sugar Crisp | `sugar-crisp.png` |
+| BRS Vitória | `brs-vitoria.png` |
+| Sweet Globe | `sweet-globe.png` |
+| Autumn Crisp | `autumn-crisp.png` |
+| Itum 9 | `itum-9.png` |
+| BRS Ísis | `brs-isis.png` |
+| Arra Cherry / Cherry Crush / ARD 36 | `arra-cherry.png` |
 
-Para incluir uma variedade nova, envie uma imagem nomeada com a variedade e informe sua identificação. Fotos devem mostrar o cacho de forma fiel, preferencialmente na vertical, com boa nitidez. É possível usar JPG, PNG ou WebP; informe a extensão real.
+**Como usar:** clique em `png/` e envie as fotos seguindo estes nomes exatos. Prefira fotos verticais, sem legendas sobre a imagem, com o cacho inteiro e coloração fiel.
 
-**Importante:** os cartões do VITRA ainda usam os arquivos `.svg`. A vinculação das fotos reais será feita e validada depois do envio, preservando o histórico, a navegação e as imagens anteriores até a troca funcionar.
+O VITRA prioriza `png/nome-da-variedade.png` e, se não encontrar, usa `svg/nome-da-variedade.svg`. Assim, as imagens antigas continuam como reserva sem misturar PNGs e SVGs.
+
+Não coloque PDFs ou documentos de avaliação nas pastas de imagem. Preserve os arquivos históricos.
