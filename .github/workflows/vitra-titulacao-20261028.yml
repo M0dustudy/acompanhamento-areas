@@ -1,0 +1,133 @@
+name: VITRA - aplicar titulacoes 28-10-2026
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  preparar-alteracao:
+    if: ${{ !contains(github.event.head_commit.message, 'VITRA TITULACAO 28-10-2026') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do estado atual
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Criar branch a partir do commit anterior
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c chore/vitra-titulacao-20261028 ${{ github.event.before }}
+
+      - name: Inserir as 3 titulacoes sem alterar historico
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+
+          start_token = 'const titulacaoRuas='
+          end_token = '};\n/* Apresentação dos registros por rua'
+          start = text.index(start_token) + len(start_token)
+          end = text.index(end_token, start)
+          obj_text = text[start:end]
+
+          registros = {
+              '302B|28/10': {
+                  'poda': '13/07/2026',
+                  'idade': 107,
+                  'observacao': 'A área apresenta predominância de cachos com desuniformidade de coloração.',
+                  'rows': [
+                      ['1 a 8', 'Vermelha', '17,2', '0,80', '22'],
+                      ['9 a 16', 'Vermelha', '17,8', '0,86', '21'],
+                      ['17 a 24', 'Vermelha', '17,8', '0,92', '19'],
+                      ['25 a 32', 'Vermelha', '16,2', '0,90', '18'],
+                      ['33 a 40', 'Vermelha', '16', '0,92', '17'],
+                      ['1 a 8', 'Rosado', '11', '1,04', '11'],
+                      ['9 a 16', 'Rosado', '12,2', '0,98', '13'],
+                      ['17 a 24', 'Rosado', '12,8', '1,22', '11'],
+                      ['25 a 32', 'Rosado', '12,2', '1,02', '12'],
+                      ['33 a 40', 'Rosado', '11,8', '1,13', '10']
+                  ]
+              },
+              '106A|28/10': {
+                  'poda': '20/07/2026',
+                  'idade': 100,
+                  'observacao': 'A área apresenta predominância de cachos verdes.',
+                  'rows': [
+                      ['1 a 8', 'Madura', '16,2', '1,02', '16'],
+                      ['9 a 16', 'Madura', '15,8', '1,08', '15'],
+                      ['17 a 24', 'Madura', '14,6', '1,13', '13'],
+                      ['25 a 32', 'Madura', '15,4', '1,13', '14'],
+                      ['33 a 40', 'Madura', '14,8', '1,14', '13'],
+                      ['1 a 8', 'Verde', '15,2', '1,10', '14'],
+                      ['9 a 16', 'Verde', '14,8', '1,20', '12'],
+                      ['17 a 24', 'Verde', '13,4', '1,20', '11'],
+                      ['25 a 32', 'Verde', '14,4', '1,19', '12'],
+                      ['33 a 40', 'Verde', '13,8', '1,20', '12']
+                  ]
+              },
+              '101A|27/10': {
+                  'poda': '13/07/2026',
+                  'idade': 106,
+                  'observacao': 'A área apresenta predominância de cachos verdes.',
+                  'rows': [
+                      ['1 a 8', 'Madura', '16', '1,08', '15'],
+                      ['9 a 16', 'Madura', '15,4', '0,95', '16'],
+                      ['17 a 24', 'Madura', '16,4', '0,96', '17'],
+                      ['25 a 32', 'Madura', '17,4', '0,87', '20'],
+                      ['33 a 40', 'Madura', '17', '0,95', '18'],
+                      ['1 a 8', 'Verde', '14,8', '1,11', '13'],
+                      ['9 a 16', 'Verde', '14,6', '1,05', '14'],
+                      ['17 a 24', 'Verde', '15', '1,07', '14'],
+                      ['25 a 32', 'Verde', '15,2', '1,02', '15'],
+                      ['33 a 40', 'Verde', '15,2', '1,08', '14']
+                  ]
+              }
+          }
+
+          # O objeto existente é JSON válido; isso impede uma gravação estruturalmente corrompida.
+          current = json.loads(obj_text)
+          for key, value in registros.items():
+              if key in current:
+                  raise SystemExit(f'REGISTRO_JA_EXISTE:{key}')
+
+          additions = []
+          for key, value in registros.items():
+              additions.append(json.dumps({key: value}, ensure_ascii=False, separators=(',', ':'))[1:-1])
+
+          new_obj_text = obj_text.rstrip()
+          if not new_obj_text.endswith('}'):
+              raise SystemExit('ERRO: objeto titulacaoRuas nao termina com }')
+          new_obj_text = new_obj_text[:-1] + ',' + ','.join(additions) + '}'
+
+          # Valida novamente antes de escrever.
+          json.loads(new_obj_text)
+          new_text = text[:start] + new_obj_text + text[end:]
+          path.write_text(new_text, encoding='utf-8')
+
+          # Confere as tres chaves no arquivo final.
+          final = path.read_text(encoding='utf-8')
+          for key in registros:
+              if f'"{key}":' not in final:
+                  raise SystemExit(f'ERRO: chave nao encontrada apos gravacao: {key}')
+          print('OK: 3 registros inseridos e validados.')
+
+      - name: Validar diff
+        run: |
+          git diff --check
+          git diff --stat
+          git diff -- index.html | grep -E '302B|106A|101A|17,2|16,2|14,8|15,4' | head -80
+
+      - name: Commitar e publicar branch de revisao
+        run: |
+          git add index.html
+          git commit -m "VITRA TITULACAO 28-10-2026"
+          git push origin chore/vitra-titulacao-20261028
