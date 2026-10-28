@@ -39,9 +39,6 @@ jobs:
                   raw = resp.read()
                   return json.loads(raw.decode('utf-8')) if raw else {}
 
-          # A execucao atual foi criada pelo commit do workflow. O pai dele e o
-          # estado imediatamente anterior; o pai desse commit e o estado limpo
-          # antes dos dois workflows temporarios.
           current = request('GET', f'{api}/commits/{current_sha}')
           first_parent = current['parents'][0]['sha']
           previous = request('GET', f'{api}/commits/{first_parent}')
@@ -57,44 +54,13 @@ jobs:
           obj_text = original[start:end]
 
           registros = {
-              '302B|28/10': {
-                  'poda':'13/07/2026','idade':107,
-                  'observacao':'A área apresenta predominância de cachos com desuniformidade de coloração.',
-                  'rows':[
-                      ['1 a 8','Vermelha','17,2','0,80','22'],['9 a 16','Vermelha','17,8','0,86','21'],
-                      ['17 a 24','Vermelha','17,8','0,92','19'],['25 a 32','Vermelha','16,2','0,90','18'],
-                      ['33 a 40','Vermelha','16','0,92','17'],['1 a 8','Rosado','11','1,04','11'],
-                      ['9 a 16','Rosado','12,2','0,98','13'],['17 a 24','Rosado','12,8','1,22','11'],
-                      ['25 a 32','Rosado','12,2','1,02','12'],['33 a 40','Rosado','11,8','1,13','10']
-                  ]
-              },
-              '106A|28/10': {
-                  'poda':'20/07/2026','idade':100,
-                  'observacao':'A área apresenta predominância de cachos verdes.',
-                  'rows':[
-                      ['1 a 8','Madura','16,2','1,02','16'],['9 a 16','Madura','15,8','1,08','15'],
-                      ['17 a 24','Madura','14,6','1,13','13'],['25 a 32','Madura','15,4','1,13','14'],
-                      ['33 a 40','Madura','14,8','1,14','13'],['1 a 8','Verde','15,2','1,10','14'],
-                      ['9 a 16','Verde','14,8','1,20','12'],['17 a 24','Verde','13,4','1,20','11'],
-                      ['25 a 32','Verde','14,4','1,19','12'],['33 a 40','Verde','13,8','1,20','12']
-                  ]
-              },
-              '101A|27/10': {
-                  'poda':'13/07/2026','idade':106,
-                  'observacao':'A área apresenta predominância de cachos verdes.',
-                  'rows':[
-                      ['1 a 8','Madura','16','1,08','15'],['9 a 16','Madura','15,4','0,95','16'],
-                      ['17 a 24','Madura','16,4','0,96','17'],['25 a 32','Madura','17,4','0,87','20'],
-                      ['33 a 40','Madura','17','0,95','18'],['1 a 8','Verde','14,8','1,11','13'],
-                      ['9 a 16','Verde','14,6','1,05','14'],['17 a 24','Verde','15','1,07','14'],
-                      ['25 a 32','Verde','15,2','1,02','15'],['33 a 40','Verde','15,2','1,08','14']
-                  ]
-              }
+              '302B|28/10': {'poda':'13/07/2026','idade':107,'observacao':'A área apresenta predominância de cachos com desuniformidade de coloração.','rows':[['1 a 8','Vermelha','17,2','0,80','22'],['9 a 16','Vermelha','17,8','0,86','21'],['17 a 24','Vermelha','17,8','0,92','19'],['25 a 32','Vermelha','16,2','0,90','18'],['33 a 40','Vermelha','16','0,92','17'],['1 a 8','Rosado','11','1,04','11'],['9 a 16','Rosado','12,2','0,98','13'],['17 a 24','Rosado','12,8','1,22','11'],['25 a 32','Rosado','12,2','1,02','12'],['33 a 40','Rosado','11,8','1,13','10']]},
+              '106A|28/10': {'poda':'20/07/2026','idade':100,'observacao':'A área apresenta predominância de cachos verdes.','rows':[['1 a 8','Madura','16,2','1,02','16'],['9 a 16','Madura','15,8','1,08','15'],['17 a 24','Madura','14,6','1,13','13'],['25 a 32','Madura','15,4','1,13','14'],['33 a 40','Madura','14,8','1,14','13'],['1 a 8','Verde','15,2','1,10','14'],['9 a 16','Verde','14,8','1,20','12'],['17 a 24','Verde','13,4','1,20','11'],['25 a 32','Verde','14,4','1,19','12'],['33 a 40','Verde','13,8','1,20','12']]},
+              '101A|27/10': {'poda':'13/07/2026','idade':106,'observacao':'A área apresenta predominância de cachos verdes.','rows':[['1 a 8','Madura','16','1,08','15'],['9 a 16','Madura','15,4','0,95','16'],['17 a 24','Madura','16,4','0,96','17'],['25 a 32','Madura','17,4','0,87','20'],['33 a 40','Madura','17','0,95','18'],['1 a 8','Verde','14,8','1,11','13'],['9 a 16','Verde','14,6','1,05','14'],['17 a 24','Verde','15','1,07','14'],['25 a 32','Verde','15,2','1,02','15'],['33 a 40','Verde','15,2','1,08','14']]}
           }
 
-          current_obj = json.loads(obj_text)
           for key in registros:
-              if key in current_obj:
+              if f'"{key}":' in obj_text:
                   raise RuntimeError(f'REGISTRO_JA_EXISTE:{key}')
 
           additions = [json.dumps({k:v}, ensure_ascii=False, separators=(',',':'))[1:-1] for k,v in registros.items()]
@@ -102,18 +68,15 @@ jobs:
           if not new_obj.endswith('}'):
               raise RuntimeError('OBJETO_TITULACAO_INVALIDO')
           new_obj = new_obj[:-1] + ',' + ','.join(additions) + '}'
-          json.loads(new_obj)
           updated = original[:start] + new_obj + original[end:]
 
-          # Cria branch diretamente a partir do estado limpo anterior aos workflows.
+          for key in registros:
+              if f'"{key}":' not in updated:
+                  raise RuntimeError(f'CHAVE_NAO_ENCONTRADA_APOS_EDICAO:{key}')
+
           branch = 'chore/vitra-titulacao-20261028-api'
           request('POST', f'{api}/git/refs', {'ref':f'refs/heads/{branch}','sha':base_sha})
 
-          payload = {
-              'message':'VITRA TITULACAO 28-10-2026',
-              'content':base64.b64encode(updated.encode('utf-8')).decode('ascii'),
-              'branch':branch,
-              'sha':content['sha']
-          }
+          payload = {'message':'VITRA TITULACAO 28-10-2026','content':base64.b64encode(updated.encode('utf-8')).decode('ascii'),'branch':branch,'sha':content['sha']}
           result = request('PUT', f'{api}/contents/index.html', payload)
           print('OK:', result.get('commit',{}).get('sha'))
