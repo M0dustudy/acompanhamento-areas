@@ -16,22 +16,8 @@ jobs:
           sparse-checkout-cone-mode: false
       - name: Diagnosticar bloco 109A
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          s=Path('index.html').read_text(encoding='utf-8')
-          m=re.search(r'("109A":\{.*?)(\},"110A":\{)',s,re.S)
-          out=[]
-          out.append('SIZE='+str(len(s)))
-          out.append('HAS_109A='+str(s.count('"109A":{')))
-          out.append('HAS_110A='+str(s.count('"110A":{')))
-          out.append('REGEX_MATCH='+str(bool(m)))
-          if m:
-            out.append('BLOCK_SIZE='+str(len(m.group(1))))
-            out.append('HAS_R='+str('"r":[' in m.group(1)))
-            out.append('HAS_DATE='+str('3ª viagem · 29/10/2026' in m.group(1)))
-          Path('/tmp/vitra-diag.txt').write_text('\n'.join(out)+'\n',encoding='utf-8')
-          PY
+          set -x
+          { echo "PWD=$(pwd)"; echo "FILES:"; ls -la; echo "INDEX_EXISTS=$(test -f index.html && echo yes || echo no)"; echo "INDEX_SIZE=$(wc -c < index.html 2>/dev/null || echo 0)"; echo "COUNT_109A=$(grep -o '\"109A\":{' index.html 2>/dev/null | wc -l || echo 0)"; echo "COUNT_110A=$(grep -o '\"110A\":{' index.html 2>/dev/null | wc -l || echo 0)"; echo "HAS_R=$(grep -o '\"r\":\[' index.html 2>/dev/null | wc -l || echo 0)"; } > /tmp/vitra-diag.txt
           git config user.name "VITRA Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp /tmp/vitra-diag.txt .github/vitra-recepcao-109a-diag.txt
