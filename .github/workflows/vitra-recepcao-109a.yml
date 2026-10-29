@@ -1,8 +1,5 @@
 name: VITRA recepcao 109A
-on:
-  push:
-    branches: [main]
-    paths: [".github/vitra-recepcao-109a.trigger"]
+on: push
 permissions:
   contents: write
 jobs:
