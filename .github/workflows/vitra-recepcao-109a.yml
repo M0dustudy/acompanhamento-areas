@@ -1,4 +1,4 @@
-name: VITRA diagnostico 109A
+name: VITRA recepcao 109A
 on:
   push:
     branches: [main]
@@ -6,21 +6,38 @@ on:
 permissions:
   contents: write
 jobs:
-  diagnose:
+  update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          sparse-checkout: index.html
-          sparse-checkout-cone-mode: false
-      - name: Diagnosticar bloco 109A
+      - name: Atualizar index.html via API
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set -x
-          { echo "PWD=$(pwd)"; echo "FILES:"; ls -la; echo "INDEX_EXISTS=$(test -f index.html && echo yes || echo no)"; echo "INDEX_SIZE=$(wc -c < index.html 2>/dev/null || echo 0)"; echo "COUNT_109A=$(grep -o '\"109A\":{' index.html 2>/dev/null | wc -l || echo 0)"; echo "COUNT_110A=$(grep -o '\"110A\":{' index.html 2>/dev/null | wc -l || echo 0)"; echo "HAS_R=$(grep -o '\"r\":\[' index.html 2>/dev/null | wc -l || echo 0)"; } > /tmp/vitra-diag.txt
-          git config user.name "VITRA Bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          cp /tmp/vitra-diag.txt .github/vitra-recepcao-109a-diag.txt
-          git add .github/vitra-recepcao-109a-diag.txt
-          git commit -m "chore: diagnosticar bloco 109A"
-          git push
+          python3 - <<'PY'
+          import base64, json, os, re, urllib.request
+          repo='M0dustudy/acompanhamento-areas'
+          branch='main'
+          api=f'https://api.github.com/repos/{repo}/contents/index.html?ref={branch}'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}
+          req=urllib.request.Request(api,headers=headers)
+          data=json.load(urllib.request.urlopen(req))
+          html=base64.b64decode(data['content']).decode('utf-8')
+          if '3ª viagem · 29/10/2026' in html:
+              raise SystemExit('A avaliação 109A de 29/10/2026 já está cadastrada')
+          entry='[\"3ª viagem · 29/10/2026\",\"Extra A 40,0% · Extra 60,0%\",\"Verde: Brix médio 13,6|Âmbar: Brix médio 15,4|Predominância: cachos verdes.\",\"A fruta apresenta quantidade elevada de cachos translúcidos, quantidade moderada de cicatrizes e bagas rachadas! Além disso, cachos com queima do sol, bagas podres, manchas foliares, bagas com desuniformidade, danos de cigarrinha e bagas com danos mecânicos.\"]'
+          pattern=r'("109A":\{.*?)(\},"110A":\{)'
+          m=re.search(pattern,html,re.S)
+          if not m:
+              raise SystemExit('Bloco 109A não localizado')
+          block=m.group(1)
+          if '"r":[' in block:
+              newblock=block[:-1]+',"r":['+entry+']}'
+          else:
+              newblock=block[:-1]+',"r":['+entry+']}'
+          updated=html[:m.start(1)]+newblock+html[m.end(1):]
+          payload=json.dumps({'message':'VITRA: registrar recepção 109A em 29/10/2026','content':base64.b64encode(updated.encode('utf-8')).decode('ascii'),'sha':data['sha'],'branch':branch},ensure_ascii=False).encode('utf-8')
+          put=urllib.request.Request(f'https://api.github.com/repos/{repo}/contents/index.html',data=payload,headers={**headers,'Content-Type':'application/json'},method='PUT')
+          result=json.load(urllib.request.urlopen(put))
+          print('COMMIT='+result['commit']['sha'])
+          print('BLOCO_109A_ATUALIZADO=SIM')
+          PY
