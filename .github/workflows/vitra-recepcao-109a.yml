@@ -1,4 +1,4 @@
-name: VITRA recepcao 109A
+name: VITRA diagnostico git 109A
 on:
   push:
     branches: [main]
@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 jobs:
-  update:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,27 +14,20 @@ jobs:
           fetch-depth: 1
           sparse-checkout: index.html
           sparse-checkout-cone-mode: false
-      - name: Aplicar recepção 109A
+      - name: Diagnóstico git
         run: |
-          git show HEAD:index.html > /tmp/index.html
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p=Path('/tmp/index.html')
-          s=p.read_text(encoding='utf-8')
-          if '3ª viagem · 29/10/2026' in s:
-              raise SystemExit('A avaliação 109A de 29/10/2026 já está cadastrada')
-          entry='[\"3ª viagem · 29/10/2026\",\"Extra A 40,0% · Extra 60,0%\",\"Verde: Brix médio 13,6|Âmbar: Brix médio 15,4|Predominância: cachos verdes.\",\"A fruta apresenta quantidade elevada de cachos translúcidos, quantidade moderada de cicatrizes e bagas rachadas! Além disso, cachos com queima do sol, bagas podres, manchas foliares, bagas com desuniformidade, danos de cigarrinha e bagas com danos mecânicos.\"]'
-          m=re.search(r'("109A":\{.*?)(\},"110A":\{)',s,re.S)
-          if not m: raise SystemExit('Bloco 109A não localizado')
-          block=m.group(1)
-          if '"r":[' in block: raise SystemExit('109A já possui histórico de recepção; atualização interrompida')
-          newblock=block[:-1]+',"r":['+entry+']}'
-          p.write_text(s[:m.start(1)]+newblock+s[m.end(1):],encoding='utf-8')
-          PY
-          cp /tmp/index.html index.html
+          set +e
+          echo "PWD=$(pwd)" > .github/vitra-git-diag.txt
+          echo "LS=" >> .github/vitra-git-diag.txt
+          ls -la >> .github/vitra-git-diag.txt 2>&1
+          echo "GIT_SHOW_EXIT:" >> .github/vitra-git-diag.txt
+          git show HEAD:index.html > /tmp/index.html 2>>.github/vitra-git-diag.txt
+          echo $? >> .github/vitra-git-diag.txt
+          echo "TMP_SIZE=$(wc -c < /tmp/index.html 2>/dev/null)" >> .github/vitra-git-diag.txt
+          echo "GIT_FILES:" >> .github/vitra-git-diag.txt
+          git ls-tree --name-only HEAD >> .github/vitra-git-diag.txt 2>&1
           git config user.name "VITRA Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git commit -m "VITRA: registrar recepção 109A em 29/10/2026"
+          git add .github/vitra-git-diag.txt
+          git commit -m "chore: diagnóstico git da recepção 109A"
           git push
