@@ -1,0 +1,39 @@
+name: VITRA recepcao 109A
+on: push
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Atualizar via Contents API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          curl -sS --fail -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/M0dustudy/acompanhamento-areas/contents/index.html?ref=main" -o /tmp/meta.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, json, re
+          meta=json.loads(Path('/tmp/meta.json').read_text())
+          html=base64.b64decode(meta['content']).decode('utf-8')
+          m=re.search(r'("109A":\{.*?)(\},"110A":\{)',html,re.S)
+          if not m: raise SystemExit('Bloco 109A não localizado')
+          block=m.group(1)
+          if '3ª viagem · 29/10/2026' in block:
+              print('A avaliação 109A de 29/10/2026 já está cadastrada; nada a fazer.')
+              raise SystemExit(0)
+          if '"r":[' in block: raise SystemExit('109A já possui histórico de recepção; atualização interrompida para evitar duplicidade estrutural')
+          entry='[\"3ª viagem · 29/10/2026\",\"Extra A 40,0% · Extra 60,0%\",\"Verde: Brix médio 13,6|Âmbar: Brix médio 15,4|Predominância: cachos verdes.\",\"A fruta apresenta quantidade elevada de cachos translúcidos, quantidade moderada de cicatrizes e bagas rachadas! Além disso, cachos com queima do sol, bagas podres, manchas foliares, bagas com desuniformidade, danos de cigarrinha e bagas com danos mecânicos.\"]'
+          newblock=block[:-1]+',"r":['+entry+']}'
+          updated=html[:m.start(1)]+newblock+html[m.end(1):]
+          Path('/tmp/updated.b64').write_text(base64.b64encode(updated.encode('utf-8')).decode('ascii'))
+          Path('/tmp/sha').write_text(meta['sha'])
+          PY
+          python3 - <<'PY'
+          import json,os,urllib.request
+          from pathlib import Path
+          payload={'message':'VITRA: registrar recepção 109A em 29/10/2026','content':Path('/tmp/updated.b64').read_text(),'sha':Path('/tmp/sha').read_text().strip(),'branch':'main'}
+          req=urllib.request.Request('https://api.github.com/repos/M0dustudy/acompanhamento-areas/contents/index.html',data=json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'},method='PUT')
+          result=json.load(urllib.request.urlopen(req)); print('COMMIT='+result['commit']['sha'])
+          PY
