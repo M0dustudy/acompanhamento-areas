@@ -6,9 +6,6 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
       - name: Atualizar via Contents API
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,9 +31,9 @@ jobs:
           Path('/tmp/sha').write_text(meta['sha'])
           PY
           python3 - <<'PY'
-          import base64,json,os,urllib.request
+          import json,os,urllib.request
           from pathlib import Path
           payload={'message':'VITRA: registrar recepção 109A em 29/10/2026','content':Path('/tmp/updated.b64').read_text(),'sha':Path('/tmp/sha').read_text().strip(),'branch':'main'}
           req=urllib.request.Request('https://api.github.com/repos/M0dustudy/acompanhamento-areas/contents/index.html',data=json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'},method='PUT')
-          r=urllib.request.urlopen(req); result=json.load(r); print('COMMIT='+result['commit']['sha'])
+          result=json.load(urllib.request.urlopen(req)); print('COMMIT='+result['commit']['sha'])
           PY
