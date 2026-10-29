@@ -1,9 +1,12 @@
-name: VITRA recepcao 109A
-on: push
+name: VITRA diagnostico 109A
+on:
+  push:
+    branches: [main]
+    paths: [".github/vitra-recepcao-109a.trigger"]
 permissions:
   contents: write
 jobs:
-  update:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,30 +14,27 @@ jobs:
           fetch-depth: 1
           sparse-checkout: index.html
           sparse-checkout-cone-mode: false
-      - name: Atualizar registro
+      - name: Diagnosticar bloco 109A
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          p=Path('index.html')
-          s=p.read_text(encoding='utf-8')
-          entry='[\"3ª viagem · 29/10/2026\",\"Extra A 40,0% · Extra 60,0%\",\"Verde: Brix médio 13,6|Âmbar: Brix médio 15,4|Predominância: cachos verdes.\",\"A fruta apresenta quantidade elevada de cachos translúcidos, quantidade moderada de cicatrizes e bagas rachadas! Além disso, cachos com queima do sol, bagas podres, manchas foliares, bagas com desuniformidade, danos de cigarrinha e bagas com danos mecânicos.\"]'
-          pattern=r'("109A":\{.*?)(\},"110A":\{)'
-          m=re.search(pattern,s,re.S)
-          if not m:
-              raise SystemExit('Bloco 109A não localizado')
-          block=m.group(1)
-          if '"3ª viagem · 29/10/2026"' in block:
-              raise SystemExit('A avaliação 109A de 29/10/2026 já está cadastrada')
-          if '"r":[' in block:
-              newblock=block[:-1]+',"r":['+entry+']}'
-          else:
-              newblock=block[:-1]+',"r":['+entry+']}'
-          s=s[:m.start(1)]+newblock+s[m.end(1):]
-          p.write_text(s,encoding='utf-8')
+          s=Path('index.html').read_text(encoding='utf-8')
+          m=re.search(r'("109A":\{.*?)(\},"110A":\{)',s,re.S)
+          out=[]
+          out.append('SIZE='+str(len(s)))
+          out.append('HAS_109A='+str(s.count('"109A":{')))
+          out.append('HAS_110A='+str(s.count('"110A":{')))
+          out.append('REGEX_MATCH='+str(bool(m)))
+          if m:
+            out.append('BLOCK_SIZE='+str(len(m.group(1))))
+            out.append('HAS_R='+str('"r":[' in m.group(1)))
+            out.append('HAS_DATE='+str('3ª viagem · 29/10/2026' in m.group(1)))
+          Path('/tmp/vitra-diag.txt').write_text('\n'.join(out)+'\n',encoding='utf-8')
           PY
           git config user.name "VITRA Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git commit -m "VITRA: registrar recepção 109A em 29/10/2026"
+          cp /tmp/vitra-diag.txt .github/vitra-recepcao-109a-diag.txt
+          git add .github/vitra-recepcao-109a-diag.txt
+          git commit -m "chore: diagnosticar bloco 109A"
           git push
