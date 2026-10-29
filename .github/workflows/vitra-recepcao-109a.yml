@@ -15,13 +15,23 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          old='\"109A\":{\"fieldPdfSource\":\"ACOMPANHAMENTO_DE_AREA_PRE_-_COLHEITA-1791634907441-pt_BR.pdf\",\"fieldPdfEvaluationIndex\":0,\"fieldPdf\":\"ACOMPANHAMENTO_DE_AREA_PRE_-_COLHEITA-1791634907441-pt_BR.pdf\",\"fieldReportId\":\"92538993\",\"fieldReportDate\":\"05/10/2026\",\"v\":\"Sugar Crisp\",\"f\":\"12/10\",\"c\":[[\"14 dias\",\"Campesita 20% · Extra A 50% · Extra 30% · 🎯 Potencial Geral de Exportação 60% (20% Campesita + 40% Extra A)\",\"Bagas miúdas, bagas mocadas, manchas da folha e bagas rachadas em grande quantidade; resíduos de pulverização e bagas podres em menor quantidade.\"],[\"07 dias\",\"Campesita 20% · Extra A 45% · Extra 35% · 🎯 Potencial Geral de Exportação 55% (20% Campesita + 35% Extra A)\",\"Bagas rachadas, manchas da folha e desuniformidade de bagas em grande quantidade.\"]],\"t\":[[\"26/10\",\"Madura: Brix 15,32 · Acidez 0,246 · Ratio 63,2|Verde: Brix 13,88 · Acidez 0,270 · Ratio 52,2|Predominância: cachos verdes.\"],[\"19/10\",\"Madura: Brix 14,20 · Acidez 0,278 · Ratio 51,6|Verde: Brix 13,28 · Acidez 0,312 · Ratio 43,0|Predominância: cachos verdes.\"],[\"15/10\",\"Madura: Brix 14,00 · Acidez 0,348 · Ratio 40,8|Verde: Brix 13,08 · Acidez 0,388 · Ratio 34,4|Predominância: cachos verdes.\"],[\"13/10\",\"Madura: Brix 13,68 · Acidez 0,358 · Ratio 39|Verde: Brix 12,68 · Acidez 0,41 · Ratio 31,4|Predominância: cachos verdes.\"],[\"09/10\",\"Madura: Brix 13,12 · Acidez 0,398 · Ratio 33|Verde: Brix 12,36 · Acidez 0,454 · Ratio 27,6|Predominância: cachos verdes.\"],[\"06/10\",\"Madura: Brix 12,92 · Acidez 0,442 · Ratio 29,6|Verde: Brix 11,88 · Acidez 0,492 · Ratio 24,4|Predominância: cachos verdes.\"]]}'
-          new=old[:-1]+',\"r\":[[\"3ª viagem · 29/10/2026\",\"Extra A 40,0% · Extra 60,0%\",\"Verde: Brix médio 13,6|Âmbar: Brix médio 15,4|Predominância: cachos verdes.\",\"A fruta apresenta quantidade elevada de cachos translúcidos, quantidade moderada de cicatrizes e bagas rachadas! Além disso, cachos com queima do sol, bagas podres, manchas foliares, bagas com desuniformidade, danos de cigarrinha e bagas com danos mecânicos.\"]]}'
-          if s.count(old)!=1:
-              raise SystemExit(f'Bloco 109A esperado 1 vez, encontrado {s.count(old)}')
-          p.write_text(s.replace(old,new),encoding='utf-8')
+          entry='[\"3ª viagem · 29/10/2026\",\"Extra A 40,0% · Extra 60,0%\",\"Verde: Brix médio 13,6|Âmbar: Brix médio 15,4|Predominância: cachos verdes.\",\"A fruta apresenta quantidade elevada de cachos translúcidos, quantidade moderada de cicatrizes e bagas rachadas! Além disso, cachos com queima do sol, bagas podres, manchas foliares, bagas com desuniformidade, danos de cigarrinha e bagas com danos mecânicos.\"]'
+          pattern=r'("109A":\{.*?)(\},"110A":\{)'
+          m=re.search(pattern,s,re.S)
+          if not m:
+              raise SystemExit('Bloco 109A não localizado')
+          block=m.group(1)
+          if '"3ª viagem · 29/10/2026"' in block:
+              raise SystemExit('A avaliação 109A de 29/10/2026 já está cadastrada')
+          if '"r":[' in block:
+              newblock=block[:-1]+',"r":['+entry+']}'
+          else:
+              newblock=block[:-1]+',"r":['+entry+']}'
+          s=s[:m.start(1)]+newblock+s[m.end(1):]
+          p.write_text(s,encoding='utf-8')
           PY
           git config user.name "VITRA Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
