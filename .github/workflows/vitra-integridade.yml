@@ -1,0 +1,24 @@
+name: VITRA - verificacao de integridade
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar:
+    name: Conferir avaliações e documentos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            index.html
+            scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar integridade sem alterar registros
+        run: node scripts/validar-vitra.mjs
