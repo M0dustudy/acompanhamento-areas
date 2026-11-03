@@ -594,7 +594,7 @@ function renderRecepcaoClassificacao(cl,details){
   notes.map(x=>'<div class="recep-detail-note">'+esc(x)+'</div>').join("")+
   (!stats&&!brix.length&&!notes.length&&!predominance?'<div class="muted">Dados não informados.</div>':'')
 }
-function formatQualityNumber(v,kind){const raw=String(v??"").trim();if(!/^[-+]?\d+(?:[,.]\d+)?$/.test(raw))return raw;const n=Number(raw.replace(",","."));if(!Number.isFinite(n))return raw;return n.toLocaleString("pt-BR",kind==="ratio"?{minimumFractionDigits:2,maximumFractionDigits:2}:{minimumFractionDigits:0,maximumFractionDigits:kind==="acidez"?3:2})}
+function formatQualityNumber(v,kind){const raw=String(v??"").trim();if(!/^[-+]?\d+(?:[,.]\d+)?$/.test(raw))return raw;const n=Number(raw.replace(",","."));if(!Number.isFinite(n))return raw;if(kind==="ratio")return Math.trunc(n).toLocaleString("pt-BR");if(kind==="acidez"){const parts=raw.replace(",",".").split(".");const truncated=parts[0]+(parts[1]?"."+parts[1].slice(0,2):"");return Number(truncated).toLocaleString("pt-BR",{maximumFractionDigits:2})}return n.toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:2})}
 function formatBrixDisplay(v){return formatQualityNumber(v,"brix")}
 function formatAcidezDisplay(v){return formatQualityNumber(v,"acidez")}
 function formatRatioDisplay(v){return formatQualityNumber(v,"ratio")}
