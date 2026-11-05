@@ -566,6 +566,14 @@ const semInfo={
 };
 Object.entries(semInfo).forEach(([x,z])=>A[x]={v:"Arra 15",f:z[0],c:[[z[1],"Sem classificação — avaliação realizada sem cachos.","Sem cachos nesta avaliação. Situação temporária associada ao calendário de poda/evaliação."]],note:"Status temporário neste ciclo devido ao calendário de poda/evaliação ter ocorrido cedo. A área permanece prevista para nova avaliação quando houver cachos."});
 A["301B"]={v:"Arra 15",f:"19/10",c:[["21 dias","Sem classificação — área sob formação de poda.","A área não apresenta cachos."]],note:"Área sob formação de poda."};
+// Regra de integridade: recepção cadastrada retira a área do acompanhamento.
+for(const area of [...groups.acomp]){
+ if(A[area]?.r?.length){
+  groups.acomp.splice(groups.acomp.indexOf(area),1);
+  if(!["colh","pausa","fim"].some(status=>groups[status].includes(area)))groups.colh.push(area);
+ }
+}
+groups.colh.sort(compararAreas);
 let st=null,ar=null,ci=0,ti=0,ri=0;
 function formatClassPercent(value){return String(value??"").replace(/\b(\d+)(?:[,.](\d+))?%/g,(_,whole,decimals)=>{const remaining=(decimals||"").replace(/0+$/ ,"");return whole+(remaining?","+remaining:"")+"%";})}
 function renderRecepcaoClassificacao(cl,details){
