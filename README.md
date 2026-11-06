@@ -11,6 +11,17 @@ Dashboard de acompanhamento das áreas de uva e controle de qualidade.
 - **Preservar sempre os dados**: nenhuma correção de previsão ou interface pode alterar medições, percentuais, datas originais dos relatórios, PDFs, recepções, históricos ou estados de colheita. Informar nome exato e número do documento quando encontrar inconsistências.
 - **Revisar antes de publicar**: comparar com o GitHub atual, conferir contagens e duplicidades, testar a lógica de datas e a visualização quando possível; confirmar a publicação somente depois de verificar o commit.
 
+## Regras permanentes — interpretação contextual de relatórios e apresentação
+
+- **Ler todo o documento antes de cadastrar:** comparar respostas de campos, observações livres, pré-limpeza, danos maiores e menores, resultados, tabelas e fotografias quando disponíveis. Um problema pode estar descrito em outro campo do mesmo relatório; consolidar o conteúdo comprovado sem depender exclusivamente da aba em que foi digitado.
+- **Não transformar falhas comuns de preenchimento em alarmes no painel:** não mostrar textos como “inconsistência no PDF”, “formato antigo” ou “confirmar classificação da linha” quando a informação pode ser interpretada com segurança pelo contexto. Exibir diretamente os achados relevantes, com linguagem natural e sem inventar intensidades.
+- **Não corrigir silenciosamente medições nem documentos originais:** manter intactos valores, respostas, datas, classificação comercial, PDFs e histórico. Se houver divergência material que não possa ser resolvida pelo próprio documento (por exemplo, lote, Brix ou resultado final incompatíveis), fazer conferência técnica antes de registrar qualquer interpretação e preservar a informação da fonte.
+- **Conferir a estrutura das tabelas:** uma categoria de fruta não pode ser preenchida com valor numérico de Brix. Revisar colunas, sequência dos grupos, médias, tipo de fruta e fotografias; normalizar o rótulo apenas quando o conjunto de dados sustentar a interpretação, sem alterar as medições originais.
+- **Reconhecer nomes equivalentes:** ARD 36 é a variedade comercialmente conhecida como ARRA Cherry Crush (Arra Cherry). Não criar alerta de divergência quando um relatório usar o código varietal e o cadastro usar o nome comercial. Preservar a nomenclatura original na origem.
+- **Atraso de colheita visível e único:** para área ainda em Acompanhamento e com previsão original vencida, exibir um único aviso de alto contraste no topo do cartão, antes de Campo, Titulação e Recepção. Não repetir a mesma previsão em outro ponto do cartão.
+- **Titulação na mesma estrutura:** manter “Medições individuais por rua” dentro da coluna Titulação, de forma expansível e responsiva. Nunca criar um segundo botão equivalente ou um bloco solto fora da grade.
+- **Verificação da publicação:** checar integridade dos registros, ausência de duplicações, sintaxe do JavaScript e visualização em desktop/celular quando possível. Um commit confirmado não comprova, sozinho, a atualização imediata do GitHub Pages.
+
 ## Padrões de reavaliação pré-colheita e apresentação do estoque
 
 - Após as avaliações oficiais de 21, 14 e 07 dias, registrar novas visitas como **Reavaliação pré-colheita · DD/MM/AAAA**, preservando todas as avaliações anteriores e diferenciando visitas da mesma data pelo número do relatório.
