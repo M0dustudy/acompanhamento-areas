@@ -2,6 +2,15 @@
 
 Dashboard de acompanhamento das áreas de uva e controle de qualidade.
 
+## Regras permanentes — atraso da colheita e interface limpa
+
+- **A data original de colheita é imutável**: identificar a previsão nos relatórios oficiais iniciais da área (avaliações de 21, 14 e 07 dias) e registrar sua origem. Uma avaliação adicional realizada depois da data prevista não pode substituir essa referência, mesmo que o PDF informe uma data nova ou provisória.
+- **Conferir todas as áreas em Acompanhamento a cada atualização**: para cada área, verificar a previsão original, a data atual, o status e a existência de recepção. Quando a previsão original já tiver passado e a área continuar em Acompanhamento, exibir automaticamente o atraso em dias ou semanas. Aplicar a mesma regra às áreas futuras.
+- **Não presumir datas**: se a previsão original não estiver comprovada, deixar a pendência identificada para conferência, sem inventar a data nem marcar um atraso fictício. Registros temporários ou calendários de poda não substituem o relatório oficial da previsão.
+- **O aviso de atraso deve ser discreto**: mostrar a informação em um único local próximo à identificação e à previsão da área, sem multiplicar banners, cards, badges ou mensagens repetidas. Preservar as cores dos indicadores de Brix e manter leitura confortável em celular.
+- **Preservar sempre os dados**: nenhuma correção de previsão ou interface pode alterar medições, percentuais, datas originais dos relatórios, PDFs, recepções, históricos ou estados de colheita. Informar nome exato e número do documento quando encontrar inconsistências.
+- **Revisar antes de publicar**: comparar com o GitHub atual, conferir contagens e duplicidades, testar a lógica de datas e a visualização quando possível; confirmar a publicação somente depois de verificar o commit.
+
 ## Separação obrigatória: nome do arquivo × apresentação no VITRA
 
 O nome padronizado `ESTOQUE_AAAA-MM-DD_DOC_..._LOTE_....pdf` é um **identificador técnico exclusivo para armazenamento no GitHub e para os links do PDF original**. Ele **não é o título, nome ou classificação da avaliação no VITRA**.
