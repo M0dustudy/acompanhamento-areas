@@ -570,119 +570,84 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}body{min-width:0!important
 .premium-area-card>.area-overdue-notice small{
   margin-top:4px!important;font-size:12px!important;font-weight:650!important;color:#6c491f!important;
 }
-/* O detalhamento passa a integrar Titulação; dados expandidos em cartões compactos. */
-.premium-area-card .tit-column .ruasdetail.ruas-wide{
-  grid-column:auto!important;display:block!important;width:100%!important;min-width:0!important;
-  max-width:100%!important;margin:13px 0 0!important;border-radius:12px!important;
-  overflow:hidden!important;box-shadow:none!important;
-}
-.premium-area-card .tit-column .ruas-wide>summary{
-  display:flex!important;flex-wrap:wrap!important;gap:8px!important;min-height:63px!important;
-  padding:11px 10px!important;align-items:center!important;justify-content:flex-start!important;
-}
-.premium-area-card .tit-column .ruas-summary-symbol{
-  flex:0 0 32px!important;width:32px!important;height:32px!important;border-radius:9px!important;font-size:19px!important;
-}
-.premium-area-card .tit-column .ruas-summary-title{flex:1 1 116px!important}
-.premium-area-card .tit-column .ruas-summary-title strong{font-size:12px!important}
-.premium-area-card .tit-column .ruas-summary-title small{font-size:10px!important}
-.premium-area-card .tit-column .ruas-summary-count{font-size:10px!important;padding:5px 7px!important}
-.premium-area-card .tit-column .ruas-detail-content{padding:10px!important}
-.premium-area-card .tit-column .ruas-meta{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;margin-bottom:10px!important}
-.premium-area-card .tit-column .ruas-meta-card{padding:9px!important;gap:3px!important}
-.premium-area-card .tit-column .ruas-meta-card strong{font-size:12px!important}
-.premium-area-card .tit-column .ruas-meta-card small{font-size:9px!important}
-.premium-area-card .tit-column .ruas-groups{grid-template-columns:minmax(0,1fr)!important;gap:9px!important}
-.premium-area-card .tit-column .ruas-group-title{padding:10px!important;gap:7px!important}
-.premium-area-card .tit-column .ruas-group-heading strong{font-size:12px!important}
-.premium-area-card .tit-column .ruas-note{padding:10px!important;margin-bottom:10px!important}
-.premium-area-card .tit-column .ruas-wide .ruastable{display:block!important;width:100%!important;min-width:0!important}
-.premium-area-card .tit-column .ruas-wide .ruastable thead{display:none!important}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody{display:block!important;padding:7px!important}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody tr{
-  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px 5px!important;
-  border:1px solid #e4ede7!important;border-radius:10px!important;margin:0 0 7px!important;padding:10px!important;
-  background:#fff!important;box-shadow:none!important;
-}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody td{
-  display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:3px!important;
-  min-width:0!important;padding:0!important;border:0!important;font-size:12px!important;
-  white-space:normal!important;text-align:left!important;
-}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody td:before{
-  content:attr(data-label);font-size:9px!important;color:#6a8471!important;font-weight:750!important;text-transform:uppercase!important;
-}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody td[data-label="Rua"]{
-  grid-column:1/-1!important;display:block!important;min-width:0!important;
-  padding-bottom:6px!important;border-bottom:1px solid #edf2ee!important;
-}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody td[data-label="Rua"]:before{
-  content:"RUA / PONTO"!important;display:block!important;margin-bottom:4px!important;
-}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody td[data-label="Fruta"]{display:none!important}
-.premium-area-card .tit-column .ruas-wide .ruastable tbody td:nth-child(n+3){text-align:left!important;white-space:normal!important}
-@media(max-width:480px){
-  .premium-area-card>.area-overdue-notice{padding:12px!important;gap:10px!important}
-  .premium-area-card>.area-overdue-notice .area-overdue-symbol{flex-basis:34px!important;width:34px!important;height:34px!important}
-}
 </style>
-<style id="vitra-ruas-duas-coloracoes-20261106">
-/* Nas áreas 110A e 110B, cada coloração fica em uma tabela única,
-   com cinco linhas, sem cartões independentes para cada rua. */
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruas-groups {
-  display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:10px!important;
+
+<style id="vitra-medicoes-unificadas-20261106">
+/* Mesmo padrão de duas tabelas para todas as áreas; o detalhamento
+   pertence à Titulação, mas usa a largura total do cartão. */
+.premium-area-card>.ruasdetail.ruas-wide{
+ grid-column:1/-1!important;width:auto!important;min-width:0!important;
+ display:block!important;max-width:none!important;margin:0 16px 17px!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruas-group-card {
-  overflow:hidden!important;border:1px solid #dfe9e2!important;border-radius:11px!important;
-  box-shadow:none!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruas-groups{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:14px!important;align-items:start!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruasscroll {
-  margin:0!important;padding:0!important;overflow-x:auto!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruas-group-card{
+ min-width:0!important;overflow:hidden!important;border-radius:13px!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable {
-  display:table!important;width:100%!important;min-width:0!important;
-  table-layout:fixed!important;border-collapse:collapse!important;
-  border-spacing:0!important;font-size:11px!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruasscroll{
+ overflow-x:auto!important;max-width:100%!important;margin:0!important;
+ -webkit-overflow-scrolling:touch;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable thead {
-  display:table-header-group!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable{
+ width:100%!important;min-width:360px!important;table-layout:fixed!important;
+ display:table!important;border-collapse:collapse!important;
+ font-size:12px!important;font-variant-numeric:tabular-nums;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody {
-  display:table-row-group!important;padding:0!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable thead{
+ display:table-header-group!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tr,
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody tr {
-  display:table-row!important;box-shadow:none!important;background:transparent!important;
-  margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tbody{
+ display:table-row-group!important;padding:0!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th,
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td,
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody td {
-  display:table-cell!important;min-width:0!important;white-space:nowrap!important;
-  border:0!important;border-bottom:1px solid #e8eee9!important;
-  padding:10px 5px!important;vertical-align:middle!important;
-  text-align:right!important;font-size:11px!important;line-height:1.3!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tr,
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tbody tr{
+ display:table-row!important;border:0!important;border-radius:0!important;
+ margin:0!important;padding:0!important;box-shadow:none!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th {
-  background:#f4f8f5!important;color:#526e5c!important;
-  font-size:9px!important;font-weight:800!important;
-  white-space:normal!important;overflow-wrap:normal!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable th,
+.premium-area-card>.ruasdetail.ruas-wide .ruastable td,
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tbody td{
+ display:table-cell!important;min-width:0!important;
+ padding:11px 5px!important;vertical-align:middle!important;
+ border:0!important;border-bottom:1px solid #e9efea!important;
+ text-align:center!important;white-space:nowrap!important;
+ font-size:11px!important;line-height:1.35!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th:first-child,
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td:first-child {
-  width:28%!important;text-align:left!important;padding-left:10px!important;
-  font-weight:800!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable th{
+ background:#f4f8f5!important;color:#526e5c!important;
+ text-align:center!important;font-weight:850!important;
+ font-size:10px!important;white-space:normal!important;
+ text-transform:uppercase!important;letter-spacing:.01em!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th:nth-child(2),
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td:nth-child(2) {
-  display:none!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable th:first-child,
+.premium-area-card>.ruasdetail.ruas-wide .ruastable td:first-child{
+ width:24%!important;min-width:0!important;padding-left:6px!important;
+ text-align:center!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td:before,
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody td:before {
-  content:none!important;display:none!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable th:nth-child(2){width:22%!important}
+.premium-area-card>.ruasdetail.ruas-wide .ruastable th:nth-child(3),
+.premium-area-card>.ruasdetail.ruas-wide .ruastable th:nth-child(4),
+.premium-area-card>.ruasdetail.ruas-wide .ruastable th:nth-child(5){width:18%!important}
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tbody td:nth-child(n+3){
+ text-align:center!important;white-space:nowrap!important;
 }
-.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody tr:last-child td {
-  border-bottom:0!important;
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tbody td[data-label="Fruta"]{
+ display:table-cell!important;
+}
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tbody td:before{
+ display:none!important;content:none!important;
+}
+.premium-area-card>.ruasdetail.ruas-wide .ruastable tbody tr:last-child td{
+ border-bottom:0!important;
+}
+@media(max-width:850px){
+ .premium-area-card>.ruasdetail.ruas-wide .ruas-groups{
+  grid-template-columns:minmax(0,1fr)!important;gap:12px!important;
+ }
+ .premium-area-card>.ruasdetail.ruas-wide{margin:0 11px 13px!important}
+ .premium-area-card>.ruasdetail.ruas-wide .ruastable{min-width:350px!important}
 }
 </style></head><body><div class="vitra-shell"><aside class="vitra-sidebar"><div class="sidebar-logo" onclick="showHome()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHome()}" aria-label="Voltar à visão geral"><span class="sidebar-monogram" aria-hidden="true">V</span><div><strong>VITRA</strong><small>Inteligência e Rastreabilidade da Uva</small></div></div><div class="sidebar-label">NAVEGAÇÃO</div><nav class="cards" id="cards" aria-label="Módulos do VITRA"></nav></aside><main class="vitra-main"><div class="vitra-hero"><div class="hero-content"><span class="hero-eyebrow">VITRA • INTELIGÊNCIA E RASTREABILIDADE DA UVA</span><h1>Excelência em cada detalhe.</h1></div><div class="hero-seal" aria-hidden="true"><span>V</span><small>VITRA</small></div></div><div class="vitra-kpis" id="vitraKpis"></div><div class="panel" id="panel"><section class="vitra-home" id="vitraHome"><div class="home-welcome"><span class="home-overline">PAINEL DE CONTROLE</span><h2>Seu trabalho, em uma visão clara.</h2><p>Acompanhe avaliações, titulações, recepção e estoque em um só lugar.</p></div></section></div><footer class="vitra-footer">VITRA</footer></main></div>
 <script>
@@ -794,7 +759,7 @@ function detalheRuas(area,data){
  ].filter(x=>x[1]!=null && x[1]!=="").map(x=>'<div class="ruas-meta-card"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>').join("");
  const obs=d.observacao?'<p class="ruas-note"><span class="ruas-note-dot" aria-hidden="true"></span><span><strong>Observação do relatório</strong>'+esc(d.observacao)+'</span></p>':"";
  const aviso=d.alertaCadastro?'<p class="ruas-note ruas-note-alert"><span class="ruas-note-dot" aria-hidden="true"></span><span><strong>Conferir variedade</strong>'+esc(d.alertaCadastro)+'</span></p>':"";
- return '<details id="'+ruaDetalheId(area,data)+'" class="ruasdetail ruas-wide'+(/^(110A|110B)$/.test(area)?' ruas-compactas':'')+'"><summary><span class="ruas-summary-symbol" aria-hidden="true">≋</span><span class="ruas-summary-title"><strong>Medições individuais por rua</strong><small>Área '+esc(area)+' · '+esc(dataCompleta)+'</small></span><span class="ruas-summary-count">'+d.rows.length+' amostras</span><span class="ruas-summary-chevron" aria-hidden="true"></span></summary><div class="ruas-detail-content"><div class="ruas-meta">'+meta+'</div>'+obs+aviso+'<div class="ruas-groups">'+gruposHtml+'</div></div></details>';
+ return '<details id="'+ruaDetalheId(area,data)+'" class="ruasdetail ruas-wide"><summary><span class="ruas-summary-symbol" aria-hidden="true">≋</span><span class="ruas-summary-title"><strong>Medições individuais por rua</strong><small>Área '+esc(area)+' · '+esc(dataCompleta)+'</small></span><span class="ruas-summary-count">'+d.rows.length+' amostras</span><span class="ruas-summary-chevron" aria-hidden="true"></span></summary><div class="ruas-detail-content"><div class="ruas-meta">'+meta+'</div>'+obs+aviso+'<div class="ruas-groups">'+gruposHtml+'</div></div></details>';
 }
 function campoFmt(x){
  if(!x)return "";
@@ -871,7 +836,7 @@ function botaoArea(x){const b=corMaturacao(x);return '<button class="'+(x===ar?'
 const areaSelections={};
 function areaSelection(code){if(!areaSelections[code]){const a=A[code]||{};areaSelections[code]={c:(a.fieldPdfHistory?.[Math.max(0,(a.c||[]).length-1)]?Math.max(0,(a.c||[]).length-1):(Number.isInteger(a.fieldPdfEvaluationIndex)?a.fieldPdfEvaluationIndex:Math.max(0,(a.c||[]).length-1))),t:0,r:0}}return areaSelections[code]}
 function areaTab(code,kind,index){areaSelection(code)[kind]=index;render();const el=document.getElementById("area-"+code);if(el)el.scrollIntoView({block:"nearest"})}
-function areaTabs(code,items,kind,selected){if(!items||!items.length)return "";return '<div class="chips area-history-tabs">'+items.map((item,i)=>'<button class="'+(i===selected?'on':'')+'" onclick="areaTab(\''+code+'\',\''+kind+'\','+i+')">'+esc(kind==="t"?dataCompletaChip(item[0]):item[0])+'</button>').join("")+'</div>'}
+function areaTabs(code,items,kind,selected){if(!items||!items.length)return "";return '<div class="chips area-history-tabs">'+items.map((item,i)=>'<button class="'+(i===selected?'on':'')+'" onclick="areaTab(\''+code+'\',\''+kind+'\','+i+')">'+esc(kind==="c"?String(item[0]).replace(/^Reavaliação pré-colheita(?=\s*·)/i,"Reavaliação"):kind==="t"?dataCompletaChip(item[0]):item[0])+'</button>').join("")+'</div>'}
 function areaStatusLabel(k){return {acomp:"EM ACOMPANHAMENTO",colh:"EM COLHEITA",pausa:"COLHEITA PAUSADA",fim:"FINALIZADA"}[k]||""}
 function calcularAtrasoColheita(a,hoje=new Date()){
  const m=String(a?.originalHarvestDate||a?.f||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -902,7 +867,7 @@ const pdfOK=!!pdf&&fieldVerifiedFiles.has(pdf)&&(!!a.fieldPdfHistory?.[idx.c]||(
 const docLinks=pdfOK?'<div class="area-doc-links"><a class="pdfbtn" href="visualizador.html?campo='+encodeURIComponent(pdf)+'" target="_blank" rel="noopener">📄 Visualizar online</a><a class="pdfbtn pdf-secondary" href="https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/main/relatorios/acompanhamento%20de%20%C3%A1rea/'+encodeURIComponent(pdf)+'" target="_blank" rel="noopener">📥 Baixar PDF</a></div>':"";
 const varietyImages={"Arra 15":"https://vinograd.info/images/sorta/a/arra-15/ARRA_15.jpg","Sugar Crisp":"https://www.ifg.world/templates/yootheme/cache/e3/sugar-crisp23-400x400-e307ba89.jpeg","BRS Vitória":"https://files.agro20.com.br/uploads/2020/02/Uva-Vit%C3%B3ria-2.jpg","Sweet Globe":"https://www.ifg.world/templates/yootheme/cache/19/sweet-globe23-400x400-198f43db.jpeg","Autumn Crisp":"https://cdn11.bigcommerce.com/s-rl94rv7pw2/images/stencil/1280x1280/products/10734/13436/thumbnail__01131.1775755559.jpg?c=1","Itum 9":"https://cdn.portalfruticola.com/2017/09/itumnine-2-768x1024.png","BRS Ísis":"https://www.embrapa.br/image/journal/article?img_id=46433972&t=1568116353346"};const varietyLocal={"Arra 15":"arra-15","Sugar Crisp":"sugar-crisp","BRS Vitória":"brs-vitoria","Vitória":"brs-vitoria","Sweet Globe":"sweet-globe","Autumn Crisp":"autumn-crisp","Itum 9":"itum-9","BRS Ísis":"brs-isis","Arra Cherry":"arra-cherry"};const varietyImage=varietyLocal[a.v]?("imagens/variedades/png/"+varietyLocal[a.v]+".png"):"";const varietySvgFallback=varietyLocal[a.v]?("imagens/variedades/svg/"+varietyLocal[a.v]+".svg"):"";
 const dormidaTag=r?.[4]?.tipo==="uva-dormida"?'<div class="recep-dormida-note"><span class="recep-dormida-badge">UVA DORMIDA</span><span class="recep-dormida-date">Colhida em '+esc(r[4].colhidaEm)+'</span></div>':"";
-return '<article class="premium-area-card" id="area-'+esc(code)+'">'+avisoAtrasoColheita(a)+'<div class="area-identity"><div class="area-photo variety-photo" role="img" aria-label="Imagem da variedade '+esc(a.v||"não informada")+'"><div class="variety-photo-fallback" aria-hidden="true"><span class="fallback-leaf">❧</span></div>'+(varietyImage?'<img src="'+esc(varietyImage)+'" alt="Fotografia do cacho da variedade '+esc(a.v)+'" data-variedade="'+esc(a.v)+'" data-svg-fallback="'+esc(varietySvgFallback)+'" loading="eager" decoding="async" fetchpriority="high" referrerpolicy="no-referrer" onload="vitraVarietyPhotoReady(this)" onerror="vitraVarietyImageFallback(this)">':'')+'</div><div class="area-identity-text"><span class="area-code">'+esc(code)+'</span><span class="area-variety">'+esc(a.v||"Variedade não informada")+'</span><span class="area-state '+esc(st)+'"><i></i>'+areaStatusLabel(st)+'</span>'+(st==="acomp"&&a.f&&!calcularAtrasoColheita(a)?'<small class="area-forecast">Previsão original: '+esc(a.originalHarvestDate||(/^\d{2}\/\d{2}$/.test(a.f)?a.f+'/2026':a.f))+'</small>':"")+'</div></div><div class="area-information"><div class="area-column field-column"><h3>🌿 CAMPO</h3>'+areaTabs(code,a.c,"c",idx.c)+'<div class="body">'+(c?campoFmt(c[1])+(c[2]?'<div class="prob campodanos"><b>⚠️ DANOS E PROBLEMAS IDENTIFICADOS</b><div>'+esc(c[2])+'</div></div>':"")+docLinks:'<span class="muted">Sem avaliação de campo registrada.</span>')+'</div></div><div class="area-column tit-column"><h3>🧪 TITULAÇÃO</h3>'+areaTabs(code,ts,"t",idx.t)+'<div class="body">'+(t?split(t[1])+detalheRuas(code,t[0]):'<span class="muted">Sem titulação registrada.</span>')+'</div></div><div class="area-column reception-column"><h3>📦 RECEPÇÃO</h3>'+areaTabs(code,rs,"r",idx.r)+'<div class="body">'+(r?renderRecepcaoClassificacao(r[1],r[2])+'<div class="prob campodanos"><b>⚠️ DANOS E OBSERVAÇÕES</b><div>'+esc(r[3]||"Não informado.")+'</div></div>'+dormidaTag:'<div class="empty-reception"><span class="empty-icon">▤</span><strong>Sem recepção registrada</strong></div>')+'</div></div></div>'+(a.note?'<div class="area-note">'+esc(a.note)+'</div>':"")+'</article>'}
+return '<article class="premium-area-card" id="area-'+esc(code)+'">'+avisoAtrasoColheita(a)+'<div class="area-identity"><div class="area-photo variety-photo" role="img" aria-label="Imagem da variedade '+esc(a.v||"não informada")+'"><div class="variety-photo-fallback" aria-hidden="true"><span class="fallback-leaf">❧</span></div>'+(varietyImage?'<img src="'+esc(varietyImage)+'" alt="Fotografia do cacho da variedade '+esc(a.v)+'" data-variedade="'+esc(a.v)+'" data-svg-fallback="'+esc(varietySvgFallback)+'" loading="eager" decoding="async" fetchpriority="high" referrerpolicy="no-referrer" onload="vitraVarietyPhotoReady(this)" onerror="vitraVarietyImageFallback(this)">':'')+'</div><div class="area-identity-text"><span class="area-code">'+esc(code)+'</span><span class="area-variety">'+esc(a.v||"Variedade não informada")+'</span><span class="area-state '+esc(st)+'"><i></i>'+areaStatusLabel(st)+'</span>'+(st==="acomp"&&a.f&&!calcularAtrasoColheita(a)?'<small class="area-forecast">Previsão original: '+esc(a.originalHarvestDate||(/^\d{2}\/\d{2}$/.test(a.f)?a.f+'/2026':a.f))+'</small>':"")+'</div></div><div class="area-information"><div class="area-column field-column"><h3>🌿 CAMPO</h3>'+areaTabs(code,a.c,"c",idx.c)+'<div class="body">'+(c?campoFmt(c[1])+(c[2]?'<div class="prob campodanos"><b>⚠️ DANOS E PROBLEMAS IDENTIFICADOS</b><div>'+esc(c[2])+'</div></div>':"")+docLinks:'<span class="muted">Sem avaliação de campo registrada.</span>')+'</div></div><div class="area-column tit-column"><h3>🧪 TITULAÇÃO</h3>'+areaTabs(code,ts,"t",idx.t)+'<div class="body">'+(t?split(t[1]):'<span class="muted">Sem titulação registrada.</span>')+'</div></div><div class="area-column reception-column"><h3>📦 RECEPÇÃO</h3>'+areaTabs(code,rs,"r",idx.r)+'<div class="body">'+(r?renderRecepcaoClassificacao(r[1],r[2])+'<div class="prob campodanos"><b>⚠️ DANOS E OBSERVAÇÕES</b><div>'+esc(r[3]||"Não informado.")+'</div></div>'+dormidaTag:'<div class="empty-reception"><span class="empty-icon">▤</span><strong>Sem recepção registrada</strong></div>')+'</div></div></div>'+(t?detalheRuas(code,t[0]):'')+(a.note?'<div class="area-note">'+esc(a.note)+'</div>':"")+'</article>'}
 function areaBrixPreview(code){const a=A[code]||{},t=titulacoesOrdenadas(a)[0];if(!t)return {cls:"brix-sem",label:"Sem titulação"};const body=String(t[1]||"");const white=/sugar crisp|sweet globe|autumn crisp|arra 15|timpson/i.test(a.v||"");const dark=/brs vit[oó]ria|vit[oó]ria|brs [ií]sis|[ií]sis|itum 9|arra cherry|cherry crush|rachely crush/i.test(a.v||"");if(!white&&!dark)return {cls:"brix-sem",label:"Sem classificação"};const lines=body.split(/\n|<br\s*\/?\s*>|[|•]/i);const predominance=(body.match(/predomin[aâ]ncia[^|.\n<]*/i)||[])[0]||"";let target="";if(/verdes?|brancas?/i.test(predominance))target="verde";else if(/madur|[aâ]mbar|amarel/i.test(predominance))target="madur";else if(/negr[ao]s?|fechado/i.test(predominance))target="negra";else if(/rosad/i.test(predominance))target="rosad";else if(/vermelh/i.test(predominance))target="vermelh";if(!target)return {cls:"brix-sem",label:"Sem predominância"};let chosen=null;for(const line of lines){if(!line.toLowerCase().includes(target)||!/brix\s*[:=]?\s*\d/i.test(line))continue;const m=line.match(/brix\s*[:=]?\s*(\d+(?:[,.]\d+)?)/i);if(m){chosen=Number(m[1].replace(",","."));break}}if(chosen===null||!Number.isFinite(chosen))return {cls:"brix-sem",label:"Sem Brix predominante"};return {cls:white?(chosen<15?"brix-branca-baixo":"brix-branca-alto"):(chosen<16?"brix-cor-baixo":"brix-cor-alto"),label:chosen.toLocaleString("pt-BR",{maximumFractionDigits:2})+" °Brix"}}
 function render(){const p=document.querySelector("#panel");if(!st)return;const codes=groups[st]||[];const search=areaSearch.trim().toLocaleLowerCase("pt-BR");const visible=codes.filter(code=>{const a=A[code]||{};return !search||[code,a.v,a.f].join(" ").toLocaleLowerCase("pt-BR").includes(search)});if(!visible.includes(ar))ar=visible[0]||null;p.innerHTML='<div class="workspace-title"><div><span class="workspace-eyebrow">PAINEL DE QUALIDADE</span><h2>'+vitraIcon(st)+labels[st]+'</h2><p>'+codes.length+' área(s)</p></div><div class="workspace-search"><input class="searchbar" id="areaSearch" placeholder="Buscar área ou variedade..." value="'+esc(areaSearch)+'"></div></div>'+(st==="acomp"?'<div class="brix-legend"><span class="brix-legend-title">Brix da coloração predominante</span><div class="brix-legend-items"><span><i class="brix-dot brix-branca-baixo"></i>Brancas: abaixo de 15</span><span><i class="brix-dot brix-branca-alto"></i>Brancas: 15 ou mais</span><span><i class="brix-dot brix-cor-baixo"></i>Vermelhas/negras: abaixo de 16</span><span><i class="brix-dot brix-cor-alto"></i>Vermelhas/negras: 16 ou mais</span></div></div>':"")+'<div class="vitra-area-overview" aria-label="Situação de Brix das áreas">'+visible.map(code=>{const q=st==="acomp"?areaBrixPreview(code):{cls:"brix-sem",label:"Área "+areaStatusLabel(st)};const atraso=st==="acomp"?calcularAtrasoColheita(A[code]||{}):null;return '<button type="button" class="vitra-area-mini '+q.cls+(atraso?' overdue-forecast':'')+(code===ar?' selected':'')+'" data-preview-area="'+esc(code)+'" aria-label="Abrir área '+esc(code)+' — '+esc(q.label)+(atraso?' — Colheita atrasada: '+esc(atraso.tempo):'')+'"><strong>'+esc(code)+'</strong></button>'}).join("")+'</div><div id="selectedArea">'+(ar?renderAreaCard(ar):'<div class="note">Nenhuma área encontrada.</div>')+'</div>';p.querySelectorAll("[data-preview-area]").forEach(b=>b.addEventListener("click",()=>{ar=b.dataset.previewArea;latest();render();}));const input=p.querySelector("#areaSearch");if(input)input.addEventListener("input",e=>{areaSearch=e.target.value;const pos=e.target.selectionStart;render();const next=document.querySelector("#areaSearch");if(next){next.focus();next.setSelectionRange(pos,pos)}})};
 
