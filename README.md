@@ -11,6 +11,15 @@ Dashboard de acompanhamento das áreas de uva e controle de qualidade.
 - **Preservar sempre os dados**: nenhuma correção de previsão ou interface pode alterar medições, percentuais, datas originais dos relatórios, PDFs, recepções, históricos ou estados de colheita. Informar nome exato e número do documento quando encontrar inconsistências.
 - **Revisar antes de publicar**: comparar com o GitHub atual, conferir contagens e duplicidades, testar a lógica de datas e a visualização quando possível; confirmar a publicação somente depois de verificar o commit.
 
+## Padrões de reavaliação pré-colheita e apresentação do estoque
+
+- Após as avaliações oficiais de 21, 14 e 07 dias, registrar novas visitas como **Reavaliação pré-colheita · DD/MM/AAAA**, preservando todas as avaliações anteriores e diferenciando visitas da mesma data pelo número do relatório.
+- A data de avaliação posterior nunca altera `originalHarvestDate`, estabelecida pelos documentos oficiais do ciclo inicial. Um campo de data posterior usado apenas como referência não reinicia a contagem de atraso.
+- No painel, apresentar o atraso discretamente ao lado da previsão original e com no máximo um ponto de identificação no seletor da área; não usar grandes faixas, alertas repetitivos ou alterações nas cores de Brix.
+- Para áreas sem previsão original confirmada, apresentar **Previsão original: a confirmar**, sem inferir atraso por datas de poda, cronogramas provisórios ou títulos antigos.
+- PDFs genéricos de campo devem ser identificados por área, data e número do relatório, receber nome técnico único (exemplo: `ACOMPANHAMENTO_DE_AREA_PRE_-_COLHEITA-93302668-pt_BR.pdf`) e ser renomeados sem duplicar seu conteúdo binário; conferir os vínculos da avaliação e do visualizador.
+- No Estoque, deixar **Produção própria**, **Produtores externos** e **Mistos** em filtros exclusivos da mesma tela, sem duplicar os registros, preservando a identificação verdadeira das avaliações.
+
 ## Separação obrigatória: nome do arquivo × apresentação no VITRA
 
 O nome padronizado `ESTOQUE_AAAA-MM-DD_DOC_..._LOTE_....pdf` é um **identificador técnico exclusivo para armazenamento no GitHub e para os links do PDF original**. Ele **não é o título, nome ou classificação da avaliação no VITRA**.
