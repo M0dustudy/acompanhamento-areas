@@ -1,0 +1,9 @@
+# VITRA — publicação do GitHub Pages
+# Os PDFs originais permanecem preservados no repositório.
+# O site/visualizador acessam os arquivos originais por raw.githubusercontent.com.
+# Nunca remover os PDFs ou seus metadados do GitHub para reduzir o site.
+exclude:
+  - relatorios
+  - scripts
+  - README.md
+  - .github
