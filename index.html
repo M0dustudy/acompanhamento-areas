@@ -625,6 +625,65 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}body{min-width:0!important
   .premium-area-card>.area-overdue-notice{padding:12px!important;gap:10px!important}
   .premium-area-card>.area-overdue-notice .area-overdue-symbol{flex-basis:34px!important;width:34px!important;height:34px!important}
 }
+</style>
+<style id="vitra-ruas-duas-coloracoes-20261106">
+/* Nas áreas 110A e 110B, cada coloração fica em uma tabela única,
+   com cinco linhas, sem cartões independentes para cada rua. */
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruas-groups {
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:10px!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruas-group-card {
+  overflow:hidden!important;border:1px solid #dfe9e2!important;border-radius:11px!important;
+  box-shadow:none!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruasscroll {
+  margin:0!important;padding:0!important;overflow-x:auto!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable {
+  display:table!important;width:100%!important;min-width:0!important;
+  table-layout:fixed!important;border-collapse:collapse!important;
+  border-spacing:0!important;font-size:11px!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable thead {
+  display:table-header-group!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody {
+  display:table-row-group!important;padding:0!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tr,
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody tr {
+  display:table-row!important;box-shadow:none!important;background:transparent!important;
+  margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th,
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td,
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody td {
+  display:table-cell!important;min-width:0!important;white-space:nowrap!important;
+  border:0!important;border-bottom:1px solid #e8eee9!important;
+  padding:10px 5px!important;vertical-align:middle!important;
+  text-align:right!important;font-size:11px!important;line-height:1.3!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th {
+  background:#f4f8f5!important;color:#526e5c!important;
+  font-size:9px!important;font-weight:800!important;
+  white-space:normal!important;overflow-wrap:normal!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th:first-child,
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td:first-child {
+  width:28%!important;text-align:left!important;padding-left:10px!important;
+  font-weight:800!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable th:nth-child(2),
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td:nth-child(2) {
+  display:none!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable td:before,
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody td:before {
+  content:none!important;display:none!important;
+}
+.premium-area-card .tit-column .ruasdetail.ruas-wide.ruas-compactas .ruastable tbody tr:last-child td {
+  border-bottom:0!important;
+}
 </style></head><body><div class="vitra-shell"><aside class="vitra-sidebar"><div class="sidebar-logo" onclick="showHome()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHome()}" aria-label="Voltar à visão geral"><span class="sidebar-monogram" aria-hidden="true">V</span><div><strong>VITRA</strong><small>Inteligência e Rastreabilidade da Uva</small></div></div><div class="sidebar-label">NAVEGAÇÃO</div><nav class="cards" id="cards" aria-label="Módulos do VITRA"></nav></aside><main class="vitra-main"><div class="vitra-hero"><div class="hero-content"><span class="hero-eyebrow">VITRA • INTELIGÊNCIA E RASTREABILIDADE DA UVA</span><h1>Excelência em cada detalhe.</h1></div><div class="hero-seal" aria-hidden="true"><span>V</span><small>VITRA</small></div></div><div class="vitra-kpis" id="vitraKpis"></div><div class="panel" id="panel"><section class="vitra-home" id="vitraHome"><div class="home-welcome"><span class="home-overline">PAINEL DE CONTROLE</span><h2>Seu trabalho, em uma visão clara.</h2><p>Acompanhe avaliações, titulações, recepção e estoque em um só lugar.</p></div></section></div><footer class="vitra-footer">VITRA</footer></main></div>
 <script>
 const groups={"acomp":["110A","110B","307A","307B","306A","306B","303B","301A","301B","302B","208A","207A","304A","208B"],"colh":["302A"],"pausa":["211A","109A","303A","106A"],"fim":["102A","202A","202B","108A","108B","203A","107A","107B","203B","106B","109B","102B","211B","101B","101A"]};
@@ -713,13 +772,14 @@ function detalheRuas(area,data){
   const v=String(nome||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
   return /verde/.test(v)?"green":/rosad/.test(v)?"rose":/vermelh/.test(v)?"red":/negra|preta/.test(v)?"dark":/madura|ambar|amarel/.test(v)?"gold":"neutral";
  };
- // Agrupa apenas apresentações consecutivas da mesma fruta; não ordena nem altera medições.
+ // Duas seções por coloração, com as medições originais preservadas.
+ // Uma coloração não deve gerar novos blocos se aparecer em ruas distintas.
  const grupos=[];
  d.rows.forEach(x=>{
-  const cor=String(x[1]??"");
-  const ultimo=grupos[grupos.length-1];
-  if(ultimo && ultimo.cor===cor)ultimo.rows.push(x);
-  else grupos.push({cor,rows:[x]});
+  const cor=String(x[1]??"").trim();
+  let grupo=grupos.find(g=>g.cor===cor);
+  if(!grupo){grupo={cor,rows:[]};grupos.push(grupo)}
+  grupo.rows.push(x);
  });
  const gruposHtml=grupos.map(g=>{
   const tom=tons(g.cor);
@@ -734,7 +794,7 @@ function detalheRuas(area,data){
  ].filter(x=>x[1]!=null && x[1]!=="").map(x=>'<div class="ruas-meta-card"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>').join("");
  const obs=d.observacao?'<p class="ruas-note"><span class="ruas-note-dot" aria-hidden="true"></span><span><strong>Observação do relatório</strong>'+esc(d.observacao)+'</span></p>':"";
  const aviso=d.alertaCadastro?'<p class="ruas-note ruas-note-alert"><span class="ruas-note-dot" aria-hidden="true"></span><span><strong>Conferir variedade</strong>'+esc(d.alertaCadastro)+'</span></p>':"";
- return '<details id="'+ruaDetalheId(area,data)+'" class="ruasdetail ruas-wide"><summary><span class="ruas-summary-symbol" aria-hidden="true">≋</span><span class="ruas-summary-title"><strong>Medições individuais por rua</strong><small>Área '+esc(area)+' · '+esc(dataCompleta)+'</small></span><span class="ruas-summary-count">'+d.rows.length+' amostras</span><span class="ruas-summary-chevron" aria-hidden="true"></span></summary><div class="ruas-detail-content"><div class="ruas-meta">'+meta+'</div>'+obs+aviso+'<div class="ruas-groups">'+gruposHtml+'</div></div></details>';
+ return '<details id="'+ruaDetalheId(area,data)+'" class="ruasdetail ruas-wide'+(/^(110A|110B)$/.test(area)?' ruas-compactas':'')+'"><summary><span class="ruas-summary-symbol" aria-hidden="true">≋</span><span class="ruas-summary-title"><strong>Medições individuais por rua</strong><small>Área '+esc(area)+' · '+esc(dataCompleta)+'</small></span><span class="ruas-summary-count">'+d.rows.length+' amostras</span><span class="ruas-summary-chevron" aria-hidden="true"></span></summary><div class="ruas-detail-content"><div class="ruas-meta">'+meta+'</div>'+obs+aviso+'<div class="ruas-groups">'+gruposHtml+'</div></div></details>';
 }
 function campoFmt(x){
  if(!x)return "";
