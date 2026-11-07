@@ -879,14 +879,32 @@ function formatarNotaTecnicaEstoque(original){
 }
 // A sinalização de pré-limpeza só aparece quando a avaliação a indica expressamente.
 // Uma referência ao procedimento, por si só, não é uma recomendação.
+// ALERTA OPERACIONAL DE LIMPEZA
+// O texto de cada laudo continua intacto: o alerta é uma avaliação para o
+// planejamento da colheita, nunca uma reclassificação do PDF.
+function revisarLimpezaPorDanos(resumo){
+ const partes=String(resumo||"").split(/[;.]/).map(s=>s.trim()).filter(Boolean);
+ const sinais=/(?:\bpodridão\b|\bpodres?\b|\brachaduras?\b|\brachad[ao]s?\b|\bmosca[- ]d(?:a|as)[- ]frutas?\b|\blagartas?\b|\bcochonilha\b|\bbagas duras\b|\bcachos enganchados\b)/i;
+ const intensos=partes.filter(t=>/(?:em grande quantidade|quantidade elevada|presença significativa|(?:danos|bagas|cachos)\s+(?:muito\s+)?(?:elevados?|numerosos?))/i.test(t)&&sinais.test(t));
+ const criticos=/(?:danos críticos?\s*:\s*(?!(?:nenhum|nenhuma|não identificado|ausente|0)\b).+|ocorrência crítica\s*:\s*(?!(?:nenhuma|não identificada|ausente|0)\b).+)/i.test(resumo);
+ return criticos||intensos.length>0;
+}
+// Necessidade expressamente documentada tem prioridade. Na ausência dela,
+// danos potencialmente graves em grande quantidade pedem conferência técnica,
+// não uma afirmação automática de limpeza obrigatória.
 function renderDanosCampo(original){
  const texto=String(original||"").trim();
  const dispensa=/(?:pré[- ]limpeza dispensada|sem necessidade de pré[- ]limpeza|pré[- ]limpeza não necessária|não precisa de pré[- ]limpeza)/i.test(texto);
  const necessita=!dispensa&&/(?:pré[- ]limpeza necessária|necessidade de pré[- ]limpeza|exige(?:m)? pré[- ]limpeza)/i.test(texto);
  const resumo=texto.replace(/\s*(?:Pré[- ]limpeza (?:necessária|dispensada|não necessária)|Sem necessidade de pré[- ]limpeza|Não precisa de pré[- ]limpeza)\.?\s*$/i,"").trim();
+ const revisar=!necessita&&!dispensa&&revisarLimpezaPorDanos(resumo);
  const aviso=necessita
   ?'<div class="field-preclean-indication needed" role="note"><span>PRÉ-LIMPEZA</span><strong>Necessária</strong></div>'
-  :dispensa?'<div class="field-preclean-indication not-needed" role="note"><span>PRÉ-LIMPEZA</span><strong>Dispensada</strong></div>':'';
+  :dispensa
+  ?'<div class="field-preclean-indication not-needed" role="note"><span>PRÉ-LIMPEZA</span><strong>Dispensada</strong></div>'
+  :revisar
+  ?'<div class="field-preclean-indication review" role="note"><span>ALERTA DE LIMPEZA</span><strong>Avaliar antes da colheita</strong></div>'
+  :'';
  return '<p class="field-damages-summary">'+esc(normalizarDescricaoDanos(resumo))+'</p>'+aviso;
 }
 
