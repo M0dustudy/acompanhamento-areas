@@ -1059,7 +1059,15 @@ function areaTab(code,kind,index,origem){
  const destino=origem==="ruas"?document.querySelector("#area-"+code+" .ruas-date-navigation"):document.getElementById("area-"+code);
  if(destino)destino.scrollIntoView({block:"nearest"});
 }
-function areaTabs(code,items,kind,selected){if(!items||!items.length)return "";return '<div class="chips area-history-tabs">'+items.map((item,i)=>'<button class="'+(i===selected?'on':'')+'" onclick="areaTab(\''+code+'\',\''+kind+'\','+i+')">'+esc(kind==="c"?String(item[0]).replace(/^Reavaliação pré-colheita(?=\s*·)/i,"Reavaliação"):kind==="t"?dataCompletaChip(item[0]):item[0])+'</button>').join("")+'</div>'}
+// Rótulos visíveis das avaliações de campo: sem datas, preservando os dados históricos.
+function rotuloAvaliacaoCampo(valor){
+ const bruto=String(valor||"").trim();
+ const prazo=bruto.match(/^(21|14|0?7)\s+dias\b/i);
+ if(prazo)return prazo[1]==="7"||prazo[1]==="07"?"07 dias":prazo[1]+" dias";
+ if(/^Reavaliação(?:\s+pré-colheita)?(?:\s*[·–-].*)?$/i.test(bruto))return "Reavaliação";
+ return bruto;
+}
+function areaTabs(code,items,kind,selected){if(!items||!items.length)return "";return '<div class="chips area-history-tabs">'+items.map((item,i)=>'<button class="'+(i===selected?'on':'')+'" onclick="areaTab(\''+code+'\',\''+kind+'\','+i+')">'+esc(kind==="c"?rotuloAvaliacaoCampo(item[0]):kind==="t"?dataCompletaChip(item[0]):item[0])+'</button>').join("")+'</div>'}
 function areaStatusLabel(k){return {acomp:"EM ACOMPANHAMENTO",colh:"EM COLHEITA",pausa:"COLHEITA PAUSADA",fim:"FINALIZADA"}[k]||""}
 function calcularAtrasoColheita(a,hoje=new Date()){
  const m=String(a?.originalHarvestDate||a?.f||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
