@@ -25,6 +25,12 @@
 <div class="va-login-footer">A ativação fica indisponível depois da criação do administrador mestre.</div></div></div>
 </div>
 <script>
+const init = new URLSearchParams(location.hash.replace(/^#/, ""));
+const invite = init.get("codigo");
+if (invite && /^[A-Za-z0-9_-]{40,100}$/.test(invite)) {
+  document.querySelector('input[name="code"]').value = invite;
+  history.replaceState(null, "", location.pathname);
+}
 document.querySelector("#setup-form").addEventListener("submit", async e => {
   e.preventDefault();
   const f=e.target, btn=f.querySelector("button[type=submit]"), out=document.querySelector("#setup-message");
