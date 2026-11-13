@@ -11,7 +11,7 @@
   const root = document.createElement("div");
   root.id = "vitra-access-root";
   document.body.appendChild(root);
-  let session = null, me = null, userRows = [], logRows = [], working = false, checkInProgress = false;
+  let session = null, me = null, userRows = [], logRows = [], working = false, checkInProgress = false, managementRequestId = 0;
   const q = (selector, base = document) => base.querySelector(selector);
   const safe = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, s =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
@@ -167,6 +167,7 @@
     });
   }
   async function logout() {
+    managementRequestId++;
     try { if (session?.access_token) await call("logout", {}, true); } catch { /* Saída local sempre prevalece */ }
     session = null;
     me = null;
@@ -199,15 +200,27 @@
   }
   async function openManagement() {
     if (me?.role !== "master") return;
+    const requestId = ++managementRequestId;
     q(".va-account")?.removeAttribute("open");
     if (typeof window.markMain === "function") window.markMain("access");
-    try { userRows = (await call("list")).users || []; logRows = (await call("logs")).logs || []; }
-    catch (e) { const panel=q("#panel"); if(panel) panel.innerHTML='<div class="va-error" role="alert">'+safe(errorMessage(e))+'</div>';return; }
-    renderManagement();
+    const panel = q("#panel");
+    if (panel) panel.innerHTML = '<section class="va-management"><div class="va-loading" role="status">Carregando acessos…</div></section>';
     if (window.innerWidth <= 900) q(".vitra-main")?.scrollIntoView({ block: "start" });
+    try {
+      const users = (await call("list")).users || [];
+      const logs = (await call("logs")).logs || [];
+      if (requestId !== managementRequestId || !q(".vitra-shell.va-admin-view")) return;
+      userRows = users;
+      logRows = logs;
+    } catch (e) {
+      if (requestId === managementRequestId && q(".vitra-shell.va-admin-view") && panel)
+        panel.innerHTML = '<div class="va-error" role="alert">' + safe(errorMessage(e)) + '</div>';
+      return;
+    }
+    renderManagement();
   }
   function renderManagement() {
-    if (me?.role !== "master") return;
+    if (me?.role !== "master" || !q(".vitra-shell.va-admin-view")) return;
     const active = userRows.filter(x => x.enabled).length;
     const recent = logRows.filter(x => x.event === "login").length;
     const rows = userRows.map(u => '<tr><td><strong>' + safe(u.display_name || u.username) + '</strong><div class="va-subtle">@' +
