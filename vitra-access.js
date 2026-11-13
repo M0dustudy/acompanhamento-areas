@@ -143,6 +143,7 @@
       nav.tabIndex = 0;
       nav.addEventListener("click", openManagement);
       nav.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManagement(); }});
+      nav.classList.toggle("active", !!q(".vitra-shell.va-admin-view"));
       q("#cards")?.appendChild(nav);
     }
 
@@ -240,7 +241,7 @@
         block_user:"Acesso bloqueado",unblock_user:"Acesso reativado",delete_user:"Acesso excluído",recovery_code_created:"Código de recuperação gerado",recovery_password_reset:"Senha recuperada"}[x.event] || x.event)) +
       '</td></tr>').join("");
     q("#panel").innerHTML = '<section class="va-management">' +
-      '<header class="va-heading"><h2>Gestão de acessos</h2></header>' +
+      '<header class="va-heading"><h2>Gestão de acessos</h2><button class="va-admin-back" type="button" id="va-back-home">← Voltar</button></header>' +
       '<div class="va-stats"><div class="va-stat"><small>Contas cadastradas</small><strong>' + userRows.length + '</strong></div>' +
       '<div class="va-stat"><small>Contas ativas</small><strong>' + active + '</strong></div>' +
       '<div class="va-stat"><small>Entradas no histórico</small><strong>' + recent + '</strong></div></div>' +
@@ -270,6 +271,7 @@
       '<div class="va-table-wrap"><table class="va-table"><thead><tr><th>Data / hora</th><th>Conta</th><th>Atividade</th></tr></thead><tbody>' +
       (logs || '<tr><td colspan="3" class="va-empty">Nenhum evento registrado.</td></tr>') +
       '</tbody></table></div></section></section>';
+    q("#va-back-home")?.addEventListener("click", () => { if (typeof window.showHome === "function") window.showHome(); window.scrollTo(0, 0); });
     q("#va-self-form").addEventListener("submit", updateMaster);
     q("#va-generate-recovery").addEventListener("click", showRecoveryGenerator);
     q("#va-create-form").addEventListener("submit", createUser);
