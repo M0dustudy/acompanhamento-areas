@@ -125,30 +125,46 @@
   }
   function removeManagement() {
     q("#cards .va-admin-nav")?.remove();
+    q(".vitra-sidebar .va-account")?.remove();
     q("#va-management-modal")?.remove();
   }
   function unlock() {
     root.innerHTML = "";
     document.documentElement.classList.remove("va-locked");
     removeManagement();
-    const chip = document.createElement("div");
-    chip.className = "va-session";
-    chip.innerHTML = "<span title=\"Conta conectada\">" + safe(me?.display_name || me?.username || "Usuário") + (me?.role === "master" ? " · Administrador" : "") +
-      "</span><button type=\"button\" id=\"va-signout\">Sair</button>";
-    root.appendChild(chip);
-    q("#va-signout").addEventListener("click", logout);
+
     if (me?.role === "master") {
       const nav = document.createElement("div");
       nav.className = "card va-admin-nav";
       nav.dataset.main = "access";
-      nav.innerHTML = '<b><span class="va-admin-icon" aria-hidden="true">✧</span> GESTÃO DE ACESSOS</b><small>Administrador</small>';
+      nav.innerHTML = '<b><span class="va-admin-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/><path d="M12 14v3"/></svg></span>GESTÃO DE ACESSOS</b>';
       nav.setAttribute("role", "button");
+      nav.setAttribute("aria-label", "Abrir Gestão de Acessos");
       nav.tabIndex = 0;
       nav.addEventListener("click", openManagement);
       nav.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManagement(); }});
-      const homeNav = q('#cards .card[data-main="home"]');
-      if (homeNav) homeNav.after(nav); else q("#cards")?.appendChild(nav);
+      q("#cards")?.appendChild(nav);
     }
+
+    const sidebar = q(".vitra-sidebar");
+    if (!sidebar) return;
+    const firstName = String(me?.display_name || me?.username || "Conta").trim().split(/\s+/)[0] || "Conta";
+    const avatar = firstName.charAt(0).toLocaleUpperCase("pt-BR");
+    const account = document.createElement("details");
+    account.className = "va-account";
+    account.innerHTML = '<summary class="va-account-toggle" aria-label="Opções da conta">' +
+      '<span class="va-avatar" aria-hidden="true">' + safe(avatar) + '</span>' +
+      '<span class="va-account-name">' + safe(firstName) + '</span>' +
+      '<svg class="va-account-chevron" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>' +
+      '<div class="va-account-options" role="group" aria-label="Ações da conta">' +
+      (me?.role === "master" ? '<button type="button" class="va-account-mobile-access" id="va-mobile-access">Gestão de acessos</button>' : '') +
+      '<button type="button" id="va-signout">Sair do VITRA</button></div>';
+    sidebar.appendChild(account);
+    q("#va-signout", account).addEventListener("click", logout);
+    q("#va-mobile-access", account)?.addEventListener("click", () => {
+      account.open = false;
+      openManagement();
+    });
   }
   async function logout() {
     try { if (session?.access_token) await call("logout", {}, true); } catch { /* Saída local sempre prevalece */ }
@@ -183,10 +199,12 @@
   }
   async function openManagement() {
     if (me?.role !== "master") return;
+    q(".va-account")?.removeAttribute("open");
     if (typeof window.markMain === "function") window.markMain("access");
     try { userRows = (await call("list")).users || []; logRows = (await call("logs")).logs || []; }
     catch (e) { const panel=q("#panel"); if(panel) panel.innerHTML='<div class="va-error" role="alert">'+safe(errorMessage(e))+'</div>';return; }
     renderManagement();
+    if (window.innerWidth <= 900) q(".vitra-main")?.scrollIntoView({ block: "start" });
   }
   function renderManagement() {
     if (me?.role !== "master") return;
@@ -209,18 +227,12 @@
         block_user:"Acesso bloqueado",unblock_user:"Acesso reativado",delete_user:"Acesso excluído",recovery_code_created:"Código de recuperação gerado",recovery_password_reset:"Senha recuperada"}[x.event] || x.event)) +
       '</td></tr>').join("");
     q("#panel").innerHTML = '<section class="va-management">' +
-      '<header class="va-heading"><div><span class="va-tag">ADMINISTRAÇÃO · VITRA</span><h2>Gestão de Acessos</h2>' +
-      '<p>Usuários autorizados, permissões e histórico de entradas.</p></div><span class="va-pill">Exclusivo do administrador</span></header>' +
+      '<header class="va-heading"><h2>Gestão de acessos</h2></header>' +
       '<div class="va-stats"><div class="va-stat"><small>Contas cadastradas</small><strong>' + userRows.length + '</strong></div>' +
       '<div class="va-stat"><small>Acessos ativos</small><strong>' + active + '</strong></div>' +
-      '<div class="va-stat"><small>Entradas recentes*</small><strong>' + recent + '</strong></div></div>' +
-      '<p class="va-subtle">* Eventos exibidos no histórico disponível, não usuários conectados neste instante.</p>' +
+      '<div class="va-stat"><small>Entradas no histórico</small><strong>' + recent + '</strong></div></div>' +
       '<div id="va-notice" hidden></div>' +
-      '<div class="va-recovery-highlight"><div class="va-recovery-mark" aria-hidden="true">✦</div>' +
-      '<div class="va-recovery-content"><strong>Recuperação da conta</strong>' +
-      '<p>Guarde um código de emergência para redefinir sua senha caso a esqueça. Ele aparece apenas uma vez.</p></div>' +
-      '<button type="button" id="va-generate-recovery" class="va-recovery-create">Gerar código de emergência <span aria-hidden="true">→</span></button></div>' +
-      '<section class="va-panel"><div class="va-panel-head"><h3>Minha conta</h3><span class="va-subtle">Seu acesso pessoal</span></div>' +
+      '<section class="va-panel"><div class="va-panel-head"><h3>Minha conta</h3></div>' +
       '<form class="va-admin-form" id="va-self-form">' +
       '<label>Seu nome<input name="display_name" maxlength="80" required value="' + safe(me.display_name) + '"></label>' +
       '<label>Seu usuário<input name="username" pattern="[A-Za-z0-9._-]{3,32}" maxlength="32" required value="' + safe(me.username) + '"></label>' +
@@ -228,14 +240,18 @@
       '<label>Nova senha (opcional)<input name="new_password" minlength="10" maxlength="128" type="password" autocomplete="new-password" placeholder="Mantenha vazio para não alterar"></label>' +
       '<div class="va-full"><button type="submit" class="va-primary">Salvar minha conta</button></div></form>' +
       '<p class="va-subtle">Mudanças da sua conta exigem a senha atual. Alterar a senha encerrará esta sessão.</p></section>' +
-      '<section class="va-panel"><div class="va-panel-head"><h3>Cadastrar colaborador</h3><span class="va-subtle">Usuário e senha exclusivos</span></div>' +
+      '<div class="va-recovery-highlight"><div class="va-recovery-mark" aria-hidden="true">✦</div>' +
+      '<div class="va-recovery-content"><strong>Código de recuperação</strong>' +
+      '<p>Gere e guarde um código para recuperar seu acesso se esquecer a senha.</p></div>' +
+      '<button type="button" id="va-generate-recovery" class="va-recovery-create">Gerar código <span aria-hidden="true">→</span></button></div>' +
+      '<section class="va-panel"><div class="va-panel-head"><h3>Novo colaborador</h3></div>' +
       '<form class="va-admin-form" id="va-create-form">' +
       '<label>Nome da pessoa<input name="display_name" maxlength="80" required placeholder="Nome para identificação"></label>' +
       '<label>Nome de usuário<input name="username" minlength="3" maxlength="32" required pattern="[A-Za-z0-9._-]+" autocomplete="off" placeholder="ex.: equipe.cq"></label>' +
       '<label class="va-full">Senha inicial<input name="password" minlength="10" maxlength="128" type="password" required autocomplete="new-password" placeholder="Ao menos 10 caracteres"></label>' +
       '<div class="va-full"><button class="va-primary" type="submit">Criar usuário</button></div></form>' +
       '<p class="va-subtle">As senhas não são exibidas depois de cadastradas. Você poderá redefini-las quando necessário.</p></section>' +
-      '<section class="va-panel"><div class="va-panel-head"><h3>Usuários autorizados</h3><span class="va-subtle">Somente sua conta pode administrar</span></div>' +
+      '<section class="va-panel"><div class="va-panel-head"><h3>Usuários autorizados</h3></div>' +
       '<div class="va-table-wrap"><table class="va-table"><thead><tr><th>Pessoa / usuário</th><th>Situação</th><th>Última entrada</th><th>Gerenciar</th></tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="va-empty">Nenhuma conta cadastrada.</td></tr>') + '</tbody></table></div></section>' +
       '<section class="va-panel"><div class="va-panel-head"><h3>Histórico de acessos</h3><span class="va-subtle">Últimos 100 eventos</span></div>' +
       '<div class="va-table-wrap"><table class="va-table"><thead><tr><th>Data / hora</th><th>Conta</th><th>Atividade</th></tr></thead><tbody>' +
