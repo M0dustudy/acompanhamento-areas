@@ -10,19 +10,19 @@
 <div class="va-wordmark"><strong>VITRA</strong><span>Inteligência e Rastreabilidade da Uva</span></div></div>
 <div class="va-scene-copy"><span class="va-kicker">Configuração inicial protegida</span>
 <h1>Sua plataforma. Seu controle.</h1>
-<p>Ative a conta principal uma única vez. Depois, somente o administrador mestre poderá cadastrar outros usuários.</p></div>
+<p>Ative a conta principal uma única vez. Depois, somente o administrador poderá cadastrar outros usuários.</p></div>
 <div class="va-scene-foot">VITRA · Ativação de uso único</div></div>
 <div class="va-side"><div class="va-login"><span class="va-badge">◇ Administração</span>
-<h2>Ativar acesso mestre</h2><p>Use o código privado de ativação fornecido no momento da instalação.</p>
+<h2>Ativar acesso de administrador</h2><p>Use o código privado de ativação fornecido no momento da instalação.</p>
 <form id="setup-form">
 <label class="va-field">Código de ativação<input class="va-input" type="password" name="code" autocomplete="off" minlength="32" required></label>
 <label class="va-field">Seu nome<input class="va-input" name="display_name" maxlength="80" value="Carlos" required></label>
 <label class="va-field">Seu usuário<input class="va-input" name="username" maxlength="32" value="carlos" pattern="[A-Za-z0-9._-]{3,32}" required></label>
-<label class="va-field">Sua senha mestre<input class="va-input" name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></label>
+<label class="va-field">Sua senha de administrador<input class="va-input" name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></label>
 <p class="va-setup-help">Crie uma senha exclusiva e guarde-a em um gerenciador de senhas. Não envie a senha nesta conversa.</p>
 <div id="setup-message" role="status"></div>
 <button class="va-login-submit" type="submit">Ativar administrador →</button></form>
-<div class="va-login-footer">A ativação fica indisponível depois da criação do administrador mestre.</div></div></div>
+<div class="va-login-footer">A ativação fica indisponível depois da criação do administrador.</div></div></div>
 </div>
 <script>
 const init = new URLSearchParams(location.hash.replace(/^#/, ""));
