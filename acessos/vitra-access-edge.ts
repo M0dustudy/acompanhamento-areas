@@ -133,6 +133,37 @@ async function handle(req, payload) {
       session:{ access_token:signed.session.access_token,refresh_token:signed.session.refresh_token,
         expires_at:signed.session.expires_at }});
   }
+  if (action === "recovery_reset") {
+    const username = userName(payload.username);
+    const code = typeof payload.code === "string" ? payload.code.replace(/[\s-]/g, "").toLowerCase() : "";
+    if (!validName(username) || !/^[a-f0-9]{64}$/.test(code) || !validPassword(payload.password))
+      return fail("Usuário, código de recuperação ou nova senha inválidos.", 400);
+    if (!await throttle(req, "recover:" + username))
+      return fail("Muitas tentativas. Tente novamente mais tarde.", 429);
+    const { data: user, error: findError } = await db.from(USER)
+      .select("id,username,role,enabled").eq("username", username).maybeSingle();
+    if (findError || !user || user.role !== "master" || user.enabled !== true)
+      return fail("Código de recuperação inválido ou já utilizado.", 401);
+    const { data: recovery, error: recoveryError } = await db.from("vitra_recovery_codes")
+      .select("code_hash,used_at").eq("user_id",user.id).maybeSingle();
+    if (recoveryError || !recovery || recovery.used_at ||
+        !constantTimeEqual(await digest(code), recovery.code_hash))
+      return fail("Código de recuperação inválido ou já utilizado.", 401);
+    const usedAt = new Date().toISOString();
+    const consumed = await db.from("vitra_recovery_codes").update({ used_at:usedAt })
+      .eq("user_id",user.id).eq("code_hash",recovery.code_hash).is("used_at",null)
+      .select("user_id").maybeSingle();
+    if (consumed.error || !consumed.data)
+      return fail("Código de recuperação inválido ou já utilizado.", 401);
+    const reset = await db.auth.admin.updateUserById(user.id,{ password:payload.password });
+    if (reset.error) {
+      await db.from("vitra_recovery_codes").update({used_at:null})
+        .eq("user_id",user.id).eq("code_hash",recovery.code_hash).eq("used_at",usedAt);
+      throw new Error("Falha ao redefinir senha; tente novamente.");
+    }
+    await logEvent(user, "recovery_password_reset", user.id);
+    return respond({ok:true,message:"Senha redefinida com sucesso. Entre com sua nova senha."});
+  }
   const caller = await sessionUser(req);
   if (!caller) return fail("Sessão inválida ou acesso bloqueado.", 401);
   if (action === "me") return respond({ok:true,profile:caller});
@@ -141,6 +172,28 @@ async function handle(req, payload) {
     return respond({ok:true});
   }
   if (caller.role !== "master") return fail("Somente o administrador mestre pode gerenciar acessos.", 403);
+  if (action === "recovery_generate") {
+    const currentPassword = payload.current_password;
+    if (typeof currentPassword !== "string" || currentPassword.length > 128 || currentPassword.length === 0)
+      return fail("Informe sua senha atual para gerar o código de recuperação.");
+    const {data: own,error:ownError} = await db.from(USER)
+      .select("auth_email").eq("id",caller.id).single();
+    if (ownError || !own) return fail("Conta mestre não encontrada.",404);
+    const verified = await newAuthClient().auth.signInWithPassword({
+      email:own.auth_email,password:currentPassword
+    });
+    if (verified.error || verified.data.user?.id !== caller.id)
+      return fail("Senha atual incorreta.",403);
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const plain = [...bytes].map(x=>x.toString(16).padStart(2,"0")).join("");
+    const grouped = plain.toUpperCase().match(/.{1,8}/g).join("-");
+    const {error} = await db.from("vitra_recovery_codes").upsert({
+      user_id:caller.id, code_hash:await digest(plain),used_at:null,created_at:new Date().toISOString()
+    },{onConflict:"user_id"});
+    if (error) throw new Error("Não foi possível gerar o código de emergência.");
+    await logEvent(caller,"recovery_code_created",caller.id);
+    return respond({ok:true,code:grouped,message:"Guarde o código em local seguro. Ele é exibido apenas uma vez."});
+  }
   if (action === "self") {
     const username = userName(payload.username);
     const displayName = String(payload.display_name ?? "").trim();
