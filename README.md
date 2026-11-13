@@ -2,6 +2,18 @@
 
 Dashboard de acompanhamento das áreas de uva e controle de qualidade.
 
+## Regra permanente — cadastro, organização e vínculo de todos os relatórios
+
+**Diretriz geral do VITRA (13/11/2026):** sempre manter os relatórios recebidos e os arquivos hospedados no GitHub **organizados, conferidos, cadastrados e vinculados às respectivas avaliações**, em todos os módulos: acompanhamento de áreas, colheita, recepção, titulação e estoque em câmara fria. Uma atualização não está concluída somente porque o PDF foi enviado ao repositório.
+
+- **Tratar novos documentos de ponta a ponta:** ao receber relatórios ou ao atuar sobre arquivos já hospedados, identificar o tipo de avaliação, a área/produtor, a data original, a variedade, o número do documento e os demais identificadores pertinentes; conferir se o registro já existe; cadastrar apenas o que for novo; anexar o PDF à avaliação correta; e preservar as avaliações anteriores.
+- **Manter vínculo verificável e individual:** confrontar os PDFs presentes nas pastas oficiais do GitHub com os registros do painel e as referências do visualizador. Cada avaliação documental deve ter seu PDF original correspondente quando hospedado, com visualização e download funcionando. Um arquivo sem cadastro, um cadastro sem arquivo ou um link incorreto é uma **pendência a identificar e resolver**, não algo a omitir.
+- **Conferir todo o histórico e a sequência:** em acompanhamento de áreas, distinguir avaliações de **21, 14 e 07 dias** e reavaliações, mantendo a data e o número de cada relatório; em estoque, respeitar lote, pallet, classificação e data original de cada laudo. Não transferir resultados de um documento para outro, não duplicar avaliações e não alterar registros anteriores para encaixar um novo PDF.
+- **Padronizar os nomes quando necessário:** renomear documentos genéricos ou repetidos com identificação técnica única, após leitura e checagem de colisões, conservando os arquivos originais e corrigindo simultaneamente todos os caminhos e vínculos. Arquivos que já tenham identificadores automáticos únicos e aceitos pelas regras podem conservar o nome.
+- **Fechar cada atualização com auditoria:** conferir quantidades de PDFs, registros, vínculos, datas e identificadores; verificar integridade do código e das referências; confirmar o commit na branch `main` e o resultado do GitHub Pages. Relatar claramente o que está concluído e qualquer pendência que continue aberta.
+- **Nunca excluir por ausência ou divergência isolada:** PDFs não encontrados, cadastros incompletos, documentos antigos e inconsistências precisam de investigação. Não apagar, substituir, reclassificar ou sobrescrever informações sem comprovação e autorização específica. Preservar backup antes de alterações relevantes.
+- **Aplicação futura:** repetir essa checagem em todas as próximas atualizações de relatórios do VITRA, sem depender de o usuário solicitar separadamente que os documentos sejam vinculados. Se faltar a fonte original, acesso ou identificação suficiente, informar a pendência e não declarar a tarefa concluída.
+
 ## Regras permanentes — atraso da colheita e interface limpa
 
 - **A data original de colheita é imutável**: identificar a previsão nos relatórios oficiais iniciais da área (avaliações de 21, 14 e 07 dias) e registrar sua origem. Uma avaliação adicional realizada depois da data prevista não pode substituir essa referência, mesmo que o PDF informe uma data nova ou provisória.
