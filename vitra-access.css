@@ -566,3 +566,235 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
 .va-login .va-login-submit > span{font:inherit;margin:0;line-height:1.4}
 .va-gate{align-items:safe center}
 @media(max-width:800px){.va-gate{align-items:safe center}}
+
+
+/* VITRA — Gestão de acessos integrada ao painel (13/11/2026).
+   Restrito à navegação, identificação de conta e vista administrativa. */
+
+/* Um módulo exclusivo: o banner do início e os indicadores não aparecem na gestão. */
+.vitra-shell.va-admin-view .vitra-main .vitra-hero,
+.vitra-shell.va-admin-view .vitra-main #vitraKpis,
+.vitra-shell.va-admin-view .vitra-main .vitra-footer{
+  display:none!important
+}
+.vitra-shell.va-admin-view .vitra-main{
+  padding-top:clamp(18px,2.4vw,32px)
+}
+.vitra-shell.va-admin-view .vitra-main #panel{
+  display:block!important;
+  margin:0!important;
+  padding:clamp(18px,2.4vw,30px)!important;
+  min-height:calc(100dvh - 70px);
+  background:#fff!important;border:1px solid #e0e9e3!important;
+  border-radius:20px!important;box-shadow:0 12px 34px #153b2810!important
+}
+.vitra-shell.va-admin-view .va-management{padding:0;font-size:13px}
+.vitra-shell.va-admin-view .va-heading{
+  display:block;position:static;
+  margin:0 0 24px;padding:0 0 19px;
+  background:transparent!important;border:0;border-bottom:1px solid #e5ede7;
+  border-radius:0;box-shadow:none!important
+}
+.vitra-shell.va-admin-view .va-heading h2{
+  margin:0!important;color:#173e2a!important;
+  font-size:clamp(24px,2.4vw,30px)!important;
+  font-weight:770!important;line-height:1.25!important;
+  letter-spacing:-.035em!important
+}
+.vitra-shell.va-admin-view .va-stats{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;margin:0 0 22px
+}
+.vitra-shell.va-admin-view .va-stat{
+  padding:17px 18px;background:#f7faf7;border-color:#e3ebe5;
+  border-radius:12px;box-shadow:none
+}
+.vitra-shell.va-admin-view .va-stat small{
+  font-size:11px;line-height:1.35;color:#607b69;letter-spacing:0;
+  margin-bottom:8px
+}
+.vitra-shell.va-admin-view .va-stat strong{
+  font-size:25px;letter-spacing:-.03em;font-weight:780;color:#174f32
+}
+.vitra-shell.va-admin-view .va-panel{
+  border:1px solid #e0e9e3;border-radius:14px;
+  padding:clamp(16px,2vw,21px);margin-bottom:14px;
+  background:#fff;box-shadow:none
+}
+.vitra-shell.va-admin-view .va-panel-head{margin-bottom:17px;gap:10px}
+.vitra-shell.va-admin-view .va-panel-head h3{
+  color:#214b33;font-size:16px;font-weight:750;line-height:1.3
+}
+.vitra-shell.va-admin-view .va-admin-form input{
+  min-height:44px;border-radius:10px!important;font-size:13px!important
+}
+.vitra-shell.va-admin-view .va-admin-form label{
+  line-height:1.45;font-size:11px;color:#496652
+}
+.vitra-shell.va-admin-view .va-recovery-highlight{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;gap:14px;
+  margin:0 0 14px;padding:17px 19px;
+  background:#f7faf6;border:1px solid #e0ebe1;
+  border-radius:13px;box-shadow:none
+}
+.vitra-shell.va-admin-view .va-recovery-mark{
+  width:40px;height:40px;font-size:21px;
+  background:#e9f2ea;border:1px solid #dce9df;border-radius:11px
+}
+.vitra-shell.va-admin-view .va-recovery-content strong{
+  font-size:13px;font-weight:750;color:#234a33
+}
+.vitra-shell.va-admin-view .va-recovery-content p{
+  font-size:11px;margin:4px 0 0;line-height:1.5;color:#728577
+}
+.vitra-shell.va-admin-view .va-recovery-create{
+  min-height:39px;padding:10px 13px!important;
+  border:1px solid #b9d4bf!important;border-radius:9px!important;
+  background:#fff!important;color:#27613e!important;
+  -webkit-text-fill-color:#27613e!important;
+  font-size:11px!important;box-shadow:none!important
+}
+.vitra-shell.va-admin-view .va-recovery-create:hover{background:#edf6ef!important}
+.vitra-shell.va-admin-view .va-table th{
+  background:#f5f8f5;color:#627d6d;
+  font-weight:750;letter-spacing:.04em
+}
+.vitra-shell.va-admin-view .va-table td{color:#244532}
+.vitra-shell.va-admin-view .va-table .va-subtle{font-size:11px}
+
+/* A administração é o último item do menu, sem destaque duplicado. */
+#cards .va-admin-nav{
+  display:flex!important;align-items:center!important;
+  min-height:50px!important;margin-top:10px!important;
+  padding:13px 12px!important;
+  border:1px solid transparent!important;
+  border-radius:12px!important;
+  background:transparent!important;box-shadow:none!important;
+  color:#e4f2e7!important;-webkit-text-fill-color:#e4f2e7!important
+}
+#cards .va-admin-nav b{
+  display:flex;align-items:center;gap:10px;
+  min-width:0;font-size:12px!important;font-weight:750!important;
+  letter-spacing:0;line-height:1.4;
+  color:inherit!important;-webkit-text-fill-color:inherit!important
+}
+#cards .va-admin-nav .va-admin-icon{
+  flex:0 0 18px;display:grid;place-items:center;
+  width:18px;height:18px;color:#bad3c2;font-size:0
+}
+#cards .va-admin-nav .va-admin-icon svg{width:18px;height:18px}
+#cards .va-admin-nav:hover,
+#cards .va-admin-nav.active{
+  background:#ffffff17!important;border-color:#e0efd335!important;
+  box-shadow:none!important;outline:0!important
+}
+#cards .va-admin-nav.active{box-shadow:inset 3px 0 0 #d0bd87!important}
+#cards .va-admin-nav:focus-visible{outline:2px solid #e5d59b!important;outline-offset:2px!important}
+#cards .va-admin-nav small{display:none!important}
+
+/* Conta conectada: discreta, sem botão flutuante sobre o conteúdo. */
+.vitra-sidebar .va-account{
+  position:relative;z-index:25;flex:0 0 auto;
+  margin-top:auto;padding-top:16px;color:#f4f7f2;
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif
+}
+.va-account-toggle{
+  display:flex;align-items:center;gap:10px;min-width:0;min-height:51px;
+  list-style:none;cursor:pointer;padding:8px 10px;
+  border:1px solid #ffffff2c;border-radius:12px;
+  background:#ffffff0e;color:#e7f4ec;
+  transition:background .18s,border-color .18s
+}
+.va-account-toggle::-webkit-details-marker{display:none}
+.va-account-toggle::marker{content:""}
+.va-account-toggle:hover,.va-account[open] .va-account-toggle{
+  background:#ffffff1b;border-color:#dfeddd5b
+}
+.va-account-toggle:focus-visible{
+  outline:2px solid #e5d49b;outline-offset:2px
+}
+.va-avatar{
+  display:grid;place-items:center;flex:0 0 32px;height:32px;
+  border-radius:10px;background:#d9e3cf;color:#1a5939;
+  font-weight:800;font-size:13px;line-height:1
+}
+.va-account-name{
+  flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;font-size:12px;font-weight:750
+}
+.va-account-chevron{
+  flex:0 0 16px;opacity:.68;transition:transform .18s
+}
+.va-account[open] .va-account-chevron{transform:rotate(180deg)}
+.va-account-options{
+  position:absolute;bottom:calc(100% - 8px);left:0;right:0;z-index:30;
+  padding:7px;border:1px solid #dbe7dc;border-radius:12px;
+  background:#fff;box-shadow:0 13px 36px #04180e55
+}
+.va-account-options button{
+  display:block;width:100%;min-height:41px;padding:10px 12px!important;
+  border:0!important;border-radius:8px!important;background:transparent!important;
+  color:#25543a!important;-webkit-text-fill-color:#25543a!important;
+  text-align:left;font:650 12px/1.4 Inter,system-ui,sans-serif!important;
+  box-shadow:none!important
+}
+.va-account-options button:hover{
+  background:#edf5ef!important;color:#17462f!important;
+  -webkit-text-fill-color:#17462f!important
+}
+.va-account-options .va-account-mobile-access{display:none!important}
+@media(min-width:721px) and (max-width:900px){
+  .vitra-sidebar .va-account{
+    width:max-content;min-width:160px;max-width:230px;
+    padding-top:12px;margin:0
+  }
+  .va-account-options{top:calc(100% + 6px);bottom:auto}
+}
+@media(max-width:720px){
+  .vitra-shell.va-admin-view .vitra-main{
+    padding:13px 12px 20px!important
+  }
+  .vitra-shell.va-admin-view .vitra-main .vitra-hero,
+  .vitra-shell.va-admin-view .vitra-main #vitraKpis{display:none!important}
+  .vitra-shell.va-admin-view .vitra-main #panel{
+    display:block!important;min-height:0!important;
+    margin:0!important;padding:20px 16px!important;
+    border-radius:16px!important
+  }
+  .vitra-shell.va-admin-view .va-heading{margin-bottom:18px;padding-bottom:15px}
+  .vitra-shell.va-admin-view .va-stats{gap:7px;margin-bottom:16px}
+  .vitra-shell.va-admin-view .va-stat{padding:12px 9px;border-radius:10px}
+  .vitra-shell.va-admin-view .va-stat small{font-size:10px}
+  .vitra-shell.va-admin-view .va-stat strong{font-size:22px}
+  .vitra-shell.va-admin-view .va-panel{padding:15px 12px}
+  .vitra-shell.va-admin-view .va-recovery-highlight{
+    grid-template-columns:auto minmax(0,1fr);padding:14px;gap:11px
+  }
+  .vitra-shell.va-admin-view .va-recovery-create{
+    grid-column:1/-1;justify-self:stretch;width:100%
+  }
+  .vitra-sidebar .va-account{
+    position:absolute;top:15px;right:16px;
+    width:auto;max-width:156px;padding:0;margin:0;z-index:30
+  }
+  .va-account-toggle{min-height:42px;padding:5px 8px;gap:7px;border-radius:11px}
+  .va-avatar{flex-basis:28px;height:28px;border-radius:8px;font-size:12px}
+  .va-account-name{font-size:11px}
+  .va-account-options{
+    top:calc(100% + 8px);bottom:auto;left:auto;right:0;
+    width:max-content;min-width:195px;max-width:min(270px,calc(100vw - 30px))
+  }
+  .va-account-options .va-account-mobile-access{display:block!important}
+}
+@media(max-width:390px){
+  .vitra-sidebar .va-account{top:14px;right:11px}
+  .va-account-name{display:none}
+  .va-account-toggle{gap:5px}
+  .vitra-shell.va-admin-view .va-stats{
+    grid-template-columns:repeat(3,minmax(0,1fr))
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .va-account-toggle,.va-account-chevron{transition:none!important}
+}
