@@ -90,7 +90,23 @@ try {
   unique(estoque.map(x => String(x.id)), 'Identificador de estoque');
   unique(estoque.map(x => String(x.file)), 'PDF de estoque');
   const stockRefs = new Set(estoque.map(x => 'relatorios/estoque/' + x.file));
-  for (const path of stockRefs) assert(tracked.has(path), 'PDF de estoque não encontrado: ' + path);
+  const pendingStock = estoque.filter(x => x.pendingPdf === true);
+  for (const item of estoque) {
+    const path = 'relatorios/estoque/' + item.file;
+    assert(typeof item.file === 'string' && item.file.endsWith('.pdf'),
+      'Nome do PDF de estoque inválido: ' + item.id);
+    if (item.pendingPdf === true) {
+      // O relatório está identificado no cadastro, mas o link continua indisponível.
+      // Ele passa a ser obrigatório e verificável assim que o arquivo for hospedado.
+      assert(!tracked.has(path), 'PDF hospedado continua pendente: ' + path);
+      assert(Boolean(item.doc && item.date && item.lot && item.pallet),
+        'Avaliação pendente sem identificação: ' + item.id);
+      assert(Array.isArray(item.boxDetails) && item.boxDetails.length === Number(item.sampled),
+        'Avaliação pendente sem caixas originais: ' + item.id);
+    } else {
+      assert(tracked.has(path), 'PDF de estoque não encontrado: ' + path);
+    }
+  }
   const stockFiles = [...tracked].filter(x => x.startsWith('relatorios/estoque/') && x.endsWith('.pdf'));
   for (const path of stockFiles) assert(stockRefs.has(path), 'PDF de estoque sem avaliação: ' + path);
   const fieldFiles = [...tracked].filter(x => x.startsWith('relatorios/acompanhamento de área/') && x.endsWith('.pdf'));
@@ -100,7 +116,7 @@ try {
   console.log('Situações de áreas:', groupCodes.length);
   console.log('Recepções:', recepcoes.length);
   console.log('Titulações por data/área:', Object.keys(titulacoes).length);
-  console.log('Estoque:', estoque.length, 'avaliações /', stockFiles.length, 'PDFs');
+  console.log('Estoque:', estoque.length, 'avaliações /', stockFiles.length, 'PDFs hospedados /', pendingStock.length, 'PDFs pendentes');
   console.log('PDFs de campo:', fieldFiles.length);
 } catch (error) {
   errors.push(error.stack || String(error));
