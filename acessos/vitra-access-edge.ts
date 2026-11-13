@@ -141,6 +141,42 @@ async function handle(req, payload) {
     return respond({ok:true});
   }
   if (caller.role !== "master") return fail("Somente o administrador mestre pode gerenciar acessos.", 403);
+  if (action === "self") {
+    const username = userName(payload.username);
+    const displayName = String(payload.display_name ?? "").trim();
+    const currentPassword = payload.current_password;
+    const newPassword = payload.new_password;
+    if (!validName(username) || !validDisplayName(displayName) ||
+        typeof currentPassword !== "string" || currentPassword.length > 128 ||
+        (newPassword && !validPassword(newPassword)))
+      return fail("Dados da conta ou senha inválidos.");
+    const { data: own } = await db.from(USER).select("auth_email,username,display_name")
+      .eq("id",caller.id).single();
+    if (!own) return fail("Conta mestre não encontrada.",404);
+    const confirmed = await newAuthClient().auth.signInWithPassword({
+      email:own.auth_email, password:currentPassword
+    });
+    if (confirmed.error || confirmed.data.user?.id !== caller.id)
+      return fail("Senha atual incorreta.",403);
+    const profileChange = username !== own.username || displayName !== own.display_name;
+    if (profileChange) {
+      const renamed = await db.from(USER).update({ username,display_name:displayName })
+        .eq("id",caller.id);
+      if (renamed.error) return fail(renamed.error.code==="23505" ?
+        "Nome de usuário já cadastrado.":"Não foi possível alterar sua conta.");
+    }
+    if (newPassword) {
+      const changed = await db.auth.admin.updateUserById(caller.id,{password:newPassword});
+      if (changed.error) {
+        if (profileChange) await db.from(USER).update({username:own.username,
+          display_name:own.display_name}).eq("id",caller.id);
+        throw new Error("Não foi possível alterar a senha mestre.");
+      }
+      await logEvent({id:caller.id,username},"reset_password",caller.id);
+    }
+    if (profileChange) await logEvent({id:caller.id,username},"update_user",caller.id);
+    return respond({ok:true,requires_relogin:Boolean(newPassword)});
+  }
   if (action === "list") {
     const { data, error } = await db.from(USER).select(userField).order("created_at", { ascending:true });
     if (error) throw new Error("Não foi possível listar os usuários.");
