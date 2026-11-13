@@ -242,7 +242,7 @@
     q("#panel").innerHTML = '<section class="va-management">' +
       '<header class="va-heading"><h2>Gestão de acessos</h2></header>' +
       '<div class="va-stats"><div class="va-stat"><small>Contas cadastradas</small><strong>' + userRows.length + '</strong></div>' +
-      '<div class="va-stat"><small>Acessos ativos</small><strong>' + active + '</strong></div>' +
+      '<div class="va-stat"><small>Contas ativas</small><strong>' + active + '</strong></div>' +
       '<div class="va-stat"><small>Entradas no histórico</small><strong>' + recent + '</strong></div></div>' +
       '<div id="va-notice" hidden></div>' +
       '<section class="va-panel"><div class="va-panel-head"><h3>Minha conta</h3></div>' +
