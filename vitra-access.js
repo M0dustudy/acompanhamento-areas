@@ -44,14 +44,51 @@
       (message ? '<div class="va-error" role="alert">' + safe(message) + '</div>' : '') +
       '<button type="submit" class="va-login-submit" id="va-submit"' + (!READY || busy ? ' disabled' : '') + '>' +
       (busy ? "Verificando acesso…" : "Entrar no VITRA →") + '</button>' +
-      '</form><div class="va-login-footer">♢ Suas credenciais são pessoais. Não compartilhe seu acesso.</div></div></div></div>';
+      '</form><div style="text-align:center;margin-top:18px"><button type="button" class="va-action" id="va-forgot">Esqueceu a senha?</button></div>' +
+      '<div class="va-login-footer">♢ Suas credenciais são pessoais. Não compartilhe seu acesso.</div></div></div></div>';
     q("#va-show-pass").addEventListener("click", () => {
       const field = q("#va-password");
       field.type = field.type === "password" ? "text" : "password";
       q("#va-show-pass").textContent = field.type === "password" ? "Mostrar" : "Ocultar";
     });
     q("#va-login-form").addEventListener("submit", submitLogin);
+    q("#va-forgot").addEventListener("click", recoveryPage);
     if (!busy) q("#va-user").focus();
+  }
+
+  function recoveryPage() {
+    loginPage();
+    q(".va-side").innerHTML = '<div class="va-login"><span class="va-badge">◇ Recuperação de acesso</span>' +
+      '<h2>Redefinir senha</h2><p>Use o código de emergência que você guardou na Gestão de Acessos. Ele só pode ser utilizado uma vez.</p>' +
+      '<form id="va-recovery-form">' +
+      '<label class="va-field">Seu usuário<input class="va-input" name="username" autocomplete="username" required maxlength="32" placeholder="ex.: carlos.chagas"></label>' +
+      '<label class="va-field">Código de recuperação<input class="va-input" name="code" autocomplete="off" required maxlength="85" placeholder="Cole seu código de emergência"></label>' +
+      '<label class="va-field">Nova senha<input class="va-input" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="Pelo menos 10 caracteres"></label>' +
+      '<label class="va-field">Confirmar nova senha<input class="va-input" name="confirm_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>' +
+      '<div id="va-recovery-message" role="alert"></div>' +
+      '<button class="va-login-submit" type="submit">Redefinir minha senha</button></form>' +
+      '<div style="margin-top:17px;text-align:center"><button class="va-action" type="button" id="va-back-login">Voltar ao login</button></div>' +
+      '<div class="va-login-footer">♢ Sem o código de emergência, a recuperação precisará ser feita pelo administrador da infraestrutura.</div></div>';
+    q("#va-back-login").addEventListener("click", () => loginPage());
+    q("#va-recovery-form").addEventListener("submit", async ev => {
+      ev.preventDefault();
+      const form = ev.currentTarget, fields = new FormData(form), btn = q('button[type="submit"]',form), msg=q("#va-recovery-message");
+      if (fields.get("password") !== fields.get("confirm_password")) {
+        msg.className="va-error";msg.textContent="As senhas não coincidem.";return;
+      }
+      btn.disabled=true;msg.className="";msg.textContent="";
+      try {
+        await call("recovery_reset",{username:fields.get("username"),code:fields.get("code"),password:fields.get("password")},false);
+        msg.className="va-toast";
+        msg.textContent="Senha redefinida. Seu código de emergência foi consumido e não poderá ser reutilizado.";
+        btn.hidden=true;
+        const back=q("#va-back-login");back.textContent="Entrar com a nova senha";
+        form.reset();
+      } catch(e) {
+        msg.className="va-error";msg.textContent=errorMessage(e);
+        btn.disabled=false;
+      }
+    });
   }
   async function call(action, payload = {}, needAuth = true) {
     if (!READY) throw new Error(configError);
@@ -182,7 +219,7 @@
       '</td><td><strong>' + safe(x.username) + '</strong></td><td>' +
       safe(({login:"Entrou no VITRA",logout:"Saiu",create_user:"Usuário criado",
         update_user:"Acesso alterado",reset_password:"Senha redefinida",
-        block_user:"Acesso bloqueado",unblock_user:"Acesso reativado",delete_user:"Acesso excluído"}[x.event] || x.event)) +
+        block_user:"Acesso bloqueado",unblock_user:"Acesso reativado",delete_user:"Acesso excluído",recovery_code_created:"Código de recuperação gerado",recovery_password_reset:"Senha recuperada"}[x.event] || x.event)) +
       '</td></tr>').join("");
     q("#panel").innerHTML = '<section class="va-management">' +
       '<header class="va-heading"><div><span class="va-tag">ADMINISTRAÇÃO · VITRA</span><h2>Gestão de Acessos</h2>' +
@@ -200,7 +237,10 @@
       '<label>Nova senha (opcional)<input name="new_password" minlength="10" maxlength="128" type="password" autocomplete="new-password" placeholder="Mantenha vazio para não alterar"></label>' +
       '<div class="va-full"><button type="submit" class="va-primary">Salvar minha conta</button></div></form>' +
       '<p class="va-subtle">Mudanças da sua conta exigem a senha atual. Alterar a senha encerrará esta sessão.</p></section>' +
-      '<section class="va-panel"><div class="va-panel-head"><h3>Cadastrar colaborador</h3><span class="va-subtle">Usuário e senha exclusivos</span></div>' +
+      '<section class="va-panel"><div class="va-panel-head"><h3>Recuperação de emergência</h3><span class="va-subtle">Exclusivo do administrador mestre</span></div>' +
+      '<p class="va-subtle">Se você esquecer a senha, um código de emergência poderá redefini-la sem e-mail. Gere um código agora e guarde-o fora do VITRA. Ele aparece uma única vez e é invalidado após o uso ou a emissão de outro código.</p>' +
+      '<button type="button" class="va-action" id="va-generate-recovery">Gerar código de recuperação</button></section>' +
+            '<section class="va-panel"><div class="va-panel-head"><h3>Cadastrar colaborador</h3><span class="va-subtle">Usuário e senha exclusivos</span></div>' +
       '<form class="va-admin-form" id="va-create-form">' +
       '<label>Nome da pessoa<input name="display_name" maxlength="80" required placeholder="Nome para identificação"></label>' +
       '<label>Nome de usuário<input name="username" minlength="3" maxlength="32" required pattern="[A-Za-z0-9._-]+" autocomplete="off" placeholder="ex.: equipe.cq"></label>' +
@@ -214,6 +254,7 @@
       (logs || '<tr><td colspan="3" class="va-empty">Nenhum evento registrado.</td></tr>') +
       '</tbody></table></div></section></section>';
     q("#va-self-form").addEventListener("submit", updateMaster);
+    q("#va-generate-recovery").addEventListener("click", showRecoveryGenerator);
     q("#va-create-form").addEventListener("submit", createUser);
     q("#panel").querySelectorAll("[data-va-action]").forEach(btn => btn.addEventListener("click", manageUser));
   }
@@ -250,6 +291,51 @@
         password: fd.get("password") });
       await refreshManagement("Acesso individual criado com sucesso.");
     } catch (e) { notify(errorMessage(e), true); button.disabled = false; }
+  }
+
+  function showRecoveryGenerator() {
+    if (me?.role !== "master") return;
+    closeModal();
+    const holder = document.createElement("div");
+    holder.id="va-management-modal";
+    holder.className="va-modal-backdrop";
+    holder.innerHTML='<div class="va-modal" role="dialog" aria-modal="true" aria-label="Gerar código de recuperação">' +
+      '<h3>Código de emergência</h3><p>Confirme sua senha atual. O novo código substituirá qualquer código de recuperação anterior.</p>' +
+      '<form id="va-recovery-generate">' +
+      '<label>Senha atual<input name="current_password" type="password" autocomplete="current-password" required></label>' +
+      '<div id="va-recovery-generate-msg" role="alert"></div>' +
+      '<div class="va-modal-buttons"><button type="button" id="va-recovery-cancel">Cancelar</button>' +
+      '<button type="submit" class="va-primary" style="width:auto;min-height:40px;padding:10px 18px!important">Gerar código</button></div></form></div>';
+    document.body.appendChild(holder);
+    q("#va-recovery-cancel",holder).addEventListener("click",closeModal);
+    q("#va-recovery-generate",holder).addEventListener("submit",async ev=>{
+      ev.preventDefault();
+      const form=ev.currentTarget,btn=q('button[type="submit"]',form),msg=q("#va-recovery-generate-msg");
+      btn.disabled=true;
+      try {
+        const data=await call("recovery_generate",{current_password:new FormData(form).get("current_password")});
+        if(!/^[A-F0-9]{8}(?:-[A-F0-9]{8}){7}$/.test(data.code || ""))
+          throw new Error("O servidor não retornou um código válido.");
+        holder.querySelector(".va-modal").innerHTML='<h3>Guarde este código</h3>' +
+          '<p>Esta é a única vez em que o código será exibido. Salve-o em um gerenciador de senhas ou anote em local seguro. Ele permite recuperar sua conta e funciona apenas uma vez.</p>' +
+          '<input id="va-recovery-value" readonly spellcheck="false" aria-label="Seu código de recuperação" value="' + safe(data.code) + '" style="font:600 12px ui-monospace,monospace;letter-spacing:.025em">' +
+          '<p class="va-subtle">Nunca envie este código pelo chat ou compartilhe com outras pessoas.</p>' +
+          '<div class="va-modal-buttons"><button type="button" id="va-copy-recovery">Copiar</button>' +
+          '<button type="button" class="va-primary" style="width:auto;min-height:40px;padding:10px 18px!important" id="va-done-recovery">Já guardei</button></div>';
+        q("#va-copy-recovery",holder).addEventListener("click",async()=>{
+          const input=q("#va-recovery-value",holder);
+          try {await navigator.clipboard.writeText(input.value);q("#va-copy-recovery",holder).textContent="Copiado"; }
+          catch {input.focus();input.select();q("#va-copy-recovery",holder).textContent="Selecione e copie";}
+        });
+        q("#va-done-recovery",holder).addEventListener("click",()=>{
+          q("#va-recovery-value",holder).value="";
+          closeModal();refreshManagement("Código de emergência gerado. Guarde-o em segurança.").catch(()=>{});
+        });
+      } catch(e) {
+        msg.className="va-error";msg.textContent=errorMessage(e);btn.disabled=false;
+      }
+    });
+    q('input[name="current_password"]',holder)?.focus();
   }
   function closeModal() { q("#va-management-modal")?.remove(); }
   function modal(title, description, html, onSubmit) {
