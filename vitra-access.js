@@ -26,42 +26,13 @@
   const configError = "A autenticação está em preparação. O VITRA oficial permanece disponível sem alterações.";
   function loginPage(message = "", busy = false) {
     document.documentElement.classList.add("va-locked");
-    root.innerHTML = '<div class="va-gate" role="main" aria-label="VITRA — Entrar">' +
-      '<div class="va-scene">' +
-      '<div class="va-brand"><div class="va-monogram" aria-hidden="true">V</div>' +
-      '<div class="va-wordmark"><strong>VITRA</strong><span>Inteligência e Rastreabilidade da Uva</span></div></div>' +
-      '<div class="va-scene-middle"><div class="va-scene-copy"><span class="va-kicker">PLATAFORMA DE QUALIDADE</span>' +
-      '<h1>Informações em ordem.<br>Do campo à câmara fria.</h1>' +
-      '<p>Avaliações, colheita, recepção, titulação e estoque em um só lugar.</p></div>' +
-      '<div class="va-grape-art" aria-hidden="true"><svg viewBox="0 0 380 465" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-      '<path d="M178 81C200 52 248 54 277 23M169 90C147 66 116 62 102 37M176 87c15 4 27 15 35 30" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>' +
-      '<path d="M174 73C149 12 88 19 70 44c37 7 54 30 91 42M212 69C227 26 285 14 323 34c-15 33-49 54-92 54" fill="#4E8860" fill-opacity=".34" stroke="currentColor" stroke-width="2"/>' +
-      '<g fill="#DCC392" fill-opacity=".1" stroke="currentColor" stroke-width="2.3">' +
-      '<circle cx="164" cy="129" r="37"/><circle cx="226" cy="131" r="37"/>' +
-      '<circle cx="126" cy="183" r="38"/><circle cx="190" cy="189" r="39"/><circle cx="253" cy="187" r="38"/>' +
-      '<circle cx="160" cy="244" r="39"/><circle cx="227" cy="244" r="39"/>' +
-      '<circle cx="192" cy="307" r="41"/><circle cx="195" cy="370" r="34"/></g>' +
-      '<circle cx="174" cy="122" r="8" fill="#F1D9A4" fill-opacity=".36"/><circle cx="134" cy="178" r="7" fill="#F1D9A4" fill-opacity=".2"/>' +
-      '<path d="M80 406c45 22 190 22 236-2" stroke="#F1D9A4" stroke-opacity=".2" stroke-width="1.5"/></svg></div></div>' +
-      '<div class="va-scene-foot"><span class="va-foot-line"></span> VITRA · Controle de qualidade</div></div>' +
-      '<div class="va-side"><div class="va-login">' +
-      '<div class="va-login-symbol" aria-hidden="true"><span>V</span></div>' +
-      '<div class="va-login-overline">BEM-VINDO</div>' +
-      '<h2>Entrar no VITRA</h2><p>Informe suas credenciais para continuar.</p>' +
-      '<form id="va-login-form" autocomplete="on">' +
-      '<label class="va-field" for="va-user">Usuário</label><div class="va-input-wrap">' +
-      '<span class="va-field-icon" aria-hidden="true">◉</span>' +
-      '<input class="va-input" id="va-user" name="username" maxlength="32" required autocomplete="username" spellcheck="false" placeholder="Seu usuário"></div>' +
-      '<label class="va-field" for="va-password">Senha</label><div class="va-input-wrap">' +
-      '<span class="va-field-icon va-lock-icon" aria-hidden="true">◇</span>' +
-      '<input class="va-input" type="password" id="va-password" name="password" required autocomplete="current-password" placeholder="Sua senha">' +
-      '<button class="va-reveal" type="button" id="va-show-pass" aria-label="Mostrar ou ocultar senha">Mostrar</button></div>' +
+    root.innerHTML = "<div class=\"va-gate\" role=\"main\" aria-label=\"Acesso ao VITRA\">\n  <div class=\"va-frame\">\n    <aside class=\"va-scene\" aria-label=\"VITRA\">\n      <div class=\"va-brand\">\n        <div class=\"va-monogram\" aria-hidden=\"true\">V</div>\n        <div class=\"va-wordmark\"><strong>VITRA</strong><span>Inteligência e Rastreabilidade da Uva</span></div>\n      </div>\n      <div class=\"va-art\" aria-hidden=\"true\">\n        <svg viewBox=\"0 0 400 430\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n          <defs>\n            <linearGradient id=\"va-vine-stroke\" x1=\"70\" y1=\"25\" x2=\"330\" y2=\"380\" gradientUnits=\"userSpaceOnUse\">\n              <stop stop-color=\"#EED8A6\" stop-opacity=\".92\"/>\n              <stop offset=\"1\" stop-color=\"#A88D58\" stop-opacity=\".38\"/>\n            </linearGradient>\n          </defs>\n          <circle cx=\"205\" cy=\"221\" r=\"169\" stroke=\"#E3CAA0\" stroke-opacity=\".12\"/>\n          <circle cx=\"205\" cy=\"221\" r=\"132\" stroke=\"#E3CAA0\" stroke-opacity=\".12\"/>\n          <path d=\"M193 119C201 88 229 64 266 47M191 127C175 100 153 84 116 76M201 119c21 16 28 32 31 51\" stroke=\"url(#va-vine-stroke)\" stroke-width=\"3.2\" stroke-linecap=\"round\"/>\n          <path d=\"M189 106C166 53 115 43 84 59c26 40 59 57 95 61M215 100c17-56 64-83 106-71-13 50-44 75-95 78\" fill=\"#ACC9A1\" fill-opacity=\".065\" stroke=\"url(#va-vine-stroke)\" stroke-width=\"2.3\" stroke-linejoin=\"round\"/>\n          <path d=\"M118 77c23 5 44 17 60 41M318 31c-40 24-68 47-92 75\" stroke=\"#E5D0A4\" stroke-opacity=\".42\" stroke-width=\"1.5\"/>\n          <g stroke=\"url(#va-vine-stroke)\" stroke-width=\"2.7\" fill=\"#E4C898\" fill-opacity=\".045\">\n            <ellipse cx=\"177\" cy=\"165\" rx=\"41\" ry=\"45\"/>\n            <ellipse cx=\"249\" cy=\"168\" rx=\"41\" ry=\"45\"/>\n            <ellipse cx=\"140\" cy=\"236\" rx=\"41\" ry=\"45\"/>\n            <ellipse cx=\"212\" cy=\"238\" rx=\"41\" ry=\"45\"/>\n            <ellipse cx=\"283\" cy=\"236\" rx=\"41\" ry=\"45\"/>\n            <ellipse cx=\"177\" cy=\"307\" rx=\"41\" ry=\"45\"/>\n            <ellipse cx=\"248\" cy=\"310\" rx=\"41\" ry=\"45\"/>\n            <ellipse cx=\"211\" cy=\"373\" rx=\"37\" ry=\"41\"/>\n          </g>\n          <path d=\"M113 368c58 39 144 39 194 0\" stroke=\"#E3CAA0\" stroke-opacity=\".18\" stroke-width=\"1.5\"/>\n        </svg>\n      </div>\n      <div class=\"va-scene-rule\" aria-hidden=\"true\"><span></span><span></span><span></span></div>\n    </aside>\n    <div class=\"va-side\">\n      <section class=\"va-login\" aria-labelledby=\"va-login-title\">\n        <span class=\"va-login-overline\">ÁREA RESTRITA</span>\n        <h2 id=\"va-login-title\">Acesse sua conta</h2>\n        <p>Entre com seu usuário e senha.</p>\n        <form id=\"va-login-form\" autocomplete=\"on\">\n          <label class=\"va-field\" for=\"va-user\">Usuário</label>\n          <div class=\"va-input-wrap\">\n            <input class=\"va-input\" id=\"va-user\" name=\"username\" maxlength=\"32\" required autocomplete=\"username\" spellcheck=\"false\" placeholder=\"Nome de usuário\">\n          </div>\n          <div class=\"va-password-head\">\n            <label class=\"va-field\" for=\"va-password\">Senha</label>\n            <button type=\"button\" class=\"va-forgot\" id=\"va-forgot\">Esqueceu a senha?</button>\n          </div>\n          <div class=\"va-input-wrap\">\n            <input class=\"va-input va-password-input\" type=\"password\" id=\"va-password\" name=\"password\" required autocomplete=\"current-password\" placeholder=\"Digite sua senha\">\n            <button class=\"va-reveal\" type=\"button\" id=\"va-show-pass\" aria-label=\"Mostrar ou ocultar senha\">Mostrar</button>\n          </div>\n          " +
       (message ? '<div class="va-error" role="alert">' + safe(message) + '</div>' : '') +
-      '<button type="submit" class="va-login-submit" id="va-submit"' + (!READY || busy ? ' disabled' : '') + '>' +
-      (busy ? "Verificando…" : "Entrar <span aria-hidden=\"true\">→</span>") + '</button>' +
-      '</form><button type="button" class="va-forgot" id="va-forgot">Esqueceu a senha?</button>' +
-      '<div class="va-login-footer"><span class="va-mini-grape" aria-hidden="true">✧</span> VITRA · Inteligência e Rastreabilidade da Uva</div>' +
-      '</div></div></div>';
+      "\n          <button type=\"submit\" class=\"va-login-submit\" id=\"va-submit\" " +
+      (!READY || busy ? ' disabled' : '') +
+      ">\n            <span>" +
+      (busy ? 'Verificando…' : 'Entrar') +
+      "</span><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" fill=\"none\" width=\"19\" height=\"19\"><path d=\"M4 12h15m-6-6 6 6-6 6\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>\n          </button>\n        </form>\n      </section>\n    </div>\n  </div>\n</div>";
     q("#va-show-pass").addEventListener("click", () => {
       const field = q("#va-password");
       field.type = field.type === "password" ? "text" : "password";
