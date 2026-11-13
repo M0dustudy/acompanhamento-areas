@@ -182,7 +182,7 @@
       '</td><td><strong>' + safe(x.username) + '</strong></td><td>' +
       safe(({login:"Entrou no VITRA",logout:"Saiu",create_user:"Usuário criado",
         update_user:"Acesso alterado",reset_password:"Senha redefinida",
-        block_user:"Acesso bloqueado",unblock_user:"Acesso reativado",delete_user:"Acesso excluído"}[x.event] || x.event) +
+        block_user:"Acesso bloqueado",unblock_user:"Acesso reativado",delete_user:"Acesso excluído"}[x.event] || x.event)) +
       '</td></tr>').join("");
     q("#panel").innerHTML = '<section class="va-management">' +
       '<header class="va-heading"><div><span class="va-tag">ADMINISTRAÇÃO · VITRA</span><h2>Gestão de Acessos</h2>' +
