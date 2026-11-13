@@ -561,3 +561,8 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
 @media(prefers-reduced-motion:reduce){
   .va-login .va-input,.va-login .va-login-submit{transition:none}
 }
+
+/* Ajustes finais de alinhamento e acessibilidade do acesso. */
+.va-login .va-login-submit > span{font:inherit;margin:0;line-height:1.4}
+.va-gate{align-items:safe center}
+@media(max-width:800px){.va-gate{align-items:safe center}}
