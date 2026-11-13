@@ -1,0 +1,38 @@
+name: VITRA - teste de autenticacao (ambiente de teste)
+on:
+  push:
+    branches: [feature/vitra-login-gestao-acessos]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar backend sem credenciais reais
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import urllib.request, urllib.error, json
+          api = "https://avzdnzzohryokzyrxnap.supabase.co/functions/v1/vitra-access"
+          key = "sb_publishable_1sZHM9G_2CrDqONVG79ELw_UTZV3cA2"
+          origin = "https://m0dustudy.github.io"
+          cases = [
+            ("preflight", "OPTIONS", None, 204),
+            ("bloqueio sem usuario", "POST", {"action":"login","username":"vitra-inexistente-ci","password":"senha-invalida-ci"}, 401),
+            ("ativacao exige codigo", "POST", {"action":"bootstrap","code":"codigo-invalido-ci"},403),
+          ]
+          for name, method, body, expected in cases:
+            data = json.dumps(body).encode() if body is not None else None
+            req = urllib.request.Request(api,method=method,data=data,headers={
+              "Origin":origin,"apikey":key,"Content-Type":"application/json",
+              "Access-Control-Request-Method":"POST"})
+            try:
+              with urllib.request.urlopen(req,timeout=20) as rsp: status=rsp.status; hdr=dict(rsp.headers); raw=rsp.read()
+            except urllib.error.HTTPError as e: status=e.code; hdr=dict(e.headers); raw=e.read()
+            print(f"{name}: status={status}; CORS={hdr.get('Access-Control-Allow-Origin', '')}")
+            if status!=expected: raise SystemExit(f"Teste falhou: {name}: esperado {expected}, recebido {status}, body={raw[:200]!r}")
+            if hdr.get("Access-Control-Allow-Origin")!=origin: raise SystemExit("CORS incorreto")
+          print("Autenticacao VITRA: testes de API aprovados.")
+          PY
