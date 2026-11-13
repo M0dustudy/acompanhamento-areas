@@ -798,3 +798,9 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
 @media(prefers-reduced-motion:reduce){
   .va-account-toggle,.va-account-chevron{transition:none!important}
 }
+
+/* O menu de conta deve transbordar o cabeçalho compacto do celular. */
+@media(max-width:720px){
+  .vitra-shell .vitra-sidebar{overflow:visible!important;min-height:78px!important}
+  .vitra-sidebar .va-account{isolation:isolate}
+}
