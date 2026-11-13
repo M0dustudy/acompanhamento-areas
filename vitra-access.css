@@ -807,3 +807,20 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
 
 /* Retorno discreto durante a consulta às contas. */
 .vitra-shell.va-admin-view .va-loading{padding:58px 18px;text-align:center;color:#57735f;font-size:13px;font-weight:600}
+
+/* Retorno explícito à visão geral quando os indicadores estão ocultos no celular. */
+.va-admin-back{display:none!important}
+@media(max-width:720px){
+ .vitra-shell.va-admin-view .va-heading{
+   display:flex!important;align-items:center;justify-content:space-between;
+   flex-wrap:nowrap;gap:10px
+ }
+ .vitra-shell.va-admin-view .va-heading h2{font-size:clamp(21px,5.8vw,26px)!important}
+ .vitra-shell.va-admin-view .va-admin-back{
+   display:inline-flex!important;align-items:center;justify-content:center;
+   flex:0 0 auto;min-height:36px;padding:7px 10px!important;
+   background:#edf5ef!important;border:1px solid #cfdfd3!important;
+   border-radius:9px!important;color:#245b3c!important;
+   -webkit-text-fill-color:#245b3c!important;font-size:11px!important
+ }
+}
