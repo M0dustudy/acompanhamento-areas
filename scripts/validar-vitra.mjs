@@ -91,11 +91,45 @@ try {
   unique(estoque.map(x => String(x.file)), 'PDF de estoque');
   const stockRefs = new Set(estoque.map(x => 'relatorios/estoque/' + x.file));
   const pendingStock = estoque.filter(x => x.pendingPdf === true);
+  const namePattern = /^ESTOQUE_(\d{4})-(\d{2})-(\d{2})_DOC_(\d+)_LOT(ES|E)_([\d-]+)\.pdf$/;
+  const automaticPattern = /^AVALIACAO_DE_ESTOQUE_EM_CAMARA_FRIA_-_FOR\.CQ\.-\d+-pt_BR\.pdf$/;
+  const isGeneric = name => /^aplicacoes?[_-]/i.test(name) ||
+    /FOR\.CQ\.068\s*-\s*\d+\.pdf$/i.test(name);
+  const verifiedMatch = html.match(/const stockVerifiedFiles=new Set\((\[[^;]+?\])\);/);
+  assert(Boolean(verifiedMatch), 'Lista de PDFs verificados ausente');
+  const verified = new Set(verifiedMatch ? JSON.parse(verifiedMatch[1]) : []);
+  const viewerHtml = readFileSync(join(root, 'visualizador.html'), 'utf8');
+  const viewerMatch = viewerHtml.match(/const map=(\{[^;]+\});/);
+  assert(Boolean(viewerMatch), 'Mapa do visualizador ausente');
+  const viewerMap = viewerMatch ? JSON.parse(viewerMatch[1]) : {};
+  unique([...verified], 'Lista de PDFs verificados');
   for (const item of estoque) {
     const path = 'relatorios/estoque/' + item.file;
     assert(typeof item.file === 'string' && item.file.endsWith('.pdf'),
       'Nome do PDF de estoque inválido: ' + item.id);
+    assert(!isGeneric(item.file), 'PDF genérico vinculado ao VITRA: ' + item.file);
+    const standardized = namePattern.exec(item.file);
+    assert(automaticPattern.test(item.file) || Boolean(standardized),
+      'Nome de estoque fora do padrão: ' + item.file);
+    if (standardized) {
+      const expectedDate = String(item.date || '').replace(
+        /^(\d{2})\/(\d{2})\/(\d{4})$/, '$3-$2-$1'
+      );
+      assert(item.file.startsWith('ESTOQUE_' + expectedDate + '_'),
+        'Data do nome diverge da avaliação: ' + item.id);
+      assert(standardized[4] === String(item.doc || '').replace(/\D/g, ''),
+        'Documento do nome diverge da avaliação: ' + item.id);
+      const lotNumbers = [...String(item.lot || '').matchAll(/(?:\d{2}\.\d{3}|\b\d{5}\b)/g),
+        ...String(item.lotNote || '').matchAll(/(?:\d{2}\.\d{3}|\b\d{5}\b)/g)]
+        .map(match => match[0].replace(/\D/g, ''));
+      const distinctLots = [...new Set(lotNumbers)];
+      assert(standardized[6] === distinctLots.join('-') &&
+        standardized[5] === (distinctLots.length > 1 ? 'ES' : 'E'),
+        'Lote do nome diverge da avaliação: ' + item.id);
+    }
     if (item.pendingPdf === true) {
+      assert(!verified.has(item.file),
+        'PDF pendente aparece na lista de links: ' + item.file);
       // O relatório está identificado no cadastro, mas o link continua indisponível.
       // Ele passa a ser obrigatório e verificável assim que o arquivo for hospedado.
       assert(!tracked.has(path), 'PDF hospedado continua pendente: ' + path);
@@ -105,10 +139,33 @@ try {
         'Avaliação pendente sem caixas originais: ' + item.id);
     } else {
       assert(tracked.has(path), 'PDF de estoque não encontrado: ' + path);
+      assert(verified.has(item.file), 'PDF hospedado fora da lista verificada: ' + item.file);
+      if (standardized) {
+        assert(viewerMap[item.pdf] === item.file,
+          'Visualizador não vincula o nome padronizado: ' + item.id);
+      }
     }
   }
   const stockFiles = [...tracked].filter(x => x.startsWith('relatorios/estoque/') && x.endsWith('.pdf'));
-  for (const path of stockFiles) assert(stockRefs.has(path), 'PDF de estoque sem avaliação: ' + path);
+  for (const path of stockFiles) {
+    assert(stockRefs.has(path), 'PDF de estoque sem avaliação: ' + path);
+    assert(!isGeneric(path.split('/').pop()), 'PDF genérico no GitHub: ' + path);
+  }
+  for (const name of verified) {
+    assert(stockRefs.has('relatorios/estoque/' + name),
+      'PDF verificado sem avaliação: ' + name);
+    assert(!isGeneric(name), 'PDF genérico na lista de links: ' + name);
+  }
+  for (const name of Object.values(viewerMap)) {
+    assert(!isGeneric(name), 'Visualizador com link genérico: ' + name);
+  }
+  const archivedFiles = [...tracked].filter(x =>
+    x.startsWith('relatorios/arquivados_sem_cadastro/') && x.endsWith('.pdf'));
+  for (const path of archivedFiles) {
+    assert(/^ARQUIVADO_SEM_CADASTRO_ID_\d+\.pdf$/.test(path.split('/').pop()),
+      'Arquivo sem cadastro com nome não identificado: ' + path);
+    assert(!stockRefs.has(path), 'Documento arquivado vinculado como estoque: ' + path);
+  }
   const fieldFiles = [...tracked].filter(x => x.startsWith('relatorios/acompanhamento de área/') && x.endsWith('.pdf'));
   for (const path of fieldFiles) assert(fieldRefs.has(path), 'PDF de campo sem registro: ' + path);
 
