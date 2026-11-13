@@ -318,3 +318,246 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
  .va-login-footer{margin-top:15px;padding-top:12px}
 }
 @media(prefers-reduced-motion:reduce){.va-login *,.va-grape-art{transition:none!important;animation:none!important}}
+
+
+/* VITRA | Acesso — composição editorial responsiva (13/11/2026).
+   Escopo: apenas o portão de acesso; dashboard e gestão não são alterados. */
+.va-gate{
+  display:flex;align-items:center;justify-content:center;
+  grid-template-columns:none;
+  inset:0;min-height:100vh;min-height:100dvh;max-height:100dvh;
+  padding:clamp(16px,3.6vw,48px);
+  overflow-x:hidden;overflow-y:auto;
+  background:
+    radial-gradient(ellipse 58% 76% at -8% 3%,#39725255,transparent 78%),
+    radial-gradient(ellipse 65% 78% at 105% 110%,#1c5a3c80,transparent 75%),
+    linear-gradient(140deg,#0b231b 0%,#153b2b 53%,#09251c 100%);
+  color:#f6f5ee;isolation:isolate;overscroll-behavior:contain
+}
+.va-gate::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.3;
+  background-image:linear-gradient(#e2d7ba12 1px,transparent 1px),linear-gradient(90deg,#e2d7ba12 1px,transparent 1px);
+  background-size:72px 72px;
+  mask-image:radial-gradient(ellipse at center,transparent 10%,black 100%)
+}
+.va-frame{
+  width:min(930px,100%);min-height:548px;flex:0 0 auto;
+  display:grid;grid-template-columns:minmax(0,.88fr) minmax(0,1.12fr);
+  position:relative;z-index:1;overflow:hidden;
+  border:1px solid #d8d2bb4d;border-radius:26px;
+  background:#fafbf7;box-shadow:0 26px 80px #04170f80,0 4px 18px #04170f2c
+}
+.va-scene{
+  display:flex;flex-direction:column;justify-content:space-between;
+  position:relative;isolation:isolate;
+  min-height:100%;height:auto;padding:35px 34px 30px;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse 90% 68% at 93% 60%,#3f77514a,transparent 78%),
+    linear-gradient(157deg,#143a2b 0%,#0d2b20 60%,#09241b 100%)
+}
+.va-scene::before{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(155deg,#fffff008,transparent 38%,#e3c89c06 95%);
+  opacity:1;mask-image:none
+}
+.va-scene::after{
+  content:"";position:absolute;width:460px;height:460px;right:-280px;bottom:-290px;
+  border:1px solid #dfc68f24;border-radius:50%;
+  box-shadow:0 0 0 54px #dfc68f08,0 0 0 112px #dfc68f05;
+  opacity:1;z-index:-1
+}
+.va-brand{display:flex;align-items:center;gap:13px;min-width:0;z-index:2}
+.va-monogram{
+  flex:0 0 49px;width:49px;height:49px;display:grid;place-items:center;
+  border-radius:13px;background:#e9cb9330;border:1px solid #e6cf9b6b;
+  box-shadow:inset 0 1px 0 #fff4d91c;
+  font:400 29px/1 Georgia,"Times New Roman",serif;color:#edd7a7
+}
+.va-wordmark{min-width:0}
+.va-wordmark strong{
+  display:block;font:400 26px/1 Georgia,"Times New Roman",serif;
+  letter-spacing:.18em;color:#f8f4e9;white-space:nowrap
+}
+.va-wordmark span{
+  display:block;margin-top:7px;max-width:280px;
+  font-size:8px;line-height:1.45;letter-spacing:.105em;
+  font-weight:500;color:#e3e7d9;text-transform:uppercase
+}
+.va-art{
+  position:absolute;inset:97px 0 26px;z-index:1;display:grid;place-items:center;
+  overflow:hidden;pointer-events:none
+}
+.va-art svg{
+  width:min(100%,370px);height:auto;max-height:100%;
+  opacity:.73;filter:drop-shadow(0 20px 28px #071e1740)
+}
+.va-scene-rule{display:flex;gap:8px;align-items:center;z-index:2;position:relative;opacity:.75}
+.va-scene-rule span{height:2px;width:13px;background:#d5b98255;border-radius:9px}
+.va-scene-rule span:first-child{width:31px;background:#ebd29b}
+.va-side{
+  min-width:0;min-height:0;margin:0;padding:48px clamp(36px,5vw,71px);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;background:#fafbf7;color:#193627
+}
+.va-login{
+  width:100%;max-width:360px;margin:0;padding:0;
+  border:0;border-radius:0;box-shadow:none;background:transparent;
+  color:#1b3e2b
+}
+.va-login-overline{
+  display:block;color:#7a845c;font-size:10px;line-height:1.3;
+  letter-spacing:.2em;font-weight:800
+}
+.va-login h2{
+  margin:13px 0 9px;line-height:1.13;
+  font-size:clamp(29px,3.1vw,36px);font-weight:760;
+  letter-spacing:-.052em;color:#183c2a;text-wrap:balance
+}
+.va-login p{
+  margin:0 0 29px;color:#738277;font-size:13px;line-height:1.6
+}
+.va-login form{margin:0}
+.va-login .va-field{
+  display:block;margin:0 0 8px;color:#334b3c;
+  font-size:12px;line-height:1.5;font-weight:750
+}
+.va-login .va-input-wrap{position:relative;display:block;margin:0 0 20px}
+.va-login .va-input{
+  display:block;width:100%;min-height:52px;outline:0;
+  padding:13px 16px!important;border-radius:11px!important;
+  background:#fff!important;border:1px solid #d4dfd4!important;
+  box-shadow:0 1px 3px #123f2807!important;
+  font-family:inherit;font-size:15px!important;color:#1c3628!important;
+  transition:border-color .18s,box-shadow .18s
+}
+.va-login .va-input::placeholder{color:#9ba79e;opacity:1}
+.va-login .va-input:hover{border-color:#a6c0aa!important}
+.va-login .va-input:focus{
+  background:#fff!important;border-color:#24704a!important;
+  box-shadow:0 0 0 3px #27734d24!important
+}
+.va-password-head{
+  display:flex;align-items:baseline;justify-content:space-between;
+  gap:8px;margin:3px 0 8px
+}
+.va-password-head .va-field{margin:0}
+.va-login .va-forgot{
+  display:inline-flex;align-items:center;justify-content:flex-end;
+  margin:0!important;padding:0!important;
+  border:0!important;background:transparent!important;
+  color:#2c6847!important;-webkit-text-fill-color:#2c6847!important;
+  font-size:11px!important;line-height:1.5;font-weight:650!important;
+  text-decoration:none;text-align:right;white-space:nowrap;
+  box-shadow:none!important;border-radius:0!important
+}
+.va-login .va-forgot:hover{text-decoration:underline}
+.va-login .va-password-input{padding-right:88px!important}
+.va-login .va-reveal{
+  top:50%;right:6px!important;transform:translateY(-50%);
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:74px;min-height:38px;
+  padding:8px 9px!important;background:transparent!important;
+  border:0!important;box-shadow:none!important;border-radius:8px!important;
+  font-size:11px!important;font-weight:700!important;
+  color:#476f56!important;-webkit-text-fill-color:#476f56!important;
+}
+.va-login .va-reveal:hover{background:#f1f6f1!important}
+.va-login .va-login-submit{
+  position:relative;width:100%;display:flex;align-items:center;justify-content:center;
+  min-height:54px;margin:27px 0 0;padding:13px 53px!important;
+  border:1px solid #195d3c!important;border-radius:11px!important;
+  background:linear-gradient(130deg,#1e6642,#155437)!important;
+  box-shadow:0 8px 18px #16553727!important;
+  font-family:inherit;font-size:14px!important;font-weight:750!important;
+  letter-spacing:.01em;color:#fff!important;-webkit-text-fill-color:#fff!important;
+  transition:background .18s,box-shadow .18s,transform .18s
+}
+.va-login .va-login-submit svg{
+  position:absolute;right:18px;top:50%;transform:translateY(-50%);
+  color:#eaf7ed;width:19px;height:19px
+}
+.va-login .va-login-submit:hover:not(:disabled){
+  background:#124b31!important;box-shadow:0 10px 22px #16553735!important;
+  transform:translateY(-1px)
+}
+.va-login .va-login-submit:focus-visible,
+.va-login .va-forgot:focus-visible,
+.va-login .va-reveal:focus-visible{outline:3px solid #78ab86!important;outline-offset:3px}
+.va-login .va-login-submit:disabled{opacity:.65;cursor:wait;transform:none}
+.va-login .va-error{
+  margin:0 0 4px;padding:10px 12px;font-size:12px;
+  background:#fff2ec;border:1px solid #ecc8bb;color:#9b4029;border-radius:9px
+}
+/* Recuperação usa a mesma caixa e as mesmas cores, sem mudar a lógica. */
+.va-side .va-login:has(#va-recovery-form){max-width:380px}
+.va-login #va-recovery-form .va-field{margin:15px 0 0}
+.va-login #va-recovery-form .va-input{margin-top:7px;padding-left:15px!important}
+.va-login #va-recovery-form .va-login-submit{margin-top:20px}
+.va-login #va-recovery-form .va-error{margin-top:11px}
+.va-login .va-login-footer{color:#7b8a7f;font-size:11px;line-height:1.5}
+.va-side .va-badge{font-size:10px}
+@media(max-width:800px){
+  .va-gate{
+    display:flex;align-items:center;justify-content:center;
+    min-height:100dvh;max-height:100dvh;
+    padding:20px 14px max(20px,env(safe-area-inset-bottom));
+    background:linear-gradient(155deg,#0d3022 0%,#13432e 47%,#09291d 100%)
+  }
+  .va-frame{
+    display:flex;flex-direction:column;width:min(456px,100%);
+    min-height:0;margin:0;border-radius:22px;
+    box-shadow:0 16px 48px #04170f85
+  }
+  .va-scene{
+    flex:0 0 auto;min-height:128px;height:128px;
+    padding:27px 27px;justify-content:flex-start;
+    background:linear-gradient(120deg,#123b2a,#0b2a1f)
+  }
+  .va-scene::after{height:180px;width:180px;right:-98px;bottom:-110px}
+  .va-brand{gap:12px}
+  .va-monogram{flex-basis:45px;height:45px;width:45px;font-size:27px;border-radius:12px}
+  .va-wordmark strong{font-size:24px;letter-spacing:.18em}
+  .va-wordmark span{font-size:8px;letter-spacing:.075em}
+  .va-art{inset:0 0 0 auto;justify-items:end;width:175px;opacity:.35}
+  .va-art svg{width:190px;transform:translate(48px,45px)}
+  .va-scene-rule{display:none}
+  .va-side{
+    flex:1 0 auto;min-height:0;margin:0;
+    padding:33px clamp(23px,6vw,40px) 35px;background:#fafbf7;
+    align-items:center;justify-content:center
+  }
+  .va-login{max-width:100%;padding:0;border-radius:0;box-shadow:none}
+  .va-login h2{font-size:clamp(27px,7vw,32px);margin:11px 0 7px}
+  .va-login p{font-size:12px;margin-bottom:25px}
+  .va-login .va-input-wrap{margin-bottom:19px}
+  .va-login .va-input{min-height:51px;font-size:16px!important}
+  .va-login .va-login-submit{min-height:52px;margin-top:23px}
+}
+@media(max-width:380px){
+  .va-gate{padding:10px 10px max(10px,env(safe-area-inset-bottom))}
+  .va-frame{border-radius:18px}
+  .va-scene{height:104px;min-height:104px;padding:22px}
+  .va-monogram{height:40px;width:40px;flex-basis:40px;font-size:24px}
+  .va-wordmark strong{font-size:21px}
+  .va-wordmark span{font-size:7px}
+  .va-side{padding:27px 22px 28px}
+  .va-login h2{font-size:27px}
+  .va-login p{margin-bottom:20px}
+  .va-login .va-input-wrap{margin-bottom:16px}
+  .va-login .va-input{min-height:48px}
+  .va-login .va-login-submit{margin-top:18px}
+}
+@media(max-height:690px){
+  .va-gate{align-items:flex-start}
+  .va-frame{margin:auto 0}
+}
+@media(min-width:801px) and (max-height:650px){
+  .va-frame{min-height:480px}
+  .va-side{padding-top:25px;padding-bottom:25px}
+  .va-login p{margin-bottom:19px}
+  .va-login .va-login-submit{margin-top:18px}
+}
+@media(prefers-reduced-motion:reduce){
+  .va-login .va-input,.va-login .va-login-submit{transition:none}
+}
