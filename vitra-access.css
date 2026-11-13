@@ -74,3 +74,247 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
 .va-modal-buttons button{border-radius:10px!important}
 @media(max-width:800px){.va-gate{grid-template-columns:minmax(0,1fr)}.va-scene{min-height:175px;padding:22px 25px}.va-scene-copy{display:none}.va-scene-foot{display:none}.va-side{align-items:flex-start;padding:27px 23px 46px;min-height:calc(100vh - 175px)}.va-login{max-width:420px}.va-brand .va-monogram{height:46px;width:46px}.va-wordmark strong{font-size:22px}.va-wordmark span{font-size:8px}.va-login h2{font-size:28px;margin-top:10px}.va-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.va-stat{padding:10px}.va-stat strong{font-size:23px}.va-admin-form{grid-template-columns:1fr}.va-session{right:8px;bottom:8px}}
 @media(prefers-reduced-motion:reduce){.va-login-submit,.va-primary{transition:none}}
+
+
+/* VITRA | Entrada refinada, desktop e celular. */
+.va-gate{
+  grid-template-columns:minmax(0,1.12fr) minmax(420px,.88fr);
+  background:#102c22;color:#f4f3e9;
+  min-height:100dvh;overscroll-behavior:contain
+}
+.va-scene{
+  isolation:isolate;justify-content:space-between;
+  background:
+    radial-gradient(ellipse 70% 60% at 85% 25%,rgba(79,133,91,.28),transparent 75%),
+    radial-gradient(ellipse 62% 72% at 0% 100%,rgba(9,32,22,.96),transparent 75%),
+    linear-gradient(143deg,#123a2b 0%,#0e2e23 44%,#091d17 100%);
+  padding:clamp(30px,4.8vw,78px);
+}
+.va-scene::before{
+  content:"";position:absolute;inset:0;z-index:-1;opacity:.34;
+  background-image:linear-gradient(#f3d9a513 1px,transparent 1px),linear-gradient(90deg,#f3d9a513 1px,transparent 1px);
+  background-size:68px 68px;
+  mask-image:linear-gradient(90deg,transparent 5%,black 100%);
+  pointer-events:none
+}
+.va-scene::after{
+  content:"";width:780px;height:780px;right:-410px;bottom:-410px;
+  box-shadow:0 0 0 90px #c6a97908,0 0 0 200px #c6a97906;
+  border:1px solid #dfc28e32;opacity:1;z-index:-1
+}
+.va-brand{gap:16px;align-items:center}
+.va-monogram{
+  width:56px;height:56px;border-radius:16px;
+  border:1px solid #e2c79879;background:linear-gradient(135deg,#f2d7a429,#d2b4780d);
+  color:#f3ddad;box-shadow:inset 0 0 22px #fff2d90a;
+  font-size:30px;letter-spacing:-.06em
+}
+.va-wordmark strong{font:500 28px/1 Georgia,serif;letter-spacing:.2em}
+.va-wordmark span{font-size:9px;letter-spacing:.14em;color:#cad9cb;margin-top:8px}
+.va-scene-middle{position:relative;display:flex;flex-direction:column;justify-content:center;flex:1;min-height:440px}
+.va-scene-copy{position:relative;z-index:2;max-width:630px;padding:0;margin:0}
+.va-kicker{
+  display:inline-flex;align-items:center;gap:11px;
+  font-size:11px;color:#e1c898;letter-spacing:.21em;font-weight:750
+}
+.va-kicker::before{content:"";width:29px;height:1px;background:#e2c28b}
+.va-scene h1{
+  max-width:655px;margin:27px 0 24px;
+  font:400 clamp(48px,4.55vw,76px)/1.1 Georgia,"Times New Roman",serif;
+  letter-spacing:-.045em;color:#f5f4e9;text-wrap:balance
+}
+.va-scene p{font-size:16px;line-height:1.85;color:#c0d5c8;max-width:410px;margin:0}
+.va-grape-art{
+  position:absolute;right:clamp(-160px,-7vw,-70px);
+  top:50%;transform:translateY(-47%) rotate(-12deg);
+  width:clamp(290px,33vw,510px);z-index:1;
+  color:#dac394;opacity:.38;filter:drop-shadow(0 38px 48px #05130e70);
+  pointer-events:none
+}
+.va-grape-art svg{width:100%;height:auto;display:block}
+.va-scene-foot{
+  display:flex;gap:12px;align-items:center;
+  font-size:10px;letter-spacing:.15em;color:#a1bba9;text-transform:uppercase
+}
+.va-foot-line{display:inline-block;height:1px;width:34px;background:#d6ba8499}
+.va-side{
+  background:radial-gradient(ellipse at 0% 0%,#f3f3eacc,transparent 58%),
+    linear-gradient(135deg,#f9faf6,#f1f4ef);
+  padding:clamp(30px,4.5vw,76px);
+  align-items:center
+}
+.va-login{
+  position:relative;background:#fff;
+  border:1px solid #e4eae1;border-radius:26px;
+  padding:clamp(30px,3.6vw,54px);
+  max-width:456px;box-shadow:0 28px 80px #173b2010,0 3px 12px #173b2008
+}
+.va-login-symbol{
+  display:grid;place-items:center;height:50px;width:50px;
+  border-radius:15px;background:#e8f2e9;border:1px solid #d4e6d7;color:#246341;
+  box-shadow:0 6px 14px #1e5b2e10;margin-bottom:29px
+}
+.va-login-symbol span{font:500 28px Georgia,serif}
+.va-login-overline{
+  color:#7b956e;letter-spacing:.2em;font-size:10px;font-weight:850;
+}
+.va-login h2{
+  font-size:clamp(27px,2.6vw,36px);margin:13px 0 11px;
+  line-height:1.15;color:#173f2b;font-weight:770;letter-spacing:-.055em
+}
+.va-login p{margin:0 0 29px;font-size:13px;color:#6c7e71;line-height:1.65}
+.va-field{font-size:12px;font-weight:730;color:#304d3b;margin:18px 0 0}
+.va-input-wrap{margin-top:8px}
+.va-input{
+  width:100%;min-height:56px;border-radius:13px!important;
+  border:1px solid #d9e4db!important;background:#fcfdfb!important;
+  color:#193a28!important;padding:15px 18px 15px 48px!important;
+  box-shadow:inset 0 1px 2px #183a2610!important;
+  font-size:14px!important;transition:box-shadow .2s,border-color .2s,background-color .2s
+}
+.va-input::placeholder{color:#98a79a}
+.va-input:hover{border-color:#b9cdbd!important}
+.va-input:focus{
+  border-color:#347950!important;background:#fff!important;
+  box-shadow:0 0 0 4px #3e86521e!important
+}
+.va-field-icon{
+  position:absolute;left:17px;top:50%;transform:translateY(-50%);
+  font-size:15px;color:#6e9678;pointer-events:none
+}
+.va-lock-icon{font-size:22px;line-height:1}
+.va-reveal{
+  position:absolute;right:9px!important;top:50%;
+  padding:9px 12px!important;border:0!important;
+  color:#386f4d!important;-webkit-text-fill-color:#386f4d!important;
+  background:transparent!important;font-size:11px!important
+}
+.va-login-submit{
+  margin-top:28px;min-height:55px;padding:15px 20px!important;
+  background:linear-gradient(120deg,#246b46,#165437)!important;
+  border-radius:13px!important;box-shadow:0 11px 25px #1b5c3d35;
+  font-size:14px;font-weight:780;letter-spacing:.01em
+}
+.va-login-submit:hover:not(:disabled){
+  background:linear-gradient(120deg,#28794d,#195c3d)!important;
+  box-shadow:0 14px 30px #1b5c3d40
+}
+.va-login-submit span{font-size:18px;font-weight:400;margin-left:7px}
+.va-forgot{
+  display:block;margin:20px auto 0!important;padding:8px 11px!important;
+  color:#2c7250!important;-webkit-text-fill-color:#2c7250!important;
+  background:transparent!important;border:0!important;font-size:12px!important;
+  font-weight:650!important;border-radius:8px!important
+}
+.va-forgot:hover{text-decoration:underline}
+.va-login-footer{
+  display:flex;gap:8px;align-items:center;justify-content:center;
+  margin-top:27px;padding-top:22px;
+  border-top:1px solid #e9eee8;color:#8c9b8b;font-size:10px;text-align:center;
+  line-height:1.6
+}
+.va-mini-grape{font-size:17px;color:#b49c6a}
+.va-login .va-error{border-radius:11px;font-size:12px;line-height:1.55}
+.va-login .va-badge{background:#e9f0e7}
+.va-login #va-recovery-form .va-input{padding-left:16px!important}
+.va-login #va-recovery-form .va-field{margin-top:14px}
+.va-login #va-recovery-form button.va-login-submit{margin-top:20px}
+.va-login #va-recovery-form input{width:100%}
+.va-recovery-highlight{
+  display:grid;grid-template-columns:auto minmax(180px,1fr) auto;gap:15px;align-items:center;
+  background:linear-gradient(120deg,#f1f7ee 0%,#f8f9f3 100%);
+  border:1px solid #d4e5d6;border-radius:17px;padding:19px 20px;margin:18px 0 14px
+}
+.va-recovery-mark{
+  width:46px;height:46px;display:grid;place-items:center;flex-shrink:0;
+  border-radius:13px;background:#ddeee0;color:#31794d;font-size:25px
+}
+.va-recovery-content strong{font-size:15px;color:#204d33;letter-spacing:-.015em}
+.va-recovery-content p{font-size:11.5px;line-height:1.6;color:#5b7664;margin:5px 0 0}
+.va-recovery-create{
+  border-radius:11px!important;background:#226641!important;color:#fff!important;
+  -webkit-text-fill-color:#fff!important;white-space:nowrap;
+  font-size:11px!important;font-weight:750!important;padding:12px 14px!important;min-height:42px
+}
+.va-recovery-create:hover{background:#175337!important}
+#cards .va-admin-nav{
+  background:linear-gradient(135deg,#f4f0dc,#ecf3e8)!important;
+  border:1px solid #d8c78f!important;border-radius:13px!important;
+  box-shadow:inset 3px 0 0 #bb9e57!important;padding:12px!important
+}
+#cards .va-admin-nav b{color:#355a3d!important;-webkit-text-fill-color:#355a3d!important;font-size:12px!important;letter-spacing:.02em}
+#cards .va-admin-nav small{display:block;color:#846d40;font-size:10px;font-weight:600;padding-left:25px;margin-top:4px}
+.va-admin-icon{width:17px;display:inline-flex;font-size:17px;line-height:1;color:#90723c;align-items:center;justify-content:center}
+#cards .va-admin-nav.active{outline:2px solid #91ad88;outline-offset:2px}
+.va-session{bottom:16px;right:17px;border-radius:15px;box-shadow:0 8px 25px #0003}
+.va-management .va-heading h2{line-height:1.2}
+@media (max-width:1080px) and (min-width:801px){
+ .va-gate{grid-template-columns:minmax(0,1fr) minmax(395px,.96fr)}
+ .va-grape-art{width:290px;opacity:.26;right:-100px}
+ .va-scene h1{font-size:clamp(43px,4.5vw,58px)}
+ .va-side{padding:20px}
+ .va-login{padding:34px}
+}
+@media (max-width:800px){
+ html.va-locked body{overflow:hidden!important}
+ .va-gate{
+   display:block;min-height:100dvh;max-height:100dvh;overflow-y:auto;overflow-x:hidden;
+   background:#f3f6f1
+ }
+ .va-scene{
+   min-height:192px;height:192px;padding:23px 22px 65px;
+   background:radial-gradient(ellipse at 85% 10%,#305d43aa,transparent 65%),linear-gradient(135deg,#143b2c,#09281e);
+   display:block
+ }
+ .va-scene::before{background-size:42px 42px;opacity:.18}
+ .va-scene::after{width:310px;height:310px;right:-210px;bottom:-180px;opacity:.7}
+ .va-brand{gap:11px}
+ .va-monogram{height:45px;width:45px;border-radius:13px;font-size:25px}
+ .va-wordmark strong{font-size:24px;letter-spacing:.17em}
+ .va-wordmark span{font-size:8px;letter-spacing:.09em;margin-top:5px}
+ .va-scene-middle,.va-scene-foot{display:none}
+ .va-side{
+   min-height:auto;margin:-73px auto 0;z-index:2;position:relative;
+   padding:0 15px max(24px,env(safe-area-inset-bottom));
+   background:transparent;display:block
+ }
+ .va-login{
+   max-width:500px;margin:0 auto;
+   border-radius:22px;padding:27px clamp(20px,5.5vw,34px) 29px;
+   box-shadow:0 15px 50px #122e1c21,0 2px 7px #12320e10;
+ }
+ .va-login-symbol{height:43px;width:43px;border-radius:13px;margin-bottom:19px}
+ .va-login-symbol span{font-size:25px}
+ .va-login h2{font-size:clamp(27px,7vw,33px);margin:12px 0 8px}
+ .va-login p{font-size:12px;margin:0 0 22px}
+ .va-field{margin-top:15px}
+ .va-input{min-height:52px!important;padding-top:13px!important;padding-bottom:13px!important;font-size:16px!important}
+ .va-login-submit{min-height:52px!important;margin-top:23px}
+ .va-login-footer{margin-top:19px;padding-top:16px}
+ .va-session{right:8px;bottom:8px;border-radius:13px;max-width:calc(100% - 16px)}
+ .va-management{padding:0}
+ .va-recovery-highlight{grid-template-columns:auto minmax(0,1fr);padding:15px;gap:12px}
+ .va-recovery-create{grid-column:1/-1;width:100%;white-space:normal}
+}
+@media(max-width:370px){
+ .va-scene{height:166px;min-height:166px;padding:19px 15px}
+ .va-side{margin-top:-61px;padding:0 10px 24px}
+ .va-login{padding:22px 18px 24px;border-radius:18px}
+ .va-wordmark strong{font-size:21px}
+ .va-wordmark span{font-size:7px}
+ .va-login-symbol{margin-bottom:15px}
+ .va-login h2{font-size:26px}
+ .va-recovery-content p{font-size:11px}
+}
+@media(min-width:801px) and (max-height:740px){
+ .va-side{padding:20px}
+ .va-login{padding:25px 36px}
+ .va-login-symbol{margin-bottom:13px}
+ .va-login h2{margin:9px 0}
+ .va-login p{margin-bottom:16px}
+ .va-field{margin-top:11px}
+ .va-input{min-height:50px}
+ .va-login-submit{margin-top:20px;min-height:50px}
+ .va-login-footer{margin-top:15px;padding-top:12px}
+}
+@media(prefers-reduced-motion:reduce){.va-login *,.va-grape-art{transition:none!important;animation:none!important}}
