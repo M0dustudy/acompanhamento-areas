@@ -90,7 +90,24 @@ try {
   unique(estoque.map(x => String(x.id)), 'Identificador de estoque');
   unique(estoque.map(x => String(x.file)), 'PDF de estoque');
   const stockRefs = new Set(estoque.map(x => 'relatorios/estoque/' + x.file));
-  for (const path of stockRefs) assert(tracked.has(path), 'PDF de estoque não encontrado: ' + path);
+  // Registros aguardando hospedagem preservam a identificação do PDF original,
+  // mas NÃO podem ter links publicados até que o arquivo esteja no repositório.
+  // Os registros já hospedados continuam sujeitos à conferência 1:1 de arquivos.
+  const pendingStock = estoque.filter(x => x.pendingPdf === true);
+  for (const record of estoque) {
+    const path = 'relatorios/estoque/' + record.file;
+    assert(typeof record.file === 'string' && record.file.endsWith('.pdf'),
+      'Nome do PDF inválido para a avaliação de estoque: ' + record.id);
+    if (record.pendingPdf === true) {
+      assert(!tracked.has(path), 'PDF hospedado ainda marcado como pendente: ' + path);
+      assert(Boolean(record.doc && record.date && record.lot && record.pallet),
+        'Relatório pendente sem identificação suficiente: ' + record.id);
+      assert(Array.isArray(record.boxDetails) && record.boxDetails.length === Number(record.sampled),
+        'Relatório pendente sem detalhamento das caixas: ' + record.id);
+    } else {
+      assert(tracked.has(path), 'PDF de estoque não encontrado: ' + path);
+    }
+  }
   const stockFiles = [...tracked].filter(x => x.startsWith('relatorios/estoque/') && x.endsWith('.pdf'));
   for (const path of stockFiles) assert(stockRefs.has(path), 'PDF de estoque sem avaliação: ' + path);
   const fieldFiles = [...tracked].filter(x => x.startsWith('relatorios/acompanhamento de área/') && x.endsWith('.pdf'));
@@ -100,7 +117,7 @@ try {
   console.log('Situações de áreas:', groupCodes.length);
   console.log('Recepções:', recepcoes.length);
   console.log('Titulações por data/área:', Object.keys(titulacoes).length);
-  console.log('Estoque:', estoque.length, 'avaliações /', stockFiles.length, 'PDFs');
+  console.log('Estoque:', estoque.length, 'avaliações /', stockFiles.length, 'PDFs hospedados /', pendingStock.length, 'pendentes');
   console.log('PDFs de campo:', fieldFiles.length);
 } catch (error) {
   errors.push(error.stack || String(error));
