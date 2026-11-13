@@ -49,7 +49,7 @@ document.querySelector("#setup-form").addEventListener("submit", async e => {
     if(!res.ok||!data.ok)throw Error(data.message||"Ativação recusada.");
     out.className="va-toast";out.textContent="Administrador mestre ativado. Redirecionando para o login...";
     f.reset();
-    setTimeout(()=>location.replace("./"),2200);
+    setTimeout(()=>location.replace("./vitra-preview.html"),1400);
   }catch(err){out.className="va-error";out.textContent=err.message||"Não foi possível ativar."}
   finally{btn.disabled=false}
 });
