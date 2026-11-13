@@ -40,7 +40,7 @@
     });
     q("#va-login-form").addEventListener("submit", submitLogin);
     q("#va-forgot").addEventListener("click", recoveryPage);
-    if (!busy) q("#va-user").focus();
+    if (!busy && window.matchMedia("(min-width: 801px)").matches) q("#va-user").focus();
   }
   function recoveryPage() {
     loginPage();
