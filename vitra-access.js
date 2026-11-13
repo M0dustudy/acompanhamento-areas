@@ -239,7 +239,7 @@
       '</td></tr>').join("");
     q("#panel").innerHTML = '<section class="va-management">' +
       '<header class="va-heading"><div><span class="va-tag">ADMINISTRAÇÃO · VITRA</span><h2>Gestão de Acessos</h2>' +
-      '<p>Contas individuais, permissões e histórico de entradas.</p></div><span class="va-pill">Exclusivo do administrador</span></header>' +
+      '<p>Usuários autorizados, permissões e histórico de entradas.</p></div><span class="va-pill">Exclusivo do administrador</span></header>' +
       '<div class="va-stats"><div class="va-stat"><small>Contas cadastradas</small><strong>' + userRows.length + '</strong></div>' +
       '<div class="va-stat"><small>Acessos ativos</small><strong>' + active + '</strong></div>' +
       '<div class="va-stat"><small>Entradas recentes*</small><strong>' + recent + '</strong></div></div>' +
@@ -262,7 +262,7 @@
       '<label>Nome da pessoa<input name="display_name" maxlength="80" required placeholder="Nome para identificação"></label>' +
       '<label>Nome de usuário<input name="username" minlength="3" maxlength="32" required pattern="[A-Za-z0-9._-]+" autocomplete="off" placeholder="ex.: equipe.cq"></label>' +
       '<label class="va-full">Senha inicial<input name="password" minlength="10" maxlength="128" type="password" required autocomplete="new-password" placeholder="Ao menos 10 caracteres"></label>' +
-      '<div class="va-full"><button class="va-primary" type="submit">Criar acesso individual</button></div></form>' +
+      '<div class="va-full"><button class="va-primary" type="submit">Criar usuário</button></div></form>' +
       '<p class="va-subtle">As senhas não são exibidas depois de cadastradas. Você poderá redefini-las quando necessário.</p></section>' +
       '<section class="va-panel"><div class="va-panel-head"><h3>Usuários autorizados</h3><span class="va-subtle">Somente sua conta pode administrar</span></div>' +
       '<div class="va-table-wrap"><table class="va-table"><thead><tr><th>Pessoa / usuário</th><th>Situação</th><th>Última entrada</th><th>Gerenciar</th></tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="va-empty">Nenhuma conta cadastrada.</td></tr>') + '</tbody></table></div></section>' +
@@ -306,7 +306,7 @@
     try {
       await call("create", { display_name: fd.get("display_name"), username: fd.get("username"),
         password: fd.get("password") });
-      await refreshManagement("Acesso individual criado com sucesso.");
+      await refreshManagement("Usuário cadastrado com sucesso.");
     } catch (e) { notify(errorMessage(e), true); button.disabled = false; }
   }
 
