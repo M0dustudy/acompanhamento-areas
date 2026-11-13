@@ -191,7 +191,16 @@
       '<div class="va-stat"><small>Acessos ativos</small><strong>' + active + '</strong></div>' +
       '<div class="va-stat"><small>Entradas recentes*</small><strong>' + recent + '</strong></div></div>' +
       '<p class="va-subtle">* Eventos exibidos no histórico disponível, não usuários conectados neste instante.</p>' +
-      '<div id="va-notice" hidden></div><section class="va-panel"><div class="va-panel-head"><h3>Cadastrar colaborador</h3><span class="va-subtle">Usuário e senha exclusivos</span></div>' +
+      '<div id="va-notice" hidden></div>' +
+      '<section class="va-panel"><div class="va-panel-head"><h3>Minha conta mestre</h3><span class="va-subtle">Seu acesso pessoal</span></div>' +
+      '<form class="va-admin-form" id="va-self-form">' +
+      '<label>Seu nome<input name="display_name" maxlength="80" required value="' + safe(me.display_name) + '"></label>' +
+      '<label>Seu usuário<input name="username" pattern="[A-Za-z0-9._-]{3,32}" maxlength="32" required value="' + safe(me.username) + '"></label>' +
+      '<label>Senha atual<input name="current_password" type="password" autocomplete="current-password" required></label>' +
+      '<label>Nova senha (opcional)<input name="new_password" minlength="10" maxlength="128" type="password" autocomplete="new-password" placeholder="Mantenha vazio para não alterar"></label>' +
+      '<div class="va-full"><button type="submit" class="va-primary">Salvar minha conta</button></div></form>' +
+      '<p class="va-subtle">Mudanças da sua conta exigem a senha atual. Alterar a senha encerrará esta sessão.</p></section>' +
+      '<section class="va-panel"><div class="va-panel-head"><h3>Cadastrar colaborador</h3><span class="va-subtle">Usuário e senha exclusivos</span></div>' +
       '<form class="va-admin-form" id="va-create-form">' +
       '<label>Nome da pessoa<input name="display_name" maxlength="80" required placeholder="Nome para identificação"></label>' +
       '<label>Nome de usuário<input name="username" minlength="3" maxlength="32" required pattern="[A-Za-z0-9._-]+" autocomplete="off" placeholder="ex.: equipe.cq"></label>' +
@@ -204,6 +213,7 @@
       '<div class="va-table-wrap"><table class="va-table"><thead><tr><th>Data / hora</th><th>Conta</th><th>Atividade</th></tr></thead><tbody>' +
       (logs || '<tr><td colspan="3" class="va-empty">Nenhum evento registrado.</td></tr>') +
       '</tbody></table></div></section></section>';
+    q("#va-self-form").addEventListener("submit", updateMaster);
     q("#va-create-form").addEventListener("submit", createUser);
     q("#panel").querySelectorAll("[data-va-action]").forEach(btn => btn.addEventListener("click", manageUser));
   }
@@ -212,6 +222,23 @@
     logRows = (await call("logs")).logs || [];
     renderManagement();
     if (message) notify(message);
+  }
+  async function updateMaster(ev) {
+    ev.preventDefault();
+    const form=ev.currentTarget, btn=q('button[type="submit"]',form);
+    const fd=new FormData(form);
+    btn.disabled=true;
+    try {
+      const result=await call("self",{ username:fd.get("username"),
+        display_name:fd.get("display_name"), current_password:fd.get("current_password"),
+        new_password:fd.get("new_password")||null });
+      form.reset();
+      if(result.requires_relogin){ await logout(); return; }
+      const resultMe=await call("me");
+      me=resultMe.profile;
+      unlock();
+      await refreshManagement("Sua conta mestre foi atualizada.");
+    } catch(e){ notify(errorMessage(e),true); btn.disabled=false; }
   }
   async function createUser(ev) {
     ev.preventDefault();
