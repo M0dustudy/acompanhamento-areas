@@ -411,6 +411,13 @@
       me = info.profile; unlock();
     }).catch(() => { session = null; remember(); loginPage(); });
   } else loginPage();
+  document.addEventListener("click", event => {
+    const menu = q(".va-account");
+    if (menu?.open && !menu.contains(event.target)) menu.open = false;
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") q(".va-account")?.removeAttribute("open");
+  });
   setInterval(() => { if (session && !document.hidden) checkSession(); }, 60000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) checkSession(); });
 })();
