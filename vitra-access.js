@@ -240,7 +240,7 @@
       '<label>Nova senha (opcional)<input name="new_password" minlength="10" maxlength="128" type="password" autocomplete="new-password" placeholder="Mantenha vazio para não alterar"></label>' +
       '<div class="va-full"><button type="submit" class="va-primary">Salvar minha conta</button></div></form>' +
       '<p class="va-subtle">Mudanças da sua conta exigem a senha atual. Alterar a senha encerrará esta sessão.</p></section>' +
-      '<div class="va-recovery-highlight"><div class="va-recovery-mark" aria-hidden="true">✦</div>' +
+      '<div class="va-recovery-highlight"><div class="va-recovery-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-2 2 1 1-3 3-2-2-3 3"/></svg></div>' +
       '<div class="va-recovery-content"><strong>Código de recuperação</strong>' +
       '<p>Gere e guarde um código para recuperar seu acesso se esquecer a senha.</p></div>' +
       '<button type="button" id="va-generate-recovery" class="va-recovery-create">Gerar código <span aria-hidden="true">→</span></button></div>' +
