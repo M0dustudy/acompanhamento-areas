@@ -804,3 +804,6 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
   .vitra-shell .vitra-sidebar{overflow:visible!important;min-height:78px!important}
   .vitra-sidebar .va-account{isolation:isolate}
 }
+
+/* Retorno discreto durante a consulta às contas. */
+.vitra-shell.va-admin-view .va-loading{padding:58px 18px;text-align:center;color:#57735f;font-size:13px;font-weight:600}
