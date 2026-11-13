@@ -22,6 +22,8 @@ jobs:
             ("preflight", "OPTIONS", None, 204),
             ("bloqueio sem usuario", "POST", {"action":"login","username":"vitra-inexistente-ci","password":"senha-invalida-ci"}, 401),
             ("ativacao exige codigo", "POST", {"action":"bootstrap","code":"codigo-invalido-ci"},403),
+            ("recuperacao exige codigo valido", "POST", {"action":"recovery_reset","username":"carlos.chagas","code":"invalido","password":"SenhaNovaImpossivel-CI-2026"},400),
+            ("codigo aleatorio nao recupera conta", "POST", {"action":"recovery_reset","username":"carlos.chagas","code":"a"*64,"password":"SenhaNovaImpossivel-CI-2026"},401),
           ]
           for name, method, body, expected in cases:
             data = json.dumps(body).encode() if body is not None else None
