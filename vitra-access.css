@@ -824,3 +824,60 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
    -webkit-text-fill-color:#245b3c!important;font-size:11px!important
  }
 }
+
+
+/* VITRA MANUAIS PRIVADOS — teste restrito à conta master. */
+#cards .va-manual-nav{
+  border:1px solid #b9d4c5!important;background:linear-gradient(135deg,#edf7f1,#f8faf7)!important;
+  color:#1e5b3d!important;-webkit-text-fill-color:#1e5b3d!important
+}
+#cards .va-manual-nav b{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.va-doc-nav-icon{font-size:19px;line-height:1}
+.va-doc-nav-test{font-size:9px;letter-spacing:.11em;color:#507d60;background:#dceee3;border-radius:6px;padding:3px 5px;margin-left:auto}
+.va-manuals{max-width:1120px;margin:0 auto;padding:8px 0 24px;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.va-doc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:22px}
+.va-doc-eyebrow{display:flex;align-items:center;gap:9px;color:#557c62;font-size:10px;font-weight:850;letter-spacing:.13em}
+.va-doc-eyebrow span{background:#e8f1e8;color:#426e4e;border:1px solid #cfe1d2;border-radius:99px;padding:4px 8px;letter-spacing:.07em}
+.va-doc-head h2{color:#193d2b;font-size:clamp(25px,3vw,35px);font-weight:800;letter-spacing:-.045em;margin:10px 0 6px;line-height:1.18}
+.va-doc-head p{color:#718376;font-size:13px;line-height:1.6;margin:0}
+.va-doc-back{border:1px solid #cdded1!important;border-radius:10px!important;padding:10px 13px!important;background:#fff!important;color:#285c3d!important;-webkit-text-fill-color:#285c3d!important;font-size:12px!important;font-weight:700;min-height:42px}
+.va-doc-security{display:flex;gap:13px;align-items:flex-start;border:1px solid #dce8da;background:#f4f8f2;border-radius:14px;padding:14px 17px;margin-bottom:20px}
+.va-doc-security>span{display:flex;align-items:center;justify-content:center;color:#2f7250;font-size:15px}
+.va-doc-security strong{display:block;color:#23523c;font-size:12px;font-weight:800}
+.va-doc-security p{font-size:12px;line-height:1.6;color:#567060;margin:5px 0 0}
+.va-doc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+.va-doc-card{background:#fff;border:1px solid #e0e9e1;border-radius:18px;box-shadow:0 5px 24px #23472b08;min-width:0;overflow:hidden}
+.va-doc-card-top{display:grid;grid-template-columns:90px minmax(0,1fr);gap:17px;align-items:center;padding:20px;border-bottom:1px solid #edf0eb;min-height:176px}
+.va-doc-cover{height:115px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;border-radius:11px;background:linear-gradient(145deg,#184f38,#123c2b);border:1px solid #1f6446;box-shadow:5px 5px 0 #dce8dd;color:#e8eddc}
+.va-doc-cover span{font:400 34px/1 Georgia,serif;color:#d4c39e}
+.va-doc-cover small{color:#c2d8c9;letter-spacing:.1em;font-size:9px;font-weight:750}
+.va-doc-ref{font-size:10px;letter-spacing:.13em;color:#528167;font-weight:800}
+.va-doc-card-heading h3{font-size:17px;font-weight:780;letter-spacing:-.025em;line-height:1.35;color:#1c4831;margin:7px 0 8px;overflow-wrap:anywhere}
+.va-doc-card-heading p{font-size:12px;line-height:1.55;color:#718176;margin:0}
+.va-doc-files{padding:8px 18px 17px}
+.va-doc-file-row{display:flex;align-items:center;justify-content:space-between;gap:13px;padding:13px 0;min-width:0}
+.va-doc-file-row+.va-doc-file-row{border-top:1px solid #e9eee9}
+.va-doc-file-info{display:flex;align-items:center;gap:10px;min-width:0}
+.va-doc-format{display:grid;place-items:center;flex:0 0 43px;height:42px;border:1px solid #dce7de;border-radius:10px;background:#f2f6f1;color:#3b7854;font-size:11px;font-weight:800}
+.va-doc-file-info>div{min-width:0}
+.va-doc-file-info strong{display:block;font-size:11px;color:#33523f;line-height:1.4}
+.va-doc-file-info small{display:block;color:#829186;font-size:10px;line-height:1.4;overflow-wrap:anywhere;margin-top:3px}
+.va-doc-controls{display:flex;align-items:center;gap:6px;justify-content:flex-end;flex-wrap:wrap;flex:0 0 auto}
+.va-doc-button,.va-doc-upload{display:inline-flex;align-items:center;justify-content:center;border:1px solid #c5dccc!important;border-radius:9px!important;padding:9px 11px!important;min-height:38px;background:#eaf4ee!important;color:#236044!important;-webkit-text-fill-color:#236044!important;font:750 11px/1.3 Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.va-doc-button:hover,.va-doc-upload:hover{background:#d8eee0!important}
+.va-doc-button:disabled{opacity:.6;cursor:wait}
+.va-doc-download{background:#fff!important}
+.va-doc-upload{position:relative;overflow:hidden}
+.va-doc-upload input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.va-doc-footnote{font-size:11px;color:#849087;line-height:1.6;margin:18px 2px}
+.va-doc-loading{background:#fff;border:1px solid #e3ede5;padding:24px;border-radius:14px;color:#647c69;font-size:12px}
+#va-manual-notice{margin:0 0 18px}
+html.va-doc-open body{overflow:hidden!important}
+.va-doc-overlay{position:fixed;inset:0;z-index:2147483640;background:#071d14dd;padding:18px;display:grid;place-items:center}
+.va-doc-viewer{width:min(1100px,100%);height:min(94vh,100%);display:flex;flex-direction:column;border-radius:15px;background:#fff;overflow:hidden;box-shadow:0 22px 70px #0007}
+.va-doc-viewer-head{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px 17px;background:#f7faf6;border-bottom:1px solid #dce8e0}
+.va-doc-viewer-head strong{color:#27503a;font-size:13px}
+.va-doc-viewer-head button{border:1px solid #d1ddcf!important;border-radius:8px!important;background:#fff!important;color:#295a40!important;-webkit-text-fill-color:#295a40!important;padding:8px 12px!important;min-height:39px}
+.va-doc-viewer iframe{flex:1 1 auto;border:0;width:100%;min-height:0;background:white}
+@media(max-width:900px){.va-doc-grid{grid-template-columns:1fr}.va-doc-card-top{min-height:0}.va-doc-head{align-items:flex-start}}
+@media(max-width:520px){.va-doc-card-top{grid-template-columns:72px minmax(0,1fr);padding:15px;gap:13px}.va-doc-cover{height:104px}.va-doc-card-heading h3{font-size:15px}.va-doc-file-row{align-items:flex-start;flex-direction:column}.va-doc-controls{width:100%;justify-content:flex-start;padding-left:52px}.va-doc-files{padding:7px 15px 13px}.va-doc-security{padding:12px}.va-doc-viewer{height:96vh}.va-doc-overlay{padding:7px}.va-doc-head h2{font-size:27px}}

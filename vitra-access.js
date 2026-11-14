@@ -11,7 +11,7 @@
   const root = document.createElement("div");
   root.id = "vitra-access-root";
   document.body.appendChild(root);
-  let session = null, me = null, userRows = [], logRows = [], working = false, checkInProgress = false, managementRequestId = 0;
+  let session = null, me = null, userRows = [], logRows = [], working = false, checkInProgress = false, managementRequestId = 0, manualRequestId = 0, manualObjectUrl = null;
   const q = (selector, base = document) => base.querySelector(selector);
   const safe = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, s =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
@@ -125,6 +125,8 @@
   }
   function removeManagement() {
     q("#cards .va-admin-nav")?.remove();
+    q("#cards .va-manual-nav")?.remove();
+    closeManualPreview();
     q(".vitra-sidebar .va-account")?.remove();
     q("#va-management-modal")?.remove();
   }
@@ -145,6 +147,16 @@
       nav.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManagement(); }});
       nav.classList.toggle("active", !!q(".vitra-shell.va-admin-view"));
       q("#cards")?.appendChild(nav);
+      const manualsNav = document.createElement("div");
+      manualsNav.className = "card va-manual-nav";
+      manualsNav.dataset.main = "manuals";
+      manualsNav.setAttribute("role", "button");
+      manualsNav.setAttribute("aria-label", "Abrir manuais técnicos — teste privado");
+      manualsNav.tabIndex = 0;
+      manualsNav.innerHTML = '<b><span class="va-doc-nav-icon" aria-hidden="true">▤</span>MANUAIS TÉCNICOS <span class="va-doc-nav-test">TESTE</span></b>';
+      manualsNav.addEventListener("click", openManuals);
+      manualsNav.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") {e.preventDefault();openManuals();} });
+      q("#cards")?.appendChild(manualsNav);
     }
 
     const sidebar = q(".vitra-sidebar");
@@ -158,7 +170,7 @@
       '<span class="va-account-name">' + safe(firstName) + '</span>' +
       '<svg class="va-account-chevron" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>' +
       '<div class="va-account-options" role="group" aria-label="Ações da conta">' +
-      (me?.role === "master" ? '<button type="button" class="va-account-mobile-access" id="va-mobile-access">Gestão de acessos</button>' : '') +
+      (me?.role === "master" ? '<button type="button" class="va-account-mobile-access" id="va-mobile-access">Gestão de acessos</button><button type="button" class="va-account-mobile-access" id="va-mobile-manuals">Manuais técnicos · teste</button>' : '') +
       '<button type="button" id="va-signout">Sair do VITRA</button></div>';
     sidebar.appendChild(account);
     q("#va-signout", account).addEventListener("click", logout);
@@ -166,9 +178,15 @@
       account.open = false;
       openManagement();
     });
+    q("#va-mobile-manuals", account)?.addEventListener("click", () => {
+      account.open = false;
+      openManuals();
+    });
+    if (me?.role !== "master" && q("#panel .va-manuals") && typeof window.showHome === "function") window.showHome();
   }
   async function logout() {
     managementRequestId++;
+    manualRequestId++;
     try { if (session?.access_token) await call("logout", {}, true); } catch { /* Saída local sempre prevalece */ }
     session = null;
     me = null;
@@ -199,6 +217,136 @@
     div.textContent = message;
     div.hidden = false;
   }
+
+  /* Módulo experimental: PDF/DOCX em storage privado, sempre validado pelo servidor. */
+  const manualDocuments = [
+    { id:"DOC.CQ.056", name:"Manual de Etiquetas e Rotulagem",
+      description:"Rastreabilidade, modelos de etiquetas, códigos de barras e requisitos específicos de clientes." },
+    { id:"DOC.CQ.055", name:"Manual e Padrões de Qualidade — Marca Própria e Exportação",
+      description:"Critérios de classificação e referências para Campesita, Happy Tree, Extra e Sacola." }
+  ];
+  async function manualApi(action, payload={}){
+    if (me?.role!=="master") throw new Error("Acesso restrito ao administrador.");
+    await freshSession();
+    const uploading=action==="upload";
+    const headers={apikey:settings.publishableKey,Authorization:"Bearer "+session.access_token};
+    if(!uploading)headers["Content-Type"]="application/json";
+    const response=await fetch(settings.url+"/functions/v1/vitra-manuais",{
+      method:"POST",headers,body:uploading?payload:JSON.stringify({action,...payload}),cache:"no-store"
+    });
+    if(!response.ok){
+      let explanation={};try{explanation=await response.json();}catch{}
+      throw new Error(explanation.message||"Não foi possível acessar os manuais.");
+    }
+    return action==="get"?response.blob():response.json();
+  }
+  function closeManualPreview(){
+    q("#va-manual-preview")?.remove();
+    document.documentElement.classList.remove("va-doc-open");
+    if(manualObjectUrl){URL.revokeObjectURL(manualObjectUrl);manualObjectUrl=null;}
+  }
+  function manualNotice(message,isError){
+    const el=q("#va-manual-notice");
+    if(!el)return;
+    el.hidden=!message;
+    el.className=isError?"va-error":"va-toast";
+    el.textContent=message||"";
+  }
+  function renderManuals(files,notice=""){
+    if(me?.role!=="master"||!q("#panel .va-manuals"))return;
+    const available=new Set((files||[]).map(x=>x.name));
+    const fileRow=(doc,format)=>{
+      const exists=available.has(doc.id+"."+format),tag=format==="pdf"?"PDF":"Word";
+      const name=doc.id+"."+format;
+      return '<div class="va-doc-file-row"><div class="va-doc-file-info"><span class="va-doc-format">'+tag+'</span>' +
+        '<div><strong>'+safe(format==="pdf"?"Documento para consulta":"Arquivo editável")+'</strong>' +
+        '<small>'+safe(exists?name:"Arquivo ainda não enviado")+'</small></div></div>' +
+        '<div class="va-doc-controls">' +
+        (exists?'<button type="button" class="va-doc-button" data-va-file-action="'+(format==="pdf"?"view":"download")+
+          '" data-va-doc="'+doc.id+'" data-va-format="'+format+'">'+(format==="pdf"?"Visualizar":"Baixar Word")+'</button>' +
+          (format==="pdf"?'<button type="button" class="va-doc-button va-doc-download" data-va-file-action="download" data-va-doc="'+doc.id+'" data-va-format="pdf">Baixar</button>':"")
+        :'<label class="va-doc-upload">Enviar '+tag+'<input aria-label="Enviar '+safe(name)+
+          '" type="file" accept="'+(format==="pdf"?".pdf,application/pdf":".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document")+
+          '" data-va-doc="'+doc.id+'" data-va-format="'+format+'"></label>')+
+        '</div></div>';
+    };
+    const cards=manualDocuments.map((doc,i)=>
+      '<article class="va-doc-card"><div class="va-doc-card-top">' +
+        '<div class="va-doc-cover" aria-hidden="true"><span>V</span><small>'+safe(doc.id)+'</small></div>' +
+        '<div class="va-doc-card-heading"><span class="va-doc-ref">'+safe(doc.id)+'</span><h3>'+safe(doc.name)+'</h3><p>'+safe(doc.description)+'</p></div>' +
+        '</div><div class="va-doc-files">'+fileRow(doc,"pdf")+fileRow(doc,"docx")+'</div></article>'
+    ).join("");
+    q("#panel").innerHTML='<section class="va-manuals" aria-label="Biblioteca privada de manuais técnicos">' +
+      '<div class="va-doc-head"><div><span class="va-doc-eyebrow">BIBLIOTECA TÉCNICA <span>TESTE PRIVADO</span></span>' +
+      '<h2>Manuais e padrões</h2><p>Documentos de referência do Controle de Qualidade.</p></div>' +
+      '<button type="button" id="va-manual-back" class="va-doc-back">Voltar ao painel</button></div>' +
+      '<div class="va-doc-security"><span aria-hidden="true">●</span><div><strong>Acesso exclusivo do administrador</strong>' +
+      '<p>Os arquivos ficam em armazenamento privado, fora do GitHub público. Consulta, envio e download exigem autenticação administrativa.</p></div></div>' +
+      '<div id="va-manual-notice" hidden></div><div class="va-doc-grid">'+cards+'</div>' +
+      '<p class="va-doc-footnote">Teste de apresentação. Os documentos só estarão disponíveis para leitura após o envio pelo administrador nesta seção; arquivos existentes nunca são substituídos automaticamente.</p>' +
+      '</section>';
+    q("#va-manual-back")?.addEventListener("click",()=>{closeManualPreview();if(typeof window.showHome==="function")window.showHome();});
+    q("#panel").querySelectorAll("[data-va-file-action]").forEach(btn=>btn.addEventListener("click",async()=>{
+      if(me?.role!=="master")return;
+      btn.disabled=true;
+      try{
+        const blob=await manualApi("get",{doc:btn.dataset.vaDoc,format:btn.dataset.vaFormat});
+        if(!q("#panel .va-manuals")||me?.role!=="master")return;
+        const url=URL.createObjectURL(blob);
+        if(btn.dataset.vaFileAction==="download"){
+          const a=document.createElement("a");a.href=url;a.download=btn.dataset.vaDoc+"."+btn.dataset.vaFormat;
+          document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+        }else{
+          closeManualPreview();
+          manualObjectUrl=url;
+          const holder=document.createElement("div");holder.id="va-manual-preview";holder.className="va-doc-overlay";
+          const windowContent=document.createElement("div");windowContent.className="va-doc-viewer";
+          const top=document.createElement("div");top.className="va-doc-viewer-head";
+          const title=document.createElement("strong");title.textContent=btn.dataset.vaDoc+" · Visualização do PDF";
+          const close=document.createElement("button");close.type="button";close.textContent="Fechar";close.addEventListener("click",closeManualPreview);
+          top.append(title,close);
+          const frame=document.createElement("iframe");frame.src=url;frame.title="Manual técnico em PDF";
+          windowContent.append(top,frame);holder.appendChild(windowContent);document.body.appendChild(holder);
+          document.documentElement.classList.add("va-doc-open");
+          holder.addEventListener("click",event=>{if(event.target===holder)closeManualPreview();});
+        }
+      }catch(e){manualNotice(errorMessage(e),true);}
+      finally{if(btn.isConnected)btn.disabled=false;}
+    }));
+    q("#panel").querySelectorAll("input[type=file][data-va-doc]").forEach(input=>input.addEventListener("change",async()=>{
+      const file=input.files?.[0];if(!file)return;
+      if(file.size>30*1024*1024){manualNotice("O arquivo ultrapassa o limite de 30 MB.",true);input.value="";return;}
+      const form=new FormData();form.set("action","upload");form.set("doc",input.dataset.vaDoc);
+      form.set("format",input.dataset.vaFormat);form.set("file",file,file.name);
+      input.disabled=true;
+      manualNotice("Enviando "+input.dataset.vaDoc+"…",false);
+      try{
+        await manualApi("upload",form);
+        const listing=await manualApi("list");
+        if(me?.role==="master"&&q("#panel .va-manuals"))renderManuals(listing.files,input.dataset.vaDoc+" enviado e armazenado com acesso restrito.");
+      }catch(e){manualNotice(errorMessage(e),true);}
+      finally{if(input.isConnected){input.disabled=false;input.value="";}}
+    }));
+    if(notice)manualNotice(notice,false);
+  }
+  async function openManuals(){
+    if(me?.role!=="master")return;
+    const requestId=++manualRequestId;
+    q(".va-account")?.removeAttribute("open");
+    if(typeof window.markMain==="function")window.markMain("manuals");
+    q("#panel").innerHTML='<section class="va-manuals"><div class="va-doc-loading" role="status">Verificando acesso administrativo…</div></section>';
+    if(window.innerWidth<=900)q(".vitra-main")?.scrollIntoView({block:"start"});
+    try{
+      const verified=await call("me");
+      if(verified.profile?.role!=="master"||verified.profile?.enabled!==true)throw new Error("Acesso reservado à conta administradora.");
+      const listing=await manualApi("list");
+      if(requestId!==manualRequestId||me?.role!=="master"||!q("#panel .va-manuals"))return;
+      renderManuals(listing.files);
+    }catch(e){
+      if(requestId===manualRequestId&&q("#panel .va-manuals"))q("#panel").innerHTML='<section class="va-manuals"><div class="va-error" role="alert">'+safe(errorMessage(e))+'</div></section>';
+    }
+  }
+
   async function openManagement() {
     if (me?.role !== "master") return;
     const requestId = ++managementRequestId;
