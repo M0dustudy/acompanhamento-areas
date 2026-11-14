@@ -289,7 +289,7 @@
     q("#vl-shot")?.setAttribute("hidden","");
     q("#vl-start")?.removeAttribute("hidden");
   }
-  function revokeLabelPhoto(){if(labelPhotoUrl){URL.revokeObjectURL(labelPhotoUrl);labelPhotoUrl=null;}}
+  function revokeLabelPhoto(){if(labelPhotoUrl){URL.revokeObjectURL(labelPhotoUrl);labelPhotoUrl=null;}labelPhotoFile=null;}
   function chooseLabelPhoto(file){
     if(!file)return;
     if(!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>10*1024*1024){
