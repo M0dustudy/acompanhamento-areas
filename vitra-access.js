@@ -11,7 +11,7 @@
   const root = document.createElement("div");
   root.id = "vitra-access-root";
   document.body.appendChild(root);
-  let session = null, me = null, userRows = [], logRows = [], working = false, checkInProgress = false, managementRequestId = 0, manualRequestId = 0, manualObjectUrl = null;
+  let session = null, me = null, userRows = [], logRows = [], working = false, checkInProgress = false, managementRequestId = 0, labelAccessReserved = 0;
   const q = (selector, base = document) => base.querySelector(selector);
   const safe = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, s =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
@@ -125,8 +125,9 @@
   }
   function removeManagement() {
     q("#cards .va-admin-nav")?.remove();
-    q("#cards .va-manual-nav")?.remove();
-    closeManualPreview();
+    q("#cards .vl-nav")?.remove();
+    stopLabelCamera();
+    revokeLabelPhoto();
     q(".vitra-sidebar .va-account")?.remove();
     q("#va-management-modal")?.remove();
   }
@@ -147,16 +148,14 @@
       nav.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManagement(); }});
       nav.classList.toggle("active", !!q(".vitra-shell.va-admin-view"));
       q("#cards")?.appendChild(nav);
-      const manualsNav = document.createElement("div");
-      manualsNav.className = "card va-manual-nav";
-      manualsNav.dataset.main = "manuals";
-      manualsNav.setAttribute("role", "button");
-      manualsNav.setAttribute("aria-label", "Abrir manuais técnicos — teste privado");
-      manualsNav.tabIndex = 0;
-      manualsNav.innerHTML = '<b><span class="va-doc-nav-icon" aria-hidden="true">▤</span>MANUAIS TÉCNICOS <span class="va-doc-nav-test">TESTE</span></b>';
-      manualsNav.addEventListener("click", openManuals);
-      manualsNav.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") {e.preventDefault();openManuals();} });
-      q("#cards")?.appendChild(manualsNav);
+      const navLabels = document.createElement("div");
+      navLabels.className = "card vl-nav";
+      navLabels.dataset.main = "labels";
+      navLabels.innerHTML = '<b><span class="vl-nav-icon" aria-hidden="true">▧</span>VERIFICAÇÃO DE ETIQUETAS <span class="vl-nav-tag">TESTE</span></b>';
+      navLabels.setAttribute("role","button");navLabels.setAttribute("aria-label","Abrir verificação de etiquetas");navLabels.tabIndex=0;
+      navLabels.addEventListener("click",openLabelReview);
+      navLabels.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openLabelReview();}});
+      q("#cards")?.appendChild(navLabels);
     }
 
     const sidebar = q(".vitra-sidebar");
@@ -170,7 +169,7 @@
       '<span class="va-account-name">' + safe(firstName) + '</span>' +
       '<svg class="va-account-chevron" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>' +
       '<div class="va-account-options" role="group" aria-label="Ações da conta">' +
-      (me?.role === "master" ? '<button type="button" class="va-account-mobile-access" id="va-mobile-access">Gestão de acessos</button><button type="button" class="va-account-mobile-access" id="va-mobile-manuals">Manuais técnicos · teste</button>' : '') +
+      (me?.role === "master" ? '<button type="button" class="va-account-mobile-access" id="va-mobile-access">Gestão de acessos</button><button type="button" class="va-account-mobile-access" id="va-mobile-labels">Verificação de etiquetas · teste</button>' : '') +
       '<button type="button" id="va-signout">Sair do VITRA</button></div>';
     sidebar.appendChild(account);
     q("#va-signout", account).addEventListener("click", logout);
@@ -178,15 +177,16 @@
       account.open = false;
       openManagement();
     });
-    q("#va-mobile-manuals", account)?.addEventListener("click", () => {
+    q("#va-mobile-labels", account)?.addEventListener("click", () => {
       account.open = false;
-      openManuals();
+      openLabelReview();
     });
-    if (me?.role !== "master" && q("#panel .va-manuals") && typeof window.showHome === "function") window.showHome();
+    if (me?.role !== "master" && q("#panel .vl-module") && typeof window.showHome === "function") window.showHome();
   }
   async function logout() {
     managementRequestId++;
-    manualRequestId++;
+    labelRequestId++;
+    stopLabelCamera();revokeLabelPhoto();
     try { if (session?.access_token) await call("logout", {}, true); } catch { /* Saída local sempre prevalece */ }
     session = null;
     me = null;
@@ -218,133 +218,280 @@
     div.hidden = false;
   }
 
-  /* Módulo experimental: PDF/DOCX em storage privado, sempre validado pelo servidor. */
-  const manualDocuments = [
-    { id:"DOC.CQ.056", name:"Manual de Etiquetas e Rotulagem",
-      description:"Rastreabilidade, modelos de etiquetas, códigos de barras e requisitos específicos de clientes." },
-    { id:"DOC.CQ.055", name:"Manual e Padrões de Qualidade — Marca Própria e Exportação",
-      description:"Critérios de classificação e referências para Campesita, Happy Tree, Extra e Sacola." }
+
+  /* VITRA · Verificação experimental de etiquetas
+     Referências técnicas: DOC.CQ.056 (12/09/2026), DOC.CQ.055 rev. 02 (29/05/2026).
+     Toda decisão automática é indicativa; conferir a foto e o modelo aprovado. */
+  const labelClients=[
+    ["expofrut","Expofrut / Novo Rumo"],["caco","CACO"],["docemel","Doce Mel"],["trielo","Trielo"],
+    ["debrand","Comércio de Frutas Debrand"],["tt","T&T"],["assai","Assaí / Bratrade"],
+    ["paguemenos","Pague Menos"],["casaavenida","Casa Avenida"],["gmap","GMAP"],["condor","Condor"],
+    ["mambo","Mambo"],["patrulha","Patrulha Canina"],["sangiuseppe","San Giuseppe"],
+    ["potiguara","Potiguara"],["cia","CIA PA (SP / RJ / PE / CE)"],["carrefour","Carrefour Mercado"],
+    ["sq","Carrefour S&Q"],["outro","Outro cliente / modelo aprovado"]
   ];
-  async function manualApi(action, payload={}){
-    if (me?.role!=="master") throw new Error("Acesso restrito ao administrador.");
-    await freshSession();
-    const uploading=action==="upload";
-    const headers={apikey:settings.publishableKey,Authorization:"Bearer "+session.access_token};
-    if(!uploading)headers["Content-Type"]="application/json";
-    const response=await fetch(settings.url+"/functions/v1/vitra-manuais",{
-      method:"POST",headers,body:uploading?payload:JSON.stringify({action,...payload}),cache:"no-store"
-    });
-    if(!response.ok){
-      let explanation={};try{explanation=await response.json();}catch{}
-      throw new Error(explanation.message||"Não foi possível acessar os manuais.");
-    }
-    return action==="get"?response.blob():response.json();
-  }
-  function closeManualPreview(){
-    q("#va-manual-preview")?.remove();
-    document.documentElement.classList.remove("va-doc-open");
-    if(manualObjectUrl){URL.revokeObjectURL(manualObjectUrl);manualObjectUrl=null;}
-  }
-  function manualNotice(message,isError){
-    const el=q("#va-manual-notice");
-    if(!el)return;
-    el.hidden=!message;
-    el.className=isError?"va-error":"va-toast";
+  const labelVarieties=[
+    ["arra15","ARRA 15 / ARRA Sweeties","AR",["ARRA 15","ARRA SWEETIES","WHITE SEEDLESS"]],
+    ["sugar","Sugar Crisp / IFG Eleven","SR",["SUGAR CRISP","IFG ELEVEN","WHITE SEEDLESS"]],
+    ["autumn","Autumn Crisp","AC",["AUTUMN CRISP","SUGRATHIRTYFIVE","WHITE SEEDLESS"]],
+    ["sweet","Sweet Globe / IFG Ten","SG",["SWEET GLOBE","IFG TEN","WHITE SEEDLESS"]],
+    ["timpson","Timpson / Sheegene 2","TI",["TIMPSON","SHEEGENE","WHITE SEEDLESS"]],
+    ["vitoria","BRS Vitória","VI",["VITÓRIA","VITORIA","BLACK SEEDLESS"]],
+    ["melodia","BRS Melodia","ME",["MELODIA","RED SEEDLESS"]],
+    ["nubia","BRS Núbia / Black Seedless","NB",["NÚBIA","NUBIA","BLACK SEEDLESS"]],
+    ["isis","BRS Ísis","IS",["ÍSIS","ISIS","RED SEEDLESS"]],
+    ["midnight","Midnight Beauty / Sugra 48","MB",["MIDNIGHT BEAUTY","MIDNIGHT","SUGRA 48"]],
+    ["scarlotta","Scarlotta Seedless","SC",["SCARLOTTA","SUGRANINETEEN"]],
+    ["itum9","Itum 9","I9",["ITUM 9","ITUM"]],
+    ["cherry","ARRA Cherry Crush","ACR",["CHERRY CRUSH","ARRA CHERRY"]],
+    ["redglobe","Red Globe","RG",["RED GLOBE"]],
+    ["ard36","ARD 36","",["ARD 36","ARDTHIRTYSIX"]],
+    ["mista","Uva mista","",["UVA MISTA"]]
+  ];
+  const labelModels=[
+    ["caixa","Etiqueta de caixa","5 kg ou 8 kg"],
+    ["cumbuca500","Cumbuca de 500 g","500 g"],
+    ["cumbuca250","Cumbuca de 250 g","250 g"],
+    ["cinta500","Cinta de 500 g","500 g"],
+    ["cinta250","Cinta de 250 g","250 g"],
+    ["selo","Selo / etiqueta complementar","Variável"],
+    ["sacola","Etiqueta de sacola","5 kg ou 8 kg"],
+    ["exportacao","Etiqueta de exportação","Conforme destino"],
+    ["outro","Outro modelo aprovado","Conforme pedido"]
+  ];
+  const labelClasses=["Campesita","Happy Tree / Extra A","Extra","Sacola","Selecionada","Outra"];
+  const labelBarcodes={
+    caco:{white:"7898941149994"},
+    docemel:{white:"7898366000542",red:"7898366000429",vitoria:"7898366001754",midnight:"7898366000481"},
+    trielo:{white:"7898366000542",red:"7898366000429",vitoria:"7898366001754",midnight:"7898366000481"},
+    assai:{white:"7898923868974",red:"7898923868998",vitoria:"7898923868981"}
+  };
+  const labelFieldNames=[
+    ["produto","Nome comercial / produto"],["peso","Peso declarado"],["lote","Lote"],
+    ["data","Data de embalagem"],["rastreio","Código de rastreabilidade"],
+    ["barcode","Código de barras / GTIN"],["produtor","Produtor"],
+    ["cnpj","CNPJ do produtor"],["ggn","GGN (quando aplicável)"],["comercializado","Comercializado por"],
+    ["destino","Destino / país de exportação"],["observacao","Observação complementar"]
+  ];
+  let labelPhotoFile=null,labelPhotoUrl=null,labelLastText="",labelCameraStream=null,labelRequestId=0;
+  function labelSelected(id){return q("#"+id)?.value||""}
+  function labelNormalize(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\s+/g," ").trim()}
+  function labelEAN(value){let n=String(value||"").replace(/\D/g,"");if(n.length!==13)return false;let sum=0;for(let i=0;i<12;i++)sum+=Number(n[i])*(i%2?3:1);return (10-(sum%10))%10===Number(n[12])}
+  function labelOption(rows,placeholder){return '<option value="">'+safe(placeholder)+'</option>'+rows.map(r=>'<option value="'+safe(r[0])+'">'+safe(r[1])+'</option>').join("")}
+  function labelNotice(message,error=false){
+    const el=q("#vl-message");if(!el)return;
+    el.hidden=!message;el.className=error?"vl-notice vl-notice-error":"vl-notice";
     el.textContent=message||"";
   }
-  function renderManuals(files,notice=""){
-    if(me?.role!=="master"||!q("#panel .va-manuals"))return;
-    const available=new Set((files||[]).map(x=>x.name));
-    const fileRow=(doc,format)=>{
-      const exists=available.has(doc.id+"."+format),tag=format==="pdf"?"PDF":"Word";
-      const name=doc.id+"."+format;
-      return '<div class="va-doc-file-row"><div class="va-doc-file-info"><span class="va-doc-format">'+tag+'</span>' +
-        '<div><strong>'+safe(format==="pdf"?"Documento para consulta":"Arquivo editável")+'</strong>' +
-        '<small>'+safe(exists?name:"Arquivo ainda não enviado")+'</small></div></div>' +
-        '<div class="va-doc-controls">' +
-        (exists?'<button type="button" class="va-doc-button" data-va-file-action="'+(format==="pdf"?"view":"download")+
-          '" data-va-doc="'+doc.id+'" data-va-format="'+format+'">'+(format==="pdf"?"Visualizar":"Baixar Word")+'</button>' +
-          (format==="pdf"?'<button type="button" class="va-doc-button va-doc-download" data-va-file-action="download" data-va-doc="'+doc.id+'" data-va-format="pdf">Baixar</button>':"")
-        :'<label class="va-doc-upload">Enviar '+tag+'<input aria-label="Enviar '+safe(name)+
-          '" type="file" accept="'+(format==="pdf"?".pdf,application/pdf":".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document")+
-          '" data-va-doc="'+doc.id+'" data-va-format="'+format+'"></label>')+
-        '</div></div>';
-    };
-    const cards=manualDocuments.map((doc,i)=>
-      '<article class="va-doc-card"><div class="va-doc-card-top">' +
-        '<div class="va-doc-cover" aria-hidden="true"><span>V</span><small>'+safe(doc.id)+'</small></div>' +
-        '<div class="va-doc-card-heading"><span class="va-doc-ref">'+safe(doc.id)+'</span><h3>'+safe(doc.name)+'</h3><p>'+safe(doc.description)+'</p></div>' +
-        '</div><div class="va-doc-files">'+fileRow(doc,"pdf")+fileRow(doc,"docx")+'</div></article>'
-    ).join("");
-    q("#panel").innerHTML='<section class="va-manuals" aria-label="Biblioteca privada de manuais técnicos">' +
-      '<div class="va-doc-head"><div><span class="va-doc-eyebrow">BIBLIOTECA TÉCNICA <span>TESTE PRIVADO</span></span>' +
-      '<h2>Manuais e padrões</h2><p>Documentos de referência do Controle de Qualidade.</p></div>' +
-      '<button type="button" id="va-manual-back" class="va-doc-back">Voltar ao painel</button></div>' +
-      '<div class="va-doc-security"><span aria-hidden="true">●</span><div><strong>Acesso exclusivo do administrador</strong>' +
-      '<p>Os arquivos ficam em armazenamento privado, fora do GitHub público. Consulta, envio e download exigem autenticação administrativa.</p></div></div>' +
-      '<div id="va-manual-notice" hidden></div><div class="va-doc-grid">'+cards+'</div>' +
-      '<p class="va-doc-footnote">Teste de apresentação. Os documentos só estarão disponíveis para leitura após o envio pelo administrador nesta seção; arquivos existentes nunca são substituídos automaticamente.</p>' +
-      '</section>';
-    q("#va-manual-back")?.addEventListener("click",()=>{closeManualPreview();if(typeof window.showHome==="function")window.showHome();});
-    q("#panel").querySelectorAll("[data-va-file-action]").forEach(btn=>btn.addEventListener("click",async()=>{
-      if(me?.role!=="master")return;
-      btn.disabled=true;
-      try{
-        const blob=await manualApi("get",{doc:btn.dataset.vaDoc,format:btn.dataset.vaFormat});
-        if(!q("#panel .va-manuals")||me?.role!=="master")return;
-        const url=URL.createObjectURL(blob);
-        if(btn.dataset.vaFileAction==="download"){
-          const a=document.createElement("a");a.href=url;a.download=btn.dataset.vaDoc+"."+btn.dataset.vaFormat;
-          document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-        }else{
-          closeManualPreview();
-          manualObjectUrl=url;
-          const holder=document.createElement("div");holder.id="va-manual-preview";holder.className="va-doc-overlay";
-          const windowContent=document.createElement("div");windowContent.className="va-doc-viewer";
-          const top=document.createElement("div");top.className="va-doc-viewer-head";
-          const title=document.createElement("strong");title.textContent=btn.dataset.vaDoc+" · Visualização do PDF";
-          const close=document.createElement("button");close.type="button";close.textContent="Fechar";close.addEventListener("click",closeManualPreview);
-          top.append(title,close);
-          const frame=document.createElement("iframe");frame.src=url;frame.title="Manual técnico em PDF";
-          windowContent.append(top,frame);holder.appendChild(windowContent);document.body.appendChild(holder);
-          document.documentElement.classList.add("va-doc-open");
-          holder.addEventListener("click",event=>{if(event.target===holder)closeManualPreview();});
-        }
-      }catch(e){manualNotice(errorMessage(e),true);}
-      finally{if(btn.isConnected)btn.disabled=false;}
-    }));
-    q("#panel").querySelectorAll("input[type=file][data-va-doc]").forEach(input=>input.addEventListener("change",async()=>{
-      const file=input.files?.[0];if(!file)return;
-      if(file.size>30*1024*1024){manualNotice("O arquivo ultrapassa o limite de 30 MB.",true);input.value="";return;}
-      const form=new FormData();form.set("action","upload");form.set("doc",input.dataset.vaDoc);
-      form.set("format",input.dataset.vaFormat);form.set("file",file,file.name);
-      input.disabled=true;
-      manualNotice("Enviando "+input.dataset.vaDoc+"…",false);
-      try{
-        await manualApi("upload",form);
-        const listing=await manualApi("list");
-        if(me?.role==="master"&&q("#panel .va-manuals"))renderManuals(listing.files,input.dataset.vaDoc+" enviado e armazenado com acesso restrito.");
-      }catch(e){manualNotice(errorMessage(e),true);}
-      finally{if(input.isConnected){input.disabled=false;input.value="";}}
-    }));
-    if(notice)manualNotice(notice,false);
+  function stopLabelCamera(){
+    if(labelCameraStream){labelCameraStream.getTracks().forEach(t=>t.stop());labelCameraStream=null;}
+    const v=q("#vl-live");if(v){v.srcObject=null;v.hidden=true;}
+    q("#vl-shot")?.setAttribute("hidden","");
+    q("#vl-start")?.removeAttribute("hidden");
   }
-  async function openManuals(){
-    if(me?.role!=="master")return;
-    const requestId=++manualRequestId;
-    q(".va-account")?.removeAttribute("open");
-    if(typeof window.markMain==="function")window.markMain("manuals");
-    q("#panel").innerHTML='<section class="va-manuals"><div class="va-doc-loading" role="status">Verificando acesso administrativo…</div></section>';
-    if(window.innerWidth<=900)q(".vitra-main")?.scrollIntoView({block:"start"});
-    try{
-      const verified=await call("me");
-      if(verified.profile?.role!=="master"||verified.profile?.enabled!==true)throw new Error("Acesso reservado à conta administradora.");
-      const listing=await manualApi("list");
-      if(requestId!==manualRequestId||me?.role!=="master"||!q("#panel .va-manuals"))return;
-      renderManuals(listing.files);
-    }catch(e){
-      if(requestId===manualRequestId&&q("#panel .va-manuals"))q("#panel").innerHTML='<section class="va-manuals"><div class="va-error" role="alert">'+safe(errorMessage(e))+'</div></section>';
+  function revokeLabelPhoto(){if(labelPhotoUrl){URL.revokeObjectURL(labelPhotoUrl);labelPhotoUrl=null;}}
+  function chooseLabelPhoto(file){
+    if(!file)return;
+    if(!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>10*1024*1024){
+      labelNotice("Escolha uma foto JPG, PNG ou WebP de até 10 MB.",true);return;
     }
+    revokeLabelPhoto();labelPhotoFile=file;labelPhotoUrl=URL.createObjectURL(file);
+    const img=q("#vl-photo");if(img){img.src=labelPhotoUrl;img.hidden=false;}
+    q("#vl-photo-empty")?.setAttribute("hidden","");
+    labelLastText="";
+    const text=q("#vl-ocr-text");if(text)text.value="";
+    labelNotice("Foto carregada. Toque em «Ler texto da etiqueta» para analisar.",false);
+    stopLabelCamera();labelCheck();
+  }
+  async function labelStartCamera(){
+    if(!navigator.mediaDevices?.getUserMedia){labelNotice("Câmera direta indisponível. Use «Tirar foto ou escolher arquivo».",true);return;}
+    try{
+      labelCameraStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1600},height:{ideal:1200}}});
+      const video=q("#vl-live");if(!video){stopLabelCamera();return;}
+      video.srcObject=labelCameraStream;video.hidden=false;await video.play();
+      q("#vl-shot")?.removeAttribute("hidden");q("#vl-start")?.setAttribute("hidden","");
+      q("#vl-photo")?.setAttribute("hidden","");q("#vl-photo-empty")?.setAttribute("hidden","");
+    }catch(e){labelNotice("Não consegui abrir a câmera. Verifique a permissão do navegador ou escolha uma foto.",true);stopLabelCamera();}
+  }
+  function labelCapture(){
+    const video=q("#vl-live");if(!video||!labelCameraStream||!video.videoWidth)return;
+    const cn=document.createElement("canvas");const scale=Math.min(1,1800/video.videoWidth);
+    cn.width=Math.round(video.videoWidth*scale);cn.height=Math.round(video.videoHeight*scale);
+    cn.getContext("2d").drawImage(video,0,0,cn.width,cn.height);
+    cn.toBlob(blob=>{if(blob)chooseLabelPhoto(new File([blob],"etiqueta-"+Date.now()+".jpg",{type:"image/jpeg"}));}, "image/jpeg",0.9);
+  }
+  async function labelEnsureOCR(){
+    if(window.Tesseract?.createWorker)return;
+    await new Promise((resolve,reject)=>{
+      const src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+      const existing=document.querySelector('script[data-vl-ocr]');
+      if(existing){existing.addEventListener("load",resolve,{once:true});existing.addEventListener("error",reject,{once:true});return;}
+      const script=document.createElement("script");script.src=src;script.async=true;script.dataset.vlOcr="true";
+      script.onload=resolve;script.onerror=()=>reject(new Error("Leitor de texto não disponível"));
+      document.head.appendChild(script);
+    });
+    if(!window.Tesseract?.createWorker)throw Error("Reconhecimento não carregado");
+  }
+  function labelExtract(text){
+    const t=String(text||"").replace(/[ \t]+/g," ");
+    const normalized=labelNormalize(t);
+    const bar=t.match(/(?:\d[\s-]*){13}/g)||[];
+    const ean=bar.map(x=>x.replace(/\D/g,"")).find(labelEAN)||bar.map(x=>x.replace(/\D/g,""))[0]||"";
+    const trace=t.match(/\bR[\s-]*\d{2}[\s-]*\d{3,5}[A-Z]?[\s-]*\d{4}[\s-]*[C58][\s-]*[A-Z]{2,3}\b/i);
+    const data=t.match(/\b([0-3]?\d)[./-]([01]?\d)[./-](20\d{2})\b/);
+    const weight=t.match(/\b(?:PESO\s*[:=]?\s*)?(\d{1,2}(?:[,.]\d{1,2})?)\s*(KG|G)\b/i);
+    const lot=t.match(/\b(?:LOTE|LOT)\s*[:#-]?\s*([0-9A-Z./-]{2,24})\b/i);
+    const fields={barcode:ean,rastreio:trace?trace[0].replace(/\s+/g,""):"",data:data?data[1].padStart(2,"0")+"/"+data[2].padStart(2,"0")+"/"+data[3]:"",peso:weight?weight[1].replace(".",",")+" "+weight[2].toUpperCase():"",lote:lot?lot[1]:""};
+    const variety=labelVarieties.find(v=>v[3].some(alias=>normalized.includes(labelNormalize(alias))&&!alias.endsWith("SEEDLESS")));
+    return {fields,variety:variety?.[0]||""};
+  }
+  async function labelRead(){
+    if(!labelPhotoFile){labelNotice("Tire uma foto ou selecione uma imagem primeiro.",true);return;}
+    const button=q("#vl-read");if(button)button.disabled=true;
+    labelNotice("Reconhecendo o texto da etiqueta. A leitura pode exigir revisão manual…");
+    let worker=null;
+    try{
+      await labelEnsureOCR();
+      worker=await window.Tesseract.createWorker("por+eng",1);
+      const result=await worker.recognize(labelPhotoFile);
+      labelLastText=String(result?.data?.text||"").trim();
+      q("#vl-ocr-text").value=labelLastText;
+      const found=labelExtract(labelLastText);
+      if(found.variety&&!labelSelected("vl-variety"))q("#vl-variety").value=found.variety;
+      for(const [key,value] of Object.entries(found.fields)){
+        const field=q("#vl-f-"+key);if(field&&value&&!field.value)field.value=value;
+      }
+      labelCheck();
+      labelNotice(labelLastText?"Leitura concluída. Confira os dados reconhecidos antes de salvar.":"Nenhum texto legível identificado. Preencha os campos manualmente.",!labelLastText);
+    }catch(e){labelNotice("Leitura automática indisponível nesta foto ou conexão. Você pode preencher tudo manualmente.",true);}
+    finally{if(worker)try{await worker.terminate();}catch{}if(button?.isConnected)button.disabled=false;}
+  }
+  function labelCheck(){
+    const client=labelSelected("vl-client"),kind=labelSelected("vl-kind"),variety=labelSelected("vl-variety"),klass=labelSelected("vl-class");
+    const t=labelVarieties.find(v=>v[0]===variety);
+    const fields=Object.fromEntries(labelFieldNames.map(([key])=>[key,q("#vl-f-"+key)?.value.trim()||""]));
+    const result=[],required=["produto","peso","lote","data","rastreio"];
+    if(kind==="caixa"||kind==="sacola"||kind==="exportacao")required.push("produtor","comercializado");
+    if(["cumbuca500","cumbuca250","cinta500","cinta250"].includes(kind))required.push("barcode");
+    if(kind==="exportacao")required.push("destino");
+    if(kind==="selo")required.splice(0,required.length,"produto","data");
+    if(!client)result.push(["pendente","Cliente","Selecione o cliente da etiqueta."]);
+    if(!kind)result.push(["pendente","Modelo","Selecione o tipo de etiqueta."]);
+    if(!variety)result.push(["pendente","Variedade","Selecione a variedade real da uva."]);
+    if(!klass)result.push(["pendente","Classificação","Confirme a classificação; não é determinada somente pela foto."]);
+    for(const key of required)if(!fields[key])result.push(["pendente",labelFieldNames.find(x=>x[0]===key)?.[1]||key,"Não identificado ou ainda não informado."]);
+    const barcode=fields.barcode.replace(/\D/g,"");
+    if(barcode&&!labelEAN(barcode))result.push(["atencao","Código de barras","O dígito verificador EAN-13 não confere. Revise a leitura."]);
+    const color=t?["arra15","sugar","autumn","sweet","timpson"].includes(variety)?"white":["vitoria","nubia","midnight"].includes(variety)?"black":"red":"";
+    const expectedCodes=labelBarcodes[client]||{};
+    const expected=(variety==="vitoria"&&expectedCodes.vitoria)||(variety==="midnight"&&expectedCodes.midnight)||(color==="white"&&expectedCodes.white)||(color==="red"&&expectedCodes.red)||"";
+    if(expected&&barcode&&barcode!==expected)result.push(["atencao","Código de barras","Código diferente da referência geral disponível para este cliente. Verifique o modelo aprovado, a embalagem e a variedade antes de corrigir."]);
+    if(client==="caco"&&color!=="white"&&client)result.push(["revisar","CACO","Nas demais variedades, utilizar o código autorizado da fazenda (DOC.CQ.056, p. 10)."]);
+    if(client==="tt"&&variety==="isis")result.push(["revisar","T&T · Ísis","Confira a identificação comercial Crimson quando aplicável (p. 17)."]);
+    if(client==="assai"&&t)result.push(["revisar","Assaí / Bratrade","Conferir as denominações comerciais Thompson, Vitória e Crimson segundo a cor da uva (pp. 18–19)."]);
+    if(["carrefour","sq"].includes(client))result.push(["revisar","Carrefour","Mercado e S&Q usam códigos diferentes; consultar o modelo aprovado específico (pp. 32–33)."]);
+    if(client==="outro")result.push(["revisar","Modelo não parametrizado","Obrigatória a conferência com o modelo aprovado pelo cliente."]);
+    if(["cumbuca500","cinta500"].includes(kind)&&fields.peso&&/250\s*G/i.test(fields.peso))result.push(["atencao","Peso","O peso informado diverge da embalagem selecionada (500 g)."]);
+    if(["cumbuca250","cinta250"].includes(kind)&&fields.peso&&/500\s*G/i.test(fields.peso))result.push(["atencao","Peso","O peso informado diverge da embalagem selecionada (250 g)."]);
+    if(fields.rastreio&&t?.[2]&&/^R[-\s]/i.test(fields.rastreio)){
+      const found=fields.rastreio.toUpperCase().match(/-([A-Z]{2,3})$/);
+      if(found&&found[1]!==t[2])result.push(["atencao","Rastreabilidade","A sigla final "+found[1]+" difere da sigla "+t[2]+" registrada no manual. Confira a etiqueta original."]);
+    }
+    if(fields.data&&!/^\d{2}\/\d{2}\/20\d{2}$/.test(fields.data))result.push(["atencao","Data","Use DD/MM/AAAA e confira com a data real da embalagem."]);
+    if(!labelPhotoFile)result.push(["revisar","Evidência","Nenhuma fotografia anexada. A conferência depende de inspeção visual."]);
+    result.push(["revisar","Conferência física","Confirme legibilidade, modelo aprovado, posição e compatibilidade da etiqueta com a ordem de produção (DOC.CQ.056, p. 4)."]);
+    const panel=q("#vl-checks");if(panel){
+      const missing=result.filter(r=>r[0]==="pendente").length,alert=result.filter(r=>r[0]==="atencao").length;
+      q("#vl-count").textContent=missing+" pendência(s) · "+alert+" divergência(s)";
+      panel.innerHTML=result.map(item=>'<div class="vl-check vl-check-'+item[0]+'"><span class="vl-check-dot" aria-hidden="true"></span><div><strong>'+safe(item[1])+'</strong><p>'+safe(item[2])+'</p></div></div>').join("");
+    }
+    return {fields,checklist:result,review_status:result.some(x=>x[0]==="atencao")?"atencao":"pendente"};
+  }
+  function labelRender(){
+    const p=q("#panel");if(!p||me?.role!=="master")return;
+    p.innerHTML='<section class="vl-module" aria-label="Verificação de etiquetas">' +
+      '<div class="vl-header"><div><span class="vl-kicker">CONTROLE DE QUALIDADE <span>TESTE ADMIN</span></span><h2>Verificação de etiquetas</h2><p>Fotografe a etiqueta, confira a leitura e complete os dados que faltam.</p></div><button class="vl-back" type="button" id="vl-back">Voltar ao painel</button></div>'+
+      '<div class="vl-layout"><div class="vl-column">' +
+      '<section class="vl-card"><div class="vl-section-head"><span>01 / Fotografia</span><h3>Capture a etiqueta</h3><p>Posicione-a inteira, com boa iluminação e sem reflexos.</p></div>'+
+      '<div class="vl-viewbox"><div id="vl-photo-empty"><span class="vl-camera-symbol">▧</span><strong>Nenhuma imagem selecionada</strong><small>Abra a câmera ou envie uma foto</small></div><video id="vl-live" autoplay muted playsinline hidden></video><img id="vl-photo" alt="Foto da etiqueta para conferência" hidden></div>'+
+      '<div class="vl-photo-actions"><button type="button" class="vl-primary" id="vl-start">Abrir câmera</button><button type="button" class="vl-primary" id="vl-shot" hidden>Capturar foto</button><label class="vl-file-label">Tirar foto ou escolher arquivo<input id="vl-file" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"></label><button type="button" class="vl-ghost" id="vl-read">Ler texto da etiqueta</button></div>'+
+      '<p class="vl-hint">A leitura é feita no aparelho quando disponível. O resultado não substitui a conferência da etiqueta e do modelo comercial.</p></section>'+
+      '<section class="vl-card"><div class="vl-section-head"><span>02 / Identificação</span><h3>Produto e destino</h3><p>Escolha o padrão que corresponde à embalagem fotografada.</p></div><div class="vl-form-grid">'+
+      '<label>Cliente / marca<select id="vl-client">'+labelOption(labelClients,"Selecione o cliente")+'</select></label>'+
+      '<label>Tipo de etiqueta<select id="vl-kind">'+labelOption(labelModels,"Selecione o modelo")+'</select></label>'+
+      '<label>Variedade<select id="vl-variety">'+labelOption(labelVarieties,"Selecione a variedade")+'</select></label>'+
+      '<label>Classificação<select id="vl-class">'+labelOption(labelClasses.map((n,i)=>[n,n]),"Selecione a classe")+'</select></label>'+
+      '</div></section></div><div class="vl-column">'+
+      '<section class="vl-card"><div class="vl-section-head"><span>03 / Dados</span><h3>Conferência dos campos</h3><p>Corrija o que a câmera não reconhecer. Os campos são editáveis.</p></div><div class="vl-form-grid">'+
+      labelFieldNames.map(([key,name])=>'<label>'+safe(name)+'<input type="text" id="vl-f-'+safe(key)+'" autocomplete="off" placeholder="Não identificado"></label>').join("")+
+      '</div><details class="vl-ocr-details"><summary>Texto bruto reconhecido da foto</summary><textarea id="vl-ocr-text" rows="4" placeholder="Texto reconhecido pela câmera (editável)"></textarea></details></section>'+
+      '<section class="vl-card"><div class="vl-section-head vl-section-result"><div><span>04 / Resultado</span><h3>Itens para conferir</h3></div><small id="vl-count">Selecione os dados</small></div><div id="vl-checks" class="vl-checks"></div>'+
+      '<label class="vl-notes-label">Observações do responsável<textarea id="vl-notes" rows="3" placeholder="Registre ajustes, dúvidas ou itens que deverão ser corrigidos na etiqueta."></textarea></label>'+
+      '<label class="vl-confirm"><input id="vl-confirm" type="checkbox"> Eu conferi os dados, o modelo aprovado e a foto. Salvar como registro de conferência, não como aprovação automática.</label>'+
+      '<button type="button" id="vl-save" class="vl-primary vl-save">Salvar conferência</button></section></div></div>'+
+      '<div id="vl-message" class="vl-notice" hidden></div>'+
+      '<section class="vl-card vl-history"><div class="vl-section-head"><span>HISTÓRICO</span><h3>Últimas verificações</h3></div><div id="vl-history">Carregando histórico…</div></section></section>';
+    q("#vl-back").addEventListener("click",()=>{stopLabelCamera();revokeLabelPhoto();if(typeof window.showHome==="function")window.showHome();});
+    q("#vl-file").addEventListener("change",e=>{if(e.target.files?.[0])chooseLabelPhoto(e.target.files[0]);});
+    q("#vl-start").addEventListener("click",labelStartCamera);q("#vl-shot").addEventListener("click",labelCapture);
+    q("#vl-read").addEventListener("click",labelRead);
+    q("#vl-ocr-text").addEventListener("input",e=>{labelLastText=e.target.value;labelCheck();});
+    p.querySelectorAll(".vl-form-grid input,.vl-form-grid select").forEach(el=>el.addEventListener("input",labelCheck));
+    q("#vl-save").addEventListener("click",labelSave);
+    labelCheck();labelHistory();
+  }
+  async function labelApi(action,payload={}){
+    if(me?.role!=="master")throw Error("Acesso restrito");
+    await freshSession();
+    const isUpload=action==="save";
+    const response=await fetch(settings.url+"/functions/v1/vitra-etiquetas",{
+      method:"POST",headers:{apikey:settings.publishableKey,Authorization:"Bearer "+session.access_token,...(!isUpload?{"Content-Type":"application/json"}:{})},
+      body:isUpload?payload:JSON.stringify({action,...payload}),cache:"no-store"
+    });
+    if(!response.ok){let x={};try{x=await response.json();}catch{}throw Error(x.message||"Não foi possível processar a conferência.");}
+    return response.json();
+  }
+  async function labelHistory(){
+    try{
+      const rows=(await labelApi("history")).rows||[];
+      if(!q("#vl-history"))return;
+      q("#vl-history").innerHTML=rows.length?rows.map(r=>
+        '<div class="vl-history-row"><div><strong>'+safe(labelClients.find(c=>c[0]===r.client)?.[1]||r.client)+'</strong>'+
+        '<span>'+safe(labelVarieties.find(c=>c[0]===r.variety)?.[1]||r.variety)+' · '+safe(labelModels.find(c=>c[0]===r.label_kind)?.[1]||r.label_kind)+'</span></div>'+
+        '<div><small>'+safe(stamp(r.created_at))+'</small><em>'+safe(r.review_status==="atencao"?"Divergência":r.review_status==="conferido"?"Conferido":"Pendente")+'</em></div></div>'
+      ).join(""):'<p class="vl-empty">Nenhuma conferência salva até agora.</p>';
+    }catch(e){if(q("#vl-history"))q("#vl-history").textContent="Não foi possível carregar o histórico.";}
+  }
+  async function labelSave(){
+    if(me?.role!=="master")return;
+    const client=labelSelected("vl-client"),kind=labelSelected("vl-kind"),variety=labelSelected("vl-variety"),klass=labelSelected("vl-class");
+    if(!client||!kind||!variety||!klass){labelNotice("Selecione cliente, tipo de etiqueta, variedade e classificação.",true);return;}
+    if(!q("#vl-confirm")?.checked){labelNotice("Confirme a conferência manual antes de registrar.",true);return;}
+    const checked=labelCheck(),form=new FormData();
+    const payload={client,variety,label_kind:kind,label_class:klass,packaging:labelModels.find(x=>x[0]===kind)?.[2]||"",
+      review_status:checked.review_status,detected_text:q("#vl-ocr-text")?.value||"",fields:checked.fields,
+      checklist:checked.checklist,notes:q("#vl-notes")?.value||""};
+    form.set("action","save");form.set("payload",JSON.stringify(payload));
+    if(labelPhotoFile)form.set("photo",labelPhotoFile,labelPhotoFile.name);
+    const btn=q("#vl-save");btn.disabled=true;labelNotice("Salvando a conferência no histórico…");
+    try{await labelApi("save",form);labelNotice("Conferência registrada no histórico. Nenhum relatório de estoque foi modificado.");q("#vl-confirm").checked=false;await labelHistory();}
+    catch(e){labelNotice(e.message||"Falha ao salvar a conferência.",true);}
+    finally{if(btn.isConnected)btn.disabled=false;}
+  }
+  async function openLabelReview(){
+    if(me?.role!=="master")return;
+    const requestId=++labelRequestId;
+    q(".va-account")?.removeAttribute("open");
+    if(typeof window.markMain==="function")window.markMain("labels");
+    q("#panel").innerHTML='<div class="vl-loading">Verificando acesso ao módulo de etiquetas…</div>';
+    try{
+      const info=await call("me");
+      if(info.profile?.role!=="master"||info.profile?.enabled!==true)throw Error("Acesso reservado ao administrador.");
+      await labelApi("history");
+      if(requestId!==labelRequestId||me?.role!=="master")return;
+      labelRender();
+      if(window.innerWidth<=900)q(".vitra-main")?.scrollIntoView({block:"start"});
+    }catch(e){if(requestId===labelRequestId)q("#panel").innerHTML='<div class="va-error" role="alert">'+safe(e.message||"Acesso não autorizado")+'</div>';}
   }
 
   async function openManagement() {
