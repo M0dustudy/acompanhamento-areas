@@ -46,7 +46,8 @@ const state={
  identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
  expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
- mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0
+ mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -84,13 +85,13 @@ function validCnpj(raw){
  return check(12)===Number(n[12])&&check(13)===Number(n[13]);
 }
 function parseTrace(value){
- const m=norm(value).replace(/[–—]/g,"-").match(/^R-(\d{2})-(\d{3,5})([A-Z])-(\d{2})(\d{2})-([C58])-([A-Z]{2,3})$/);
- return m?{year:m[1],area:m[2],valve:m[3],day:m[4],month:m[5],method:m[6],variety:m[7]}:null;
+ const m=norm(value).replace(/[–—]/g,"-").replace(/\s/g,"").match(/^R-(\d{2})-([0-9A-Z]{1,24})-(\d{2})(\d{2})-([C58])-([A-Z0-9]{2,5})$/);
+ return m?{year:m[1],areaValve:m[2],area:"",valve:"",day:m[3],month:m[4],method:m[5],variety:m[6]}:null;
 }
 function expectedCode(){
  const x=state.expected;
  if(!x.year||!x.area||!x.valve||!x.day||!x.month||!x.method||!x.variety)return "";
- return "R-"+x.year+"-"+x.area+x.valve+"-"+x.day+x.month+"-"+x.method+"-"+x.variety;
+ return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9]/g,"")+norm(x.valve).replace(/[^A-Z0-9]/g,"")+"-"+x.day+x.month+"-"+x.method+"-"+x.variety;
 }
 function expectedVariety(){
  return varieties.find(x=>x[2]===state.expected.variety)?.[0]||"";
@@ -110,7 +111,7 @@ function extract(raw,barcode){
  const words=rawWords.filter(x=>x!=="expofrut"||!n.includes("COMERCIALIZADO POR")||candidateClients.length===1&&candidateClients[0]==="expofrut");
  const agreed=candidateClients.filter(x=>words.includes(x));
  const foundClient=agreed.length===1?agreed[0]:words.length===1?words[0]:candidateClients.length===1?candidateClients[0]:"";
- const traceMatch=str(raw).match(/\bR[\s\-–—]*(\d{2})[\s\-–—]*(\d{3,5}[A-Za-z])[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z]{2,3})\b/i);
+ const traceMatch=str(raw).match(/\bR[\s\-–—]*(\d{2})[\s\-–—]*([0-9A-Za-z]{2,24})[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z0-9]{2,5})\b/i);
  const trace=traceMatch?"R-"+traceMatch[1]+"-"+traceMatch[2].toUpperCase()+"-"+traceMatch[3]+"-"+traceMatch[4].toUpperCase()+"-"+traceMatch[5].toUpperCase():"";
  const track=parseTrace(trace),group=matches.filter(x=>!foundClient||x.client===foundClient);
  const wordVar=varieties.filter(x=>x[3].some(alias=>n.includes(norm(alias))));
@@ -226,7 +227,15 @@ async function loadPatterns(){
    catalog.push({barcode:p.barcode,client:p.client,product:p.product||"",variety:p.variety,color:"",
     weight:digits(p.weight).slice(0,4),kind:p.label_kind,klass:p.label_class||"",source:"Padrão validado no histórico"});
   }
- }catch{notice("Catálogo complementar temporariamente indisponível. A consulta local continua ativa.",true);}
+  state.catalogLoaded=true;
+ }catch{state.catalogLoaded=false;notice("Catálogo complementar temporariamente indisponível. A consulta local continua ativa.",true);}
+ if(state.photo)showResult();
+}
+async function loadEntities(){
+ if(!ctx?.canAccess?.())return;
+ try{const response=await ctx.api("references");state.entities=Array.isArray(response.rows)?response.rows:[];state.refsLoaded=state.entities.length>0;}
+ catch{state.entities=[];state.refsLoaded=false;notice("Base privada de produtores indisponível; dados institucionais não serão aprovados automaticamente.",true);}
+ if(state.photo)showResult();
 }
 function drawCrop(){
  const stage=el("vl2-stage"),frame=el("vl2-frame");if(!stage||!frame)return;
@@ -565,7 +574,7 @@ function mount(adapter){
  el("vl2-square")?.addEventListener("click",()=>{state.crop.ratio=1;el("vl2-square").classList.add("active");el("vl2-rectangle").classList.remove("active");drawCrop();});
  el("vl2-rectangle")?.addEventListener("click",()=>{state.crop.ratio=1.5;el("vl2-rectangle").classList.add("active");el("vl2-square").classList.remove("active");drawCrop();});
  el("vl2-zoom")?.addEventListener("input",e=>{state.crop.scale=Number(e.target.value)/100;drawCrop();});
- bindFrame();showResult();loadPatterns();fetchHistory();
+ bindFrame();showResult();loadPatterns();loadEntities();fetchHistory();
 }
 window.VITRA_LABEL_SMART={mount,catalogCount:catalog.length,reference:"DOC.CQ.056"};
 })();
