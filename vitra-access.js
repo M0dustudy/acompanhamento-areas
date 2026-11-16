@@ -185,15 +185,16 @@
       openLabelReview();
     });
     if (me?.role !== "master" && q("#panel .vl-module") && typeof window.showHome === "function") window.showHome();
+    window.VITRA_MODULE_ALLOWED = key => me?.role==="master"||me?.module_access?.[key]!==false;
     applyModuleVisibility();
   }
-  const moduleKeys={acomp:"field",colh:"harvest",pausa:"paused",fim:"finished",recep:"reception",titul:"titulation",estoque:"stock"};
+  const moduleKeys={acomp:"field",colh:"harvest",pausa:"paused",fim:"finished","external-reception":"reception",stock:"stock",recep:"reception",titul:"titulation",estoque:"stock"};
   function applyModuleVisibility(){
     const allowed=me?.role==="master"?null:me?.module_access||{};
     q("#cards")?.querySelectorAll("[data-main]").forEach(node=>{
       const raw=node.dataset.main||"";
       const id=moduleKeys[raw]||(/recept|recep/i.test(raw)?"reception":/titula|titul/i.test(raw)?"titulation":/stock|estoque/i.test(raw)?"stock":null);
-      if(id&&allowed&&allowed[id]===false)node.hidden=true;
+      if(id)node.hidden=Boolean(allowed&&allowed[id]===false);
     });
   }
   async function logout() {
@@ -215,8 +216,10 @@
     try {
       const info = await call("me");
       if (!info.profile?.username || info.profile.enabled !== true) throw new Error("Acesso revogado.");
-      if (!me || info.profile.role !== me.role || info.profile.username !== me.username) {
+      if (!me || info.profile.role !== me.role || info.profile.username !== me.username ||
+          JSON.stringify(info.profile.module_access||{})!==JSON.stringify(me.module_access||{})) {
         me = info.profile;
+        if(typeof window.showHome==="function")window.showHome();
         unlock();
       }
     } catch (err) {
