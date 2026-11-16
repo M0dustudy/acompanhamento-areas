@@ -639,57 +639,69 @@ function ocrEvidenceScore(value){
 }
 async function readPhoto(){
  if(!state.photo||!ctx?.canAccess?.())return;
- const seq=++state.sequence,progress=el("vl2-progress");
- if(progress){progress.hidden=false;progress.textContent="Lendo a etiqueta completa…";}
- let worker=null,recognized="",barcode="",failed=false;
- try{
+ const seq=++state.sequence,photo=state.photo,progress=el("vl2-progress");
+ state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
+ if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia para leitura…";}
+ let worker=null,recognized="",barcode="",printedNumber="",failure="";
+ const update=message=>{if(seq===state.sequence&&progress)progress.textContent=message;};
+ const run=async()=>{
   try{
+   update("Carregando o leitor de texto…");
    await ensureOCR();
-   if(progress)progress.textContent="Reconhecendo os textos, siglas e números impressos…";
-   worker=await window.Tesseract.createWorker("por+eng",1);
-   recognized=str((await worker.recognize(state.photo,{rotateAuto:true})).data?.text).trim();
-   if(ocrEvidenceScore(recognized)<32&&seq===state.sequence){
-    let source=null;
-    try{
-     source=await createImageBitmap(state.photo,{imageOrientation:"from-image"});
-     let best=ocrEvidenceScore(recognized),bestImage=null;
-     for(const angle of [90,270]){
-      if(seq!==state.sequence)break;
-      const rotated=rotateBitmapCanvas(source,angle);
-      const proposed=str((await worker.recognize(rotated,{rotateAuto:true})).data?.text).trim();
-      const score=ocrEvidenceScore(proposed);
-      if(score>best+4){best=score;recognized=proposed;bestImage=rotated;}
-     }
-     if(bestImage&&seq===state.sequence){
-      const rotatedPhoto=await photoFromCanvas(bestImage);
-      setPhoto(rotatedPhoto);
-     }
-    }catch{}finally{source?.close?.();}
+   worker=await getOCRWorker();
+   if(seq!==state.sequence)return;
+   update("Lendo variedade, data e rastreabilidade…");
+   const canvas=await limitWork(prepareOCRImage(photo,2300),6000,"Não foi possível preparar a foto.");
+   try{
+    recognized=str((await limitWork(worker.recognize(canvas),19000,"Leitura de texto excedeu o limite de tempo.")).data?.text||"").trim();
+   }catch(e){failure=e.message||"Reconhecimento de texto interrompido.";discardOCRWorker(worker);worker=null;}
+   if(seq!==state.sequence)return;
+   if(worker&&recognized&&!/R[\s-]*\d{2}[\s-]*[0-9A-Z]{2,}/i.test(recognized)){
+    update("Conferindo números pequenos e a linha de rastreabilidade…");
+    const improved=await limitWork(enhanceForOCR(photo),5500,"Falha ao preparar contraste.").catch(()=>null);
+    if(improved){
+     try{
+      const alternative=str((await limitWork(worker.recognize(improved),8500,"Tempo de reconhecimento complementar esgotado.")).data?.text||"").trim();
+      if(ocrEvidenceScore(alternative)>ocrEvidenceScore(recognized))recognized=alternative;
+      else if(/R[\s-]*\d{2}[\s-]*[0-9A-Z]{2,}/i.test(alternative))recognized+="\n"+alternative;
+     }catch{discardOCRWorker(worker);worker=null;}
+    }
    }
-   if(ocrEvidenceScore(recognized)<30&&seq===state.sequence){
-     if(progress)progress.textContent="Aprimorando a leitura de caracteres e números pequenos…";
-     const sharpened=await enhanceForOCR(state.photo);
-     if(sharpened){
-       const alternative=str((await worker.recognize(sharpened)).data?.text).trim();
-       if(ocrEvidenceScore(alternative)>ocrEvidenceScore(recognized))recognized=alternative;
-     }
-   }
-  }catch{failed=true;}
-  if(seq!==state.sequence||!ctx?.canAccess?.())return;
-  const likelyBox=/\b(?:PRODUZIDO POR|COMERCIALIZADO POR|CNPJ|GGN|GLN|CLASSE.*PESO)\b/.test(norm(recognized));
-  if(!likelyBox){if(progress)progress.textContent="Lendo as barras do código EAN-13…";barcode=await scanBarcode(state.photo);}
-  if(seq!==state.sequence||!ctx?.canAccess?.())return;
-  const data=extract(recognized,barcode);
-  state.text=recognized;state.barcode=barcode||data.fields.barcode;state.barcodeBars=barcode;state.barcodePrinted=getEAN(recognized);state.detected=data;
-  state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
-  // Uma escolha explícita feita antes da foto nunca é substituída pelo OCR.
-  if(!state.clientConfirmed)state.identity.client=data.detectedClient;
-  state.identity.kind=data.identity.kind;state.identity.variety=data.identity.variety;state.identity.klass=data.identity.klass;
-  state.ocrFailed=failed;state.scanCompleted=true;state.issues=[];showResult();
-  if(el("vl2-results")&&window.innerWidth<1000)el("vl2-results").scrollIntoView({behavior:"smooth",block:"start"});
-  notice(failed?"Leitura parcial. Confira a imagem e corrija os campos que não foram identificados.":"Etiqueta analisada. Informe as referências de produção para concluir a comparação.",failed);
- }finally{
-  try{await worker?.terminate();}catch{}
+  }catch(e){failure=e?.message||"Não foi possível iniciar o reconhecimento de texto.";}
+  if(seq!==state.sequence)return;
+  const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
+  if(!likelyBox){
+   update("Conferindo o código de barras…");
+   barcode=await limitWork(scanBarcode(photo),9600,"Tempo de leitura das barras esgotado.").catch(()=>"");
+  }
+  if(seq!==state.sequence)return;
+  printedNumber=getEAN(recognized);
+  if(!likelyBox&&barcode&&worker&&!printedNumber){
+   update("Lendo os números impressos abaixo das barras…");
+   printedNumber=await printedEANNearBarcode(photo,worker);
+  }
+ };
+ try{await limitWork(run(),54000,"A análise excedeu o tempo máximo. Tente novamente com a etiqueta centralizada.");}
+ catch(e){failure=e?.message||"A leitura foi interrompida.";if(worker)discardOCRWorker(worker);state.sequence++; }
+ finally{
+  const stillCurrent=seq===state.sequence||!!failure&&seq+1===state.sequence;
+  if(stillCurrent&&ctx?.canAccess?.()){
+   try{
+    const data=extract(recognized,barcode);
+    state.text=recognized;state.barcode=barcode||data.fields.barcode;
+    state.barcodeBars=barcode;state.barcodePrinted=printedNumber||getEAN(recognized);
+    state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
+    if(!state.clientConfirmed)state.identity.client=data.detectedClient;
+    state.identity.kind=data.identity.kind;state.identity.variety=data.identity.variety;state.identity.klass=data.identity.klass;
+    state.analysisError=failure||(!recognized?"O texto da etiqueta não pôde ser lido. Verifique a orientação e tente novamente.":"");
+    state.ocrFailed=!!state.analysisError;state.scanCompleted=true;state.issues=[];
+    showResult();
+    if(el("vl2-results")&&window.innerWidth<1000)el("vl2-results").scrollIntoView({behavior:"smooth",block:"start"});
+    notice(state.analysisError?
+      "Leitura incompleta: "+state.analysisError+" A fotografia foi preservada para nova tentativa.":
+      "Leitura concluída. Informe o cliente e a rastreabilidade da ordem de produção para conferir.",!!state.analysisError);
+   }catch(e){state.analysisError=e?.message||"Falha ao interpretar os dados reconhecidos.";state.scanCompleted=false;showResult();notice(state.analysisError,true);}
+  }
   if(progress)progress.hidden=true;
  }
 }
