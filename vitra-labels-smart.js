@@ -866,11 +866,26 @@ function showResult(){
  const report=diagnosticV4();state.diag=report;
  const kind=state.identity.kind,name=nameOf(kinds,kind);
  const initial=state.detected?.identity?.variety?nameOf(varieties,state.detected.identity.variety):"Não identificada";
- const code=state.fields.barcode||"Não identificado";
+ const f=state.fields,code=f.barcode||"Não identificado",box=category()==="box",unit=category()==="unit";
  const owners=distinct(catalog.filter(x=>x.barcode===code).map(x=>x.client));
  const ownerNames=owners.map(x=>nameOf(clients,x)).sort((a,b)=>a.localeCompare(b,"pt-BR"));
- const codeContext=owners.length>1?"O mesmo EAN-13 consta para "+ownerNames.join(" e ")+". Isso não significa erro por si só.":owners.length===1?"EAN-13 associado a "+ownerNames[0]+".":"O EAN-13 ainda não foi localizado no catálogo consultado.";
- const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><span>01</span><div><strong>Leitura da fotografia</strong><small>Identificação preliminar</small></div></div><div class="vl2-reading-facts"><div><small>Modelo</small><strong>'+esc(kind?name:"A confirmar")+'</strong></div><div><small>Uva</small><strong>'+esc(initial)+'</strong></div><div class="vl2-reading-barcode"><small>Código de barras (EAN-13 completo)</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p></div></div></section>';
+ const codeContext=owners.length>1?"Código EAN-13 cadastrado para "+ownerNames.join(" e ")+". Não é necessariamente uma irregularidade.":owners.length===1?"EAN-13 associado a "+ownerNames[0]+".":"Código não cadastrado ou ainda não identificado.";
+ const photoValue=(label,value)=>'<div><small>'+esc(label)+'</small><strong>'+esc(value||"Não reconhecido")+'</strong></div>';
+ const evidence=box?
+  photoValue("Produzido por",state.referenceProducer?.name||f.produtor)+
+  photoValue("Comercializado por",state.referenceMerchant?.name||f.comercializado)+
+  photoValue("CNPJ do produtor",f.cnpj)+photoValue("CNPJ do comerciante",f.cnpjComercial)+
+  photoValue("GGN do produtor",f.ggn)+
+  (f.ggnComercial?photoValue("GGN do comerciante",f.ggnComercial):"")+
+  (f.gln?photoValue("GLN do produtor",f.gln):"")+
+  (f.glnComercial?photoValue("GLN do comerciante",f.glnComercial):""):
+  unit?
+  '<div class="vl2-reading-barcode"><small>Código de barras (EAN-13 completo)</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p></div>'+
+  photoValue("Número impresso",state.barcodePrinted)+photoValue("Barras decodificadas",state.barcodeBars):
+  '<div class="vl2-reading-barcode"><small>Identificadores</small><strong>Aguardando identificação do modelo</strong></div>';
+ const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><span>01</span><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
+  photoValue("Modelo",kind?name:"A confirmar")+photoValue("Uva",initial)+evidence+
+  '</div></section>';
  const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><span>02</span><div><strong>Dados da ordem de produção</strong><small>Informe os valores corretos, independentes da etiqueta impressa.</small></div></div>'+clientChooser()+traceBuilder()+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
