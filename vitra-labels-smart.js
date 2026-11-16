@@ -768,56 +768,71 @@ function ocrEvidenceScore(value){
  if(getEAN(text))score+=20;
  return score;
 }
-async function readPhoto(){
+async function readPhoto(deep=false){
  if(!state.photo||!ctx?.canAccess?.())return;
  const seq=++state.sequence,photo=state.photo,progress=el("vl2-progress");
  state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
- showResult();
- if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia para leitura…";}
+ state.ocrConflicts=[];state.ocrPasses=0;showResult();
+ if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
  let worker=null,recognized="",barcode="",printedNumber="",failure="";
+ const passages=[];
  const update=message=>{if(seq===state.sequence&&progress)progress.textContent=message;};
+ const readPass=async(canvas,ms)=>!worker||seq!==state.sequence?"":str((await limitWork(worker.recognize(canvas),ms,"Tempo de leitura excedido.")).data?.text||"").trim();
  const run=async()=>{
   try{
-   update("Carregando o leitor de texto…");
-   await ensureOCR();
-   worker=await getOCRWorker();
+   update("Inicializando o leitor de texto…");
+   await ensureOCR();worker=await getOCRWorker();if(seq!==state.sequence)return;
+   update("Lendo todas as informações da etiqueta…");
+   const canvas=await limitWork(prepareOCRImage(photo,2700),6500,"Falha ao preparar foto.");
+   try{const original=await readPass(canvas,23000);if(original)passages.push(original);}
+   catch(e){failure=e?.message||"A leitura inicial não foi concluída.";discardOCRWorker(worker);worker=null;}
    if(seq!==state.sequence)return;
-   update("Lendo variedade, data e rastreabilidade…");
-   const canvas=await limitWork(prepareOCRImage(photo,2300),6000,"Não foi possível preparar a foto.");
-   try{
-    recognized=str((await limitWork(worker.recognize(canvas),19000,"Leitura de texto excedeu o limite de tempo.")).data?.text||"").trim();
-   }catch(e){failure=e.message||"Reconhecimento de texto interrompido.";discardOCRWorker(worker);worker=null;}
-   if(seq!==state.sequence)return;
-   if(worker&&recognized&&!/R[\s-]*\d{2}[\s-]*[0-9A-Z]{2,}/i.test(recognized)){
-    update("Conferindo números pequenos e a linha de rastreabilidade…");
-    const improved=await limitWork(enhanceForOCR(photo),5500,"Falha ao preparar contraste.").catch(()=>null);
-    if(improved){
+   if(!worker){
+    try{update("Reiniciando o reconhecimento para uma nova tentativa…");await ensureOCR();worker=await getOCRWorker();}
+    catch(e){failure=e?.message||failure;}
+   }
+   if(worker&&shouldScanOCRBands(passages.join("\n"),deep)){
+    const bands=[{a:0,b:.59,contrast:false,name:"superior"},
+                 {a:.41,b:1,contrast:true,name:"inferior"}];
+    for(const band of bands){
+     if(seq!==state.sequence||!worker)break;
+     update("Ampliando e verificando a região "+band.name+"…");
      try{
-      const alternative=str((await limitWork(worker.recognize(improved),8500,"Tempo de reconhecimento complementar esgotado.")).data?.text||"").trim();
-      if(ocrEvidenceScore(alternative)>ocrEvidenceScore(recognized))recognized=alternative;
-      else if(/R[\s-]*\d{2}[\s-]*[0-9A-Z]{2,}/i.test(alternative))recognized+="\n"+alternative;
-     }catch{discardOCRWorker(worker);worker=null;}
+      const canvas=await limitWork(prepareOCRBand(photo,band.a,band.b,band.contrast),5500,"Falha ao ampliar a região.");
+      const recognizedBand=await readPass(canvas,14500);
+      if(recognizedBand)passages.push(recognizedBand);
+     }catch(e){
+      failure=failure||"Uma região não pôde ser lida por completo.";
+      discardOCRWorker(worker);worker=null;break;
+     }
     }
    }
-  }catch(e){failure=e?.message||"Não foi possível iniciar o reconhecimento de texto.";}
+   if(seq!==state.sequence)return;
+   recognized=mergeOCRPassages(passages);
+   if(worker&&(!ocrTraceCandidates(recognized).length||(deep&&passages.length<2))){
+    update("Realçando pequenos caracteres e a linha de rastreabilidade…");
+    const improved=await limitWork(enhanceForOCR(photo),5500,"Falha no contraste.").catch(()=>null);
+    if(improved){
+     try{const enhanced=await readPass(improved,11500);if(enhanced)passages.push(enhanced);recognized=mergeOCRPassages(passages);}
+     catch{failure=failure||"Leitura complementar incompleta.";discardOCRWorker(worker);worker=null;}
+    }
+   }
+  }catch(e){failure=e?.message||"Reconhecimento não concluído.";}
   if(seq!==state.sequence)return;
-  const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
-  if(!likelyBox){
-   update("Conferindo o código de barras…");
-   barcode=await limitWork(scanBarcode(photo,seq),9600,"Tempo de leitura das barras esgotado.").catch(()=>"");
-  }
+  state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;
+  const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
+  if(!likelyBox){update("Decodificando o código de barras…");barcode=await limitWork(scanBarcode(photo,seq),10500,"Tempo de leitura do código de barras excedido.").catch(()=>"");}
   if(seq!==state.sequence)return;
   printedNumber=getEAN(recognized);
   if(!likelyBox&&barcode&&worker&&!printedNumber){
-   update("Lendo os números impressos abaixo das barras…");
+   update("Lendo separadamente os números impressos sob as barras…");
    printedNumber=await printedEANNearBarcode(photo,worker);
   }
  };
- try{await limitWork(run(),54000,"A análise excedeu o tempo máximo. Tente novamente com a etiqueta centralizada.");}
- catch(e){failure=e?.message||"A leitura foi interrompida.";if(worker)discardOCRWorker(worker); }
+ try{await limitWork(run(),93000,"Limite de leitura atingido. A foto foi preservada.");}
+ catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
-  const stillCurrent=seq===state.sequence;
-  if(stillCurrent&&ctx?.canAccess?.()){
+  if(seq===state.sequence&&ctx?.canAccess?.()){
    try{
     const data=extract(recognized,barcode);
     state.text=recognized;state.barcode=barcode||data.fields.barcode;
@@ -825,18 +840,17 @@ async function readPhoto(){
     state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
     if(!state.clientConfirmed)state.identity.client=data.detectedClient;
     state.identity.kind=data.identity.kind;state.identity.variety=data.identity.variety;state.identity.klass=data.identity.klass;
-    state.analysisError=failure||(!recognized?"O texto da etiqueta não pôde ser lido. Verifique a orientação e tente novamente.":"");
+    state.analysisError=failure||(!recognized?"Não foi possível reconhecer texto nesta fotografia com segurança.":"");
     state.ocrFailed=!!state.analysisError;state.scanCompleted=true;state.issues=[];
     showResult();
     if(el("vl2-results")&&window.innerWidth<1000)el("vl2-results").scrollIntoView({behavior:"smooth",block:"start"});
-    notice(state.analysisError?
-      "Leitura incompleta: "+state.analysisError+" A fotografia foi preservada para nova tentativa.":
-      "Leitura concluída. Informe o cliente e a rastreabilidade da ordem de produção para conferir.",!!state.analysisError);
-   }catch(e){state.analysisError=e?.message||"Falha ao interpretar os dados reconhecidos.";state.scanCompleted=false;showResult();notice(state.analysisError,true);}
+    notice(state.analysisError?"Leitura parcial: "+state.analysisError+" A imagem segue disponível.":"Leitura concluída em "+state.ocrPasses+" passagem(ns). Confira os alertas e a ordem de produção.",!!state.analysisError);
+   }catch(e){state.analysisError=e?.message||"Erro ao interpretar a etiqueta.";state.scanCompleted=false;showResult();notice(state.analysisError,true);}
   }
   if(progress)progress.hidden=true;
  }
 }
+
 function clientChooser(){
  const active=state.identity.client;
  return '<div class="vl2-client-wrap"><div class="vl2-control-label">Cliente <small>seleção obrigatória</small></div>'+
