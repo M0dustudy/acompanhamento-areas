@@ -56,3 +56,30 @@ Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes
 - Os registros mostram usuário responsável, diagnóstico e fotografia. A conta mestre pode **ocultar e restaurar** registros; colaboradores não podem ocultar.
 - O recurso é uma ocultação reversível com auditoria, **não** exclusão física dos documentos originais. Nunca apagar evidências sem autorização expressa.
 - Controles visuais dos demais módulos devem respeitar as preferências atribuídas, mas uma eventual restrição de confidencialidade de dados publicados no HTML exige migração dos dados protegidos para uma API autenticada.
+
+
+## Revisão operacional v5 — 16/11/2026, após teste móvel
+### Câmera, rotação e recorte
+- O carregamento da galeria deve apresentar a imagem inteira, sem preenchimento por corte e sem descartar margens por padrão.
+- A área renderizada e o bitmap recortado usam a mesma geometria, inclusive em fotos verticais.
+- A galeria oferece rotação de 90° nos dois sentidos e análise da foto completa. O recorte é opcional quando houver mais de uma etiqueta ou fundo em excesso.
+- O reconhecimento tenta corrigir orientação e contraste em leituras difíceis; não pressupõe exatidão absoluta.
+
+### Comparações específicas por tipo
+- **Cumbuca/cinta:** verificar variedade, sigla, data impressa, rastreabilidade, peso/modelo quando disponível, EAN-13 do cliente, código decodificado das barras e 13 dígitos impressos abaixo. Essas duas leituras devem ser independentes; diferença comprovada reprova e falta de leitura mantém pendente.
+- **Caixa:** não exigir EAN-13. Comparar produtor e comercializador separadamente; podem ser empresas distintas ou a mesma. Verificar nome, CNPJ se aplicável, GGN, GLN, endereço, CEP e coordenadas quando impressos e documentados. Um campo obrigatório ilegível impede aprovação.
+- A confirmação do cliente vem depois da foto, usando a ordem de produção como referência independente.
+- Não pedir o modelo novamente quando a leitura já sustenta sua identificação; em dúvida, solicitar confirmação sem presumir.
+- Leitura inconclusiva não é aprovação, e referências fixas não podem ser substituídas para simular conformidade.
+
+### Catálogo e rastreabilidade da fonte
+- Preservados os 196 vínculos EAN/cliente do módulo anterior, com 163 códigos distintos e 17 identificações de clientes no catálogo de códigos. A transcrição foi espelhada numa tabela privada para conferência adicional no servidor.
+- As filiais CIA PA SP, RJ, PE e CE aparecem separadas porque constam no manual, mas o EAN genérico não aprova automaticamente uma filial sem autorização própria.
+- A base privada de entidades conserva os dados documentados. O manual DOC.CQ.056, p. 38, sustenta as coordenadas de Expofrut e Fazenda Novo Rumo.
+- A importação do catálogo não equivale a auditoria documental de todos os códigos e imagens: divergências exigem consulta à página correspondente do manual.
+
+### Histórico, exclusão e segurança
+- Salvar somente após parecer digital favorável e confirmação humana. O servidor confere rastreabilidade, existência das referências e, na cumbuca, a igualdade entre EAN das barras, número impresso e catálogo autorizado.
+- Novas verificações pertencem ao fluxo v5; registros anteriores não foram alterados e não devem ser confundidos com verificações v5.
+- Só a conta mestre pode ocultar, restaurar ou excluir definitivamente um registro. Excluir exige digitação literal da palavra EXCLUIR e elimina a foto e eventuais padrões aprendidos somente daquele registro; o evento de auditoria permanece.
+- Nenhum registro histórico foi excluído como parte desta atualização.
