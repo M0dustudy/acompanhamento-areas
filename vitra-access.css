@@ -897,3 +897,9 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
 .va-module-choice{display:flex!important;flex-direction:row!important;align-items:center;gap:9px;border:1px solid #d8e6da;border-radius:10px;padding:10px 12px;background:#f7faf7;color:#315a3c;font-size:12px!important;line-height:1.4!important;font-weight:700}
 .va-module-choice input[type="checkbox"]{flex:0 0 18px;width:18px!important;height:18px!important;accent-color:#246d47;min-height:0!important;margin:0!important}
 @media(max-width:420px){.va-module-choices{grid-template-columns:1fr}}
+
+/* Permissões de visualização dentro dos cartões das áreas. */
+html.va-no-titulation .tit-column,
+html.va-no-titulation .ruasdetail,
+html.va-no-titulation .ruas-date-navigation{display:none!important}
+html.va-no-reception .reception-column{display:none!important}
