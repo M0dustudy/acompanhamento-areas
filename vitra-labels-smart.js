@@ -60,9 +60,17 @@ function parseTrace(value){
  return m?{year:m[1],areaValve:m[2],area:"",valve:"",day:m[3],month:m[4],method:m[5],variety:m[6]}:null;
 }
 function expectedCode(){
- const x=state.expected;
- if(!x.year||!x.area||!x.valve||!x.day||!x.month||!x.method||!x.variety)return "";
- return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+x.method+"-"+x.variety;
+ const x=state.expected,unit=category()==="unit",box=category()==="box";
+ if(!(unit||box)||!x.year||!x.area||!x.valve||!x.day||!x.month||!x.variety||(box&&!x.method))return "";
+ return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+(unit?"*":x.method)+"-"+x.variety;
+}
+function codeMatchesReference(reference,printed){
+ const expected=norm(reference).replace(/\s/g,""),actual=norm(printed).replace(/\s/g,"");
+ if(!expected||!actual)return false;
+ if(!expected.includes("-*-"))return expected===actual;
+ const ref=expected.match(/^R-(\d{2})-([0-9A-Z_./]{1,40})-(\d{4})-\*-([A-Z0-9]{2,5})$/);
+ const code=parseTrace(actual);
+ return !!(ref&&code&&ref[1]===code.year&&ref[2]===code.areaValve&&ref[3]===code.day+code.month&&ref[4]===code.variety);
 }
 function expectedVariety(){
  return varieties.find(x=>x[2]===state.expected.variety)?.[0]||"";
@@ -754,8 +762,8 @@ function traceBuilder(){
  const letters=["A","B","C","D","1","2","3","4"].map(x=>[x,x]);
  const varietiesCodes=varieties.filter(x=>x[2]).slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(x=>[x[2],x[2]+" · "+x[1]]);
  const siteAreas=(()=>{try{return typeof A==="object"&&A?Object.keys(A).map(digits).filter(x=>x.length>=3&&x.length<=5):[];}catch{return [];}})();
- const expected=expectedCode(),observed=state.fields.rastreio||"";
- const same=expected&&observed&&norm(expected)===norm(observed);
+ const expected=expectedCode(),observed=state.fields.rastreio||"",box=category()==="box";
+ const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
  return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
   '<p>Informe a rastreabilidade real da produção. O código lido na foto será comparado separadamente.</p>'+
@@ -766,7 +774,7 @@ function traceBuilder(){
   '<label>Válvula'+'<input data-vl2-trace="valve" maxlength="16" list="vl2-valves" value="'+esc(state.expected.valve)+'" placeholder="Letra ou número"><datalist id="vl2-valves">'+letters.map(x=>'<option value="'+x[0]+'"></option>').join("")+'</datalist>'+'</label>'+
   '<div class="vl2-trace-field"><span>Dia</span>'+traceOptions(day,"day","Dia")+'</div>'+
   '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
-  '<div class="vl2-trace-field"><span>Pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Método")+'</div>'+
+  (box?'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>':"")+
   '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected||"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
@@ -885,9 +893,9 @@ function diagnosticV4(){
   if(!trace)add("error","Formato de rastreabilidade","O código impresso "+printed+" não segue o formato R-ANO-ÁREA/VÁLVULA-DDMM-MÉTODO-SIGLA.");
   else if(!varieties.some(v=>v[2]===trace.variety))add("pending","Sigla desconhecida","A sigla '"+trace.variety+"' não foi encontrada no glossário; confira a impressão e a referência atualizada do produtor.");
   if(expected){
-   if(norm(expected).replace(/\s/g,"")!==norm(printed).replace(/\s/g,""))
+   if(!codeMatchesReference(expected,printed))
     add("error","Rastreabilidade divergente","Etiqueta: "+printed+" · ordem de produção: "+expected+".","DOC.CQ.056, pp. 2–3, 7");
-   else add("ok","Rastreabilidade","O código impresso confere integralmente com a ordem de produção: "+expected+".");
+   else add("ok","Rastreabilidade",unit?"Ano, área/válvula, data e variedade conferem com a ordem. A pesagem impressa segue um código válido do manual e não exige identificação de caixa da cumbuca.":"O código impresso confere integralmente com a ordem de produção: "+expected+".");
   }
  }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
  const photoVar=state.detected?.identity?.variety||"",referenceVar=expectedVariety();
