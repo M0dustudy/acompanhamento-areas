@@ -14,7 +14,7 @@ const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",
 const state={
  photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,
  identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
- expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""},
+ expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
  entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null
@@ -47,7 +47,7 @@ function resetScan(){
  state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
- state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
+ state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
  state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;state.kindConfirmed=false;
 }
 function validCnpj(raw){
@@ -877,57 +877,16 @@ function diagnosticV4(){
    }
   }
  }else if(box){
-  // Etiquetas de caixa não exigem código de barras.
-  if(f.barcode&&eanValid(f.barcode))add("ok","Código complementar","EAN encontrado na fotografia, mas não obrigatório para etiqueta de caixa.");
- }
- if(printed){
-  if(!trace)add("error","Formato de rastreabilidade","O código impresso "+printed+" não segue o formato R-ANO-ÁREA/VÁLVULA-DDMM-MÉTODO-SIGLA.");
-  else if(!varieties.some(v=>v[2]===trace.variety))add("pending","Sigla desconhecida","A sigla '"+trace.variety+"' não foi encontrada no glossário; confira a impressão e a referência atualizada do produtor.");
-  if(expected){
-   if(norm(expected).replace(/\s/g,"")!==norm(printed).replace(/\s/g,""))
-    add("error","Rastreabilidade divergente","Etiqueta: "+printed+" · ordem de produção: "+expected+".","DOC.CQ.056, pp. 2–3, 7");
-   else add("ok","Rastreabilidade","O código impresso confere integralmente com a ordem de produção: "+expected+".");
-  }
- }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
- const photoVar=state.detected?.identity?.variety||"",referenceVar=expectedVariety();
- const printedVar=trace?varieties.find(v=>v[2]===trace.variety)?.[0]||"":"";
- if(photoVar&&printedVar&&photoVar!==printedVar)
-   add("error","Variedade e sigla","O nome da uva identificado na etiqueta é "+nameOf(varieties,photoVar)+", mas a rastreabilidade termina em "+trace.variety+" ("+nameOf(varieties,printedVar)+").");
- else if(photoVar&&printedVar)add("ok","Variedade e sigla",nameOf(varieties,photoVar)+" corresponde à sigla "+trace.variety+" no manual.","DOC.CQ.056, p. 5");
- else if(photoVar)add("ok","Variedade identificada",nameOf(varieties,photoVar)+" reconhecida no texto da etiqueta.");
- else if(printedVar)add("ok","Sigla reconhecida",trace.variety+" corresponde a "+nameOf(varieties,printedVar)+" no manual.");
- else add("pending","Variedade","Não foi possível confirmar nome e sigla da uva na fotografia.");
- if(referenceVar&&((photoVar&&photoVar!==referenceVar)||(printedVar&&printedVar!==referenceVar)))
-   add("error","Variedade da ordem de produção","A referência exige "+nameOf(varieties,referenceVar)+", mas a sigla impressa corresponde a "+nameOf(varieties,printedVar||photoVar)+".");
- const validateDate=(d,m,y)=>{const dt=new Date(Number(y),Number(m)-1,Number(d));return dt.getFullYear()===Number(y)&&dt.getMonth()===Number(m)-1&&dt.getDate()===Number(d);};
- if(trace){
-  const year=2000+Number(trace.year);
-  if(!validateDate(trace.day,trace.month,year))add("error","Data codificada","Dia e mês inválidos no código de rastreabilidade: "+trace.day+"/"+trace.month+"/"+year+".");
- }
- const datePhoto=state.detected?.printedDate||"";
- if(datePhoto){
-  const dd=datePhoto.split("/");
-  if(dd.length===3&&!validateDate(dd[0],dd[1],dd[2]))add("error","Data de embalagem","A data impressa "+datePhoto+" não é válida.");
-  else if(trace&&datePhoto!==trace.day+"/"+trace.month+"/20"+trace.year)add("error","Data divergente","Data impressa: "+datePhoto+" · data na rastreabilidade: "+trace.day+"/"+trace.month+"/20"+trace.year+".");
-  else if(trace)add("ok","Data","A data "+datePhoto+" coincide com a data codificada na rastreabilidade.");
- }else if(unit)add("pending","Data impressa","A data de embalagem não foi lida separadamente. O dia e o mês do código não comprovam, por si sós, que a data impressa está correta.");
- if(unit){
-  const weights=distinct(matches.filter(x=>!selected||x.client===selected).map(x=>x.weight));
-  const expectation=kind.includes("250")?"250":kind.includes("500")?"500":weights.length===1?weights[0]:"";
-  if(expectation&&state.detected?.weightPhoto){
-    const observed=digits(state.detected.weightPhoto);
-    if(observed!==expectation)add("error","Peso da cumbuca","Etiqueta: "+state.detected.weightPhoto+" · modelo: "+expectation+" g.");
-    else add("ok","Peso da unidade","Peso impresso confere com "+expectation+" g.");
-  }else if(!expectation)add("pending","Peso / modelo da cumbuca","Peso da cumbuca não pôde ser confirmado. Confira 250 g ou 500 g conforme o modelo aprovado.");
- }
- if(box){
-  if(!state.identity.klass)add("pending","Classificação da caixa","Não foi possível reconhecer a classificação impressa.");
-  else{
-   const same=matches.filter(x=>x.client===catalogClient(selected));
-   const classes=distinct(same.map(x=>x.klass).filter(Boolean));
-   if(classes.length===1&&classes[0]!==state.identity.klass)add("error","Classificação","Etiqueta: "+state.identity.klass+" · modelo cadastrado: "+classes[0]+".");
-   else add("ok","Classificação",state.identity.klass+" identificada; "+(classes.length===1?"referência consultada.":"confirmar modelo específico no padrão do cliente."));
-  }
+  const chosenClass=state.expected.klass||"",readClass=state.identity.klass||"";
+  if(!chosenClass)add("pending","Classificação da ordem","Informe a classificação real da ordem de produção para compará-la com a classe impressa na caixa.");
+  if(!readClass)add("pending","Classificação impressa","O sistema não conseguiu ler a classe impressa na caixa. Uma nova fotografia poderá permitir a comparação.");
+  else if(chosenClass&&readClass!==chosenClass)
+   add("error","Classificação divergente","Caixa impressa: "+readClass+" · ordem de produção: "+chosenClass+".");
+  else if(chosenClass)add("ok","Classificação","A caixa indica "+readClass+", conforme a ordem de produção.");
+  const same=matches.filter(x=>x.client===catalogClient(selected));
+  const classesFromCatalog=distinct(same.map(x=>x.klass).filter(Boolean));
+  if(readClass&&classesFromCatalog.length===1&&classesFromCatalog[0]!==readClass)
+   add("error","Padrão do cliente","O cadastro do cliente exige "+classesFromCatalog[0]+", enquanto a caixa indica "+readClass+".");
   if(!state.refsLoaded)add("pending","Cadastro institucional","A base privada de produtores está indisponível; GGN/CNPJ/endereço não podem ser validados.");
   else {
    const ref=registryAudit();state.referenceChecks=ref.rows;state.referenceProducer=ref.producer;state.referenceMerchant=ref.merchant;
@@ -948,7 +907,7 @@ function diagnosticV4(){
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
   if(state.sources[k]==="Corrigido manualmente")add("pending","Identificador ajustado","O campo "+k+" foi alterado manualmente. Uma nova leitura da foto é necessária para aprovação automática.");
  const critical=checks.filter(x=>x.status==="error"),pending=checks.filter(x=>x.status==="pending");
- const ready=Boolean(state.photo&&state.scanCompleted&&state.clientConfirmed&&expected&&kind);
+ const ready=Boolean(state.photo&&state.scanCompleted&&state.clientConfirmed&&expected&&kind&&(!box||state.expected.klass));
  const status=!ready?"coleta":critical.length?"reprovado":pending.length?"pendente":"aprovado";
  const summary=status==="coleta"?"Complete o cliente e a rastreabilidade da ordem de produção. Só depois o VITRA emitirá o resultado.":
  status==="reprovado"?"Foram identificadas "+critical.length+" divergência(s) entre a etiqueta e as referências consultadas.":
@@ -993,7 +952,8 @@ function showResult(){
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
- const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados da ordem de produção</strong><small>Informe os valores corretos, independentes da etiqueta impressa.</small></div></div>'+clientChooser()+traceBuilder()+
+ const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados da ordem de produção</strong><small>Informe somente os dados que não constam no cadastro.</small></div></div>'+clientChooser()+traceBuilder()+
+ (box?'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>Confirme a classe que deveria constar na etiqueta da caixa.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>':"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
  const issues=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
@@ -1166,7 +1126,7 @@ async function saveReview(){
  }
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
- const fields={...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),clientConfirmed:state.clientConfirmed,
+ const fields={...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:state.expected.klass||"",clientConfirmed:state.clientConfirmed,
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
