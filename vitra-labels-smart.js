@@ -464,14 +464,52 @@ async function ensureOCR(){
  if(!window.Tesseract?.createWorker)throw Error("OCR indisponível");
 }
 async function scanBarcode(file){
- if(typeof BarcodeDetector==="undefined")return "";
- let bitmap=null;
+ let bmp=null;let canvas=null;
  try{
-  bitmap=await createImageBitmap(file);
-  const detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a"]});
-  const found=await detector.detect(bitmap);
-  return found.find(x=>eanValid(x.rawValue))?.rawValue||"";
- }catch{return "";}finally{bitmap?.close?.();}
+  bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
+  canvas=document.createElement("canvas");
+  const factor=Math.min(1,2500/Math.max(bmp.width,bmp.height));
+  canvas.width=Math.max(1,Math.round(bmp.width*factor));canvas.height=Math.max(1,Math.round(bmp.height*factor));
+  canvas.getContext("2d").drawImage(bmp,0,0,canvas.width,canvas.height);
+  if(typeof BarcodeDetector!=="undefined"){
+   try{
+    const detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a"]});
+    const codes=await detector.detect(canvas);
+    for(const x of codes){const raw=digits(x.rawValue);const ean=raw.length===12?"0"+raw:raw;
+     if(eanValid(ean))return ean;
+    }
+   }catch{}
+  }
+  // ZXing é alternativa para navegadores sem suporte nativo ao BarcodeDetector.
+  try{
+   const mod=await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm");
+   const reader=new mod.BrowserMultiFormatOneDReader();
+   for(let attempt=0;attempt<2;attempt++){
+    let sample=canvas;
+    if(attempt){
+     sample=document.createElement("canvas");sample.width=canvas.height;sample.height=canvas.width;
+     const g=sample.getContext("2d");g.translate(sample.width/2,sample.height/2);g.rotate(Math.PI/2);
+     g.drawImage(canvas,-canvas.width/2,-canvas.height/2);
+    }
+    try{
+     const result=await reader.decodeFromCanvas(sample),raw=digits(result?.getText?.()||result?.text||"");
+     const ean=raw.length===12?"0"+raw:raw;
+     if(eanValid(ean))return ean;
+    }catch{}
+   }
+  }catch{}
+  return "";
+ }catch{return "";}finally{bmp?.close?.();}
+}
+function rotateBitmapCanvas(source,angle,maxDim=3000){
+ const sw=source.width,sh=source.height,scale=Math.min(1,maxDim/Math.max(sw,sh));
+ const cw=Math.max(1,Math.round(sw*scale)),ch=Math.max(1,Math.round(sh*scale));
+ const out=document.createElement("canvas");
+ out.width=Math.abs(angle)%180===90?ch:cw;out.height=Math.abs(angle)%180===90?cw:ch;
+ const g=out.getContext("2d");g.translate(out.width/2,out.height/2);g.rotate(angle*Math.PI/180);
+ g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";
+ g.drawImage(source,-cw/2,-ch/2,cw,ch);
+ return out;
 }
 async function enhanceForOCR(file){
  let bitmap=null;
@@ -511,7 +549,25 @@ async function readPhoto(){
    await ensureOCR();
    if(progress)progress.textContent="Consultando as referências do manual e do catálogo…";
    worker=await window.Tesseract.createWorker("por+eng",1);
-   recognized=str((await worker.recognize(state.photo)).data?.text).trim();
+   recognized=str((await worker.recognize(state.photo,{rotateAuto:true})).data?.text).trim();
+   if(ocrEvidenceScore(recognized)<32&&seq===state.sequence){
+    let source=null;
+    try{
+     source=await createImageBitmap(state.photo,{imageOrientation:"from-image"});
+     let best=ocrEvidenceScore(recognized),bestImage=null;
+     for(const angle of [90,270]){
+      if(seq!==state.sequence)break;
+      const rotated=rotateBitmapCanvas(source,angle);
+      const proposed=str((await worker.recognize(rotated,{rotateAuto:true})).data?.text).trim();
+      const score=ocrEvidenceScore(proposed);
+      if(score>best+4){best=score;recognized=proposed;bestImage=rotated;}
+     }
+     if(bestImage&&seq===state.sequence){
+      const rotatedPhoto=await photoFromCanvas(bestImage);
+      setPhoto(rotatedPhoto);
+     }
+    }catch{}finally{source?.close?.();}
+   }
    if(ocrEvidenceScore(recognized)<30&&seq===state.sequence){
      if(progress)progress.textContent="Aprimorando a leitura de caracteres e números pequenos…";
      const sharpened=await enhanceForOCR(state.photo);
