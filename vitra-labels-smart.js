@@ -542,41 +542,62 @@ function prepareOCRImage(file,maxSide=2300){
  });
 }
 async function scanBarcode(file){
- let bmp=null;let canvas=null;
+ let bmp=null;
  try{
   bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
-  canvas=document.createElement("canvas");
-  const factor=Math.min(1,2500/Math.max(bmp.width,bmp.height));
-  canvas.width=Math.max(1,Math.round(bmp.width*factor));canvas.height=Math.max(1,Math.round(bmp.height*factor));
+  const factor=Math.min(1,2400/Math.max(bmp.width,bmp.height));
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.max(1,Math.round(bmp.width*factor));
+  canvas.height=Math.max(1,Math.round(bmp.height*factor));
   canvas.getContext("2d").drawImage(bmp,0,0,canvas.width,canvas.height);
   if(typeof BarcodeDetector!=="undefined"){
    try{
     const detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a"]});
-    const codes=await detector.detect(canvas);
-    for(const x of codes){const raw=digits(x.rawValue);const ean=raw.length===12?"0"+raw:raw;
-     if(eanValid(ean))return ean;
+    const codes=await limitWork(detector.detect(canvas),3300,"Tempo esgotado no leitor nativo");
+    for(const x of codes){
+     const value=digits(x.rawValue),ean=value.length===12?"0"+value:value;
+     if(!eanValid(ean))continue;
+     const bounds=x.boundingBox;
+     if(bounds?.width&&bounds?.height)state.barcodeRegion={x:bounds.x,y:bounds.y,w:bounds.width,h:bounds.height,iw:canvas.width,ih:canvas.height};
+     return ean;
     }
    }catch{}
   }
-  // ZXing é alternativa para navegadores sem suporte nativo ao BarcodeDetector.
   try{
-   const mod=await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm");
+   const mod=await limitWork(import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm"),4800,"Biblioteca de barras não respondeu");
    const reader=new mod.BrowserMultiFormatOneDReader();
-   for(let attempt=0;attempt<2;attempt++){
-    let sample=canvas;
-    if(attempt){
-     sample=document.createElement("canvas");sample.width=canvas.height;sample.height=canvas.width;
-     const g=sample.getContext("2d");g.translate(sample.width/2,sample.height/2);g.rotate(Math.PI/2);
-     g.drawImage(canvas,-canvas.width/2,-canvas.height/2);
-    }
+   const samples=[canvas];
+   const rotated=rotateBitmapCanvas(canvas,90,2300);samples.push(rotated);
+   for(const sample of samples){
     try{
-     const result=await reader.decodeFromCanvas(sample),raw=digits(result?.getText?.()||result?.text||"");
-     const ean=raw.length===12?"0"+raw:raw;
+     const code=await limitWork(reader.decodeFromCanvas(sample),3200,"O leitor não localizou as barras");
+     const value=digits(code?.getText?.()||code?.text||"");
+     const ean=value.length===12?"0"+value:value;
      if(eanValid(ean))return ean;
     }catch{}
    }
   }catch{}
   return "";
+ }catch{return "";}finally{bmp?.close?.();}
+}
+async function printedEANNearBarcode(file,worker){
+ const r=state.barcodeRegion;if(!r?.w||!r.ih)return "";
+ let bmp=null;
+ try{
+  bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
+  const mx=bmp.width/r.iw,my=bmp.height/r.ih;
+  const left=Math.max(0,Math.round((r.x-r.w*.26)*mx));
+  const top=Math.max(0,Math.round((r.y-r.h*.38)*my));
+  const right=Math.min(bmp.width,Math.round((r.x+r.w*1.26)*mx));
+  const bottom=Math.min(bmp.height,Math.round((r.y+r.h*2.2)*my));
+  if(right<=left||bottom<=top)return "";
+  const width=right-left,height=bottom-top,scale=Math.min(3.5,1600/width);
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);
+  const g=canvas.getContext("2d");g.fillStyle="white";g.fillRect(0,0,canvas.width,canvas.height);
+  g.filter="grayscale(1) contrast(1.55)";g.drawImage(bmp,left,top,width,height,0,0,canvas.width,canvas.height);
+  const data=await limitWork(worker.recognize(canvas),7200,"A leitura dos números foi interrompida");
+  return getEAN(data.data?.text||"");
  }catch{return "";}finally{bmp?.close?.();}
 }
 function rotateBitmapCanvas(source,angle,maxDim=3000){
