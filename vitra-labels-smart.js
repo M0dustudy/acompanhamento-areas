@@ -17,7 +17,7 @@ const state={
  expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -47,7 +47,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
- state.notes="";state.mode="empty";
+ state.notes="";state.mode="empty";state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -104,7 +104,7 @@ function extract(raw,barcode){
  let kind="";
  const explicitCinta=/\bCINTA\b/.test(n),explicitCumbuca=/\bCUMBUCA\b/.test(n);
  const printedCnpj=/\bCNPJ\b/.test(n),printedGgn=/\bGGN\b/.test(n);
- const boxEvidence=!!classCode||/\bCAIXA\b|\b(?:5|8)\s*KG\b/.test(n);
+ const boxEvidence=!!printedCnpj||!!printedGgn||/\b(?:PRODUZIDO POR|COMERCIALIZADO POR|GGN|GLN|CNPJ)\b/.test(n)||(/\bCAIXA\b|\b(?:5|8)\s*KG\b/.test(n)&&!explicitCumbuca);
  const wG=/\b250\s*G\b/.test(n)?"250":/\b500\s*G\b/.test(n)?"500":/^\d{3} G$/i.test(peso)?digits(peso):"";
  const catalogKind=distinct(group.map(x=>x.kind));
  if(explicitCinta&&wG)kind="cinta"+wG;
@@ -113,6 +113,8 @@ function extract(raw,barcode){
  else if(/\bSELO\b/.test(n))kind="selo";
  else if(catalogKind.length===1&&catalogKind[0])kind=catalogKind[0];
  else if(wG&&b&&!printedCnpj&&!printedGgn)kind="cumbuca"+wG;
+ else if(!boxEvidence&&b&&state.photoAspect>0&&state.photoAspect<1.27)kind=wG?"cumbuca"+wG:"cumbuca500";
+ else if(boxEvidence&&state.photoAspect>1.25)kind="caixa";
  // Códigos 20/21 identificam a embalagem, mas não comprovam o tamanho físico da etiqueta.
  const dateMatch=str(raw).match(/\b([0-3]?\d)[.\/-]([01]?\d)[.\/-]((?:20)?\d{2})\b/);
  const date=dateMatch?dateMatch[1].padStart(2,"0")+"/"+dateMatch[2].padStart(2,"0")+"/"+(dateMatch[3].length===2?"20"+dateMatch[3]:dateMatch[3]):track?track.day+"/"+track.month+"/20"+track.year:"";
@@ -316,6 +318,7 @@ function setPhoto(file){
  positionMode("ready");
 }
 function photoFromCanvas(canvas){
+ state.photoAspect=canvas.width/canvas.height;
  return new Promise((resolve,reject)=>canvas.toBlob(blob=>{
   if(!blob)return reject(Error("Não foi possível recortar a imagem."));
   resolve(new File([blob],"etiqueta-"+Date.now()+".jpg",{type:"image/jpeg"}));
@@ -427,8 +430,8 @@ async function readPhoto(){
   // Uma escolha explícita feita antes da foto nunca é substituída pelo OCR.
   if(!state.clientConfirmed)state.identity.client=data.detectedClient;
   state.identity.kind=data.identity.kind;state.identity.variety=data.identity.variety;state.identity.klass=data.identity.klass;
-  state.issues=computeIssues();showResult();
-  notice(failed?"Texto não reconhecido integralmente. Confira o que ficou pendente.":"Leitura realizada. Compare a rastreabilidade e confirme o cliente.",failed);
+  state.ocrFailed=failed;state.scanCompleted=true;state.issues=[];showResult();
+  notice(failed?"Leitura parcial. Confira a imagem e corrija os campos que não foram identificados.":"Etiqueta analisada. Informe as referências de produção para concluir a comparação.",failed);
  }finally{
   try{await worker?.terminate();}catch{}
   if(progress)progress.hidden=true;
@@ -437,7 +440,7 @@ async function readPhoto(){
 function clientChooser(){
  const active=state.identity.client;
  return '<div class="vl2-client-wrap"><div class="vl2-control-label">Cliente <small>seleção obrigatória</small></div>'+
-  '<details class="vl2-client-combo" id="vl2-client-combo"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><strong>'+esc(active?nameOf(clients,active):"Pesquisar ou selecionar cliente")+'</strong><em>'+esc(state.clientConfirmed?"Alterar":"Confirmar")+'</em></summary>'+
+  '<details name="vl2-choice" class="vl2-client-combo" id="vl2-client-combo"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><strong>'+esc(active?nameOf(clients,active):"Pesquisar ou selecionar cliente")+'</strong><em>'+esc(state.clientConfirmed?"Alterar":"Confirmar")+'</em></summary>'+
   '<div class="vl2-client-pop"><input id="vl2-client-search" type="search" autocomplete="off" aria-label="Pesquisar cliente" placeholder="Digite o nome do cliente…"><div class="vl2-client-options">'+
   sortedClients.map(c=>'<button type="button" data-vl2-client="'+esc(c[0])+'" data-label="'+esc(norm(c[1]))+'">'+esc(c[1])+'</button>').join("")+
   '</div></div></details><p class="vl2-help">'+(state.clientConfirmed?"Cliente confirmado. Você pode alterá-lo a qualquer momento.":active?"Identificação sugerida pela foto; toque para confirmar.":"Escolha o cliente para cruzar com a etiqueta.")+'</p></div>';
@@ -446,7 +449,7 @@ function lookupPicker(items,key,value,placeholder,attribute){
  const ordered=items.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{numeric:true,sensitivity:"base"}));
  const selected=ordered.find(x=>x[0]===value),attr=attribute==="trace"?"data-vl2-option-trace":"data-vl2-option-identity";
  const list=ordered.map(x=>'<button type="button" '+attr+'="'+esc(key)+'" data-pick-value="'+esc(x[0])+'" data-pick-label="'+esc(norm(x[1]))+'"'+(x[0]===value?' aria-current="true"':'')+'>'+esc(x[1])+'</button>').join("");
- return '<details class="vl2-lookup"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><span>'+esc(selected?selected[1]:placeholder)+'</span><b aria-hidden="true">⌄</b></summary><div class="vl2-lookup-pop"><input type="search" data-vl2-search-choice autocomplete="off" placeholder="Pesquisar opção…"><div class="vl2-lookup-list">'+list+'</div></div></details>';
+ return '<details name="vl2-choice" class="vl2-lookup"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><span>'+esc(selected?selected[1]:placeholder)+'</span><b aria-hidden="true">⌄</b></summary><div class="vl2-lookup-pop"><div class="vl2-popup-header"><strong>'+esc(placeholder)+'</strong><button type="button" data-vl2-close-lookup aria-label="Fechar opções">✕</button></div><input type="search" data-vl2-search-choice autocomplete="off" placeholder="Pesquisar opção…" aria-label="Pesquisar '+esc(placeholder)+'"><div class="vl2-lookup-list">'+list+'</div></div></details>';
 }
 function traceOptions(items,key,placeholder){return lookupPicker(items,key,state.expected[key],placeholder,"trace");}
 function traceBuilder(){
@@ -742,7 +745,7 @@ function mount(adapter){
   '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE <i>TESTE ADMINISTRATIVO</i></span><h2>Conferência de etiquetas</h2><p>Fotografe uma etiqueta, confirme o cliente e compare a rastreabilidade.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
   '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Uma etiqueta por foto</h3><p>Centralize o rótulo no quadro. O restante será descartado.</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
-  '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><div class="vl2-crop-stepper"><button id="vl2-zoom-out" type="button" aria-label="Diminuir quadro">−</button><button id="vl2-zoom-in" type="button" aria-label="Aumentar quadro">+</button><button id="vl2-center" type="button">Centralizar</button></div><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
+  '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
   '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Abrir câmera traseira</button><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
   '<button id="vl2-capture" type="button" class="vl2-apply" hidden>Capturar somente a área marcada</button>'+
   '<button id="vl2-apply-crop" type="button" class="vl2-apply" hidden>Recortar e analisar etiqueta</button>'+
@@ -760,8 +763,6 @@ function mount(adapter){
  el("vl2-rectangle")?.addEventListener("click",()=>{state.crop.ratio=1.5;setCropShape("vl2-rectangle");drawCrop();});
  el("vl2-portrait")?.addEventListener("click",()=>{state.crop.ratio=.68;setCropShape("vl2-portrait");drawCrop();});
  el("vl2-center")?.addEventListener("click",()=>{state.crop.cx=.5;state.crop.cy=.5;drawCrop();});
- el("vl2-zoom-in")?.addEventListener("click",()=>adjustCrop(.07));
- el("vl2-zoom-out")?.addEventListener("click",()=>adjustCrop(-.07));
  el("vl2-zoom")?.addEventListener("input",e=>{state.crop.scale=Number(e.target.value)/100;drawCrop();});
  bindFrame();showResult();loadPatterns();loadEntities();fetchHistory();
 }
