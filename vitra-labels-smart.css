@@ -560,3 +560,15 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
 .vl2-sample{margin-top:12px}
 .vl2-sample .vl2-evaluate{margin:8px 0 3px}
 @media(max-width:480px){.vl2-quick-trace input{font-size:12px;padding:12px 10px;min-height:44px}}
+
+/* Leitura reforçada e alertas de segurança ainda na prévia da fotografia. */
+.vl2-retry-deep{display:block;width:100%;margin:12px 0;padding:12px 16px;border:1px solid #b6d4bf;
+ color:#245b3a;background:#f4faf5;border-radius:11px;font:650 12px/1.35 Inter,system-ui,sans-serif;cursor:pointer}
+.vl2-retry-deep:hover{background:#e9f4ed}
+.vl2-quick-alerts{margin:12px 0;padding:14px 16px;border:1px solid #e7c8b0;background:#fff8f1;
+ color:#6b3d24;border-radius:13px}
+.vl2-quick-alerts>strong{display:block;font-size:14px;margin:0 0 5px}
+.vl2-quick-alerts>small{display:block;color:#85664d;font-size:11px;line-height:1.5;margin:0 0 7px}
+.vl2-quick-alerts>div{padding:9px 0;border-top:1px solid #edd9c9}
+.vl2-quick-alerts>div b{display:block;font-size:12px}
+.vl2-quick-alerts>div p{font-size:12px;line-height:1.5;margin:4px 0 0;overflow-wrap:anywhere}
