@@ -199,6 +199,34 @@ function registryAudit(){
   else add("confirmar","CNPJ do comerciante","Número lido, mas não foi possível confirmar a empresa responsável na base.");
  }
  if(merchant)add("ok","Comercializado por",merchant.name+" · endereço cadastrado: "+(merchant.address||"sem endereço"),ref(merchant));
+ if(producer){
+  if(!f.cnpj&&producer.cnpj)add("confirmar","CNPJ do produtor","Existe CNPJ de referência para "+producer.name+", mas o número impresso não foi lido integralmente.",ref(producer));
+  if(!f.ggn&&producer.ggn)add("confirmar","GGN do produtor","Não foi possível ler o GGN de "+producer.name+" para compará-lo ao cadastro.",ref(producer));
+ }
+ if(merchant){
+  if(!f.cnpjComercial&&merchant.cnpj)add("confirmar","CNPJ do comerciante","CNPJ do comercializador não foi reconhecido; existe uma referência cadastrada para "+merchant.name+".",ref(merchant));
+  if(f.ggnComercial&&merchant.ggn)compare("ggnComercial","GGN comercial",f.ggnComercial,merchant.ggn,merchant);
+  else if(f.ggnComercial)add("confirmar","GGN comercial","Número impresso, mas o cadastro consultado não contém GGN comercial para conferir.",ref(merchant));
+ }
+ const compareGLN=(name,read,entity)=>{
+  if(!read)return;
+  if(digits(read).length!==13){add("atencao",name,"O identificador possui "+digits(read).length+" dígitos; confira se foram impressos 13.",entity?ref(entity):"DOC.CQ.056");return;}
+  if(entity?.gln){
+    if(digits(entity.gln)===digits(read))add("ok",name,"GLN "+read+" coincide com "+entity.name+".",ref(entity));
+    else add("atencao",name,"GLN impresso "+read+" não corresponde ao cadastro "+entity.gln+" de "+entity.name+".",ref(entity));
+  }else add("confirmar",name,"GLN "+read+" identificado, mas não há número GLN aprovado no cadastro para comparação. Não foi liberado automaticamente.",entity?ref(entity):"DOC.CQ.056");
+ };
+ compareGLN("GLN do produtor",f.gln,producer);
+ compareGLN("GLN do comerciante",f.glnComercial,merchant);
+ const geoContent=(block)=>norm(block).match(/LOCALIZACAO\s+GEOGRAFICA\s*[:\-]?\s*([0-9°'’"”“\sSNWE.,-]{9,60})/)?.[1]||"";
+ for(const [who,block,entity] of [["produtor",produced,producer],["comerciante",marketed,merchant]]){
+  if(!entity?.geo_location)continue;
+  const read=geoContent(block),digitsRead=digits(read),digitsExpected=digits(entity.geo_location);
+  if(digitsRead&&digitsRead===digitsExpected)add("ok","Coordenadas do "+who,"Localização geográfica coincide com a referência de "+entity.name+".",ref(entity));
+  else if(digitsRead&&digitsRead.length===digitsExpected.length)add("atencao","Coordenadas do "+who,"Coordenadas lidas "+read.trim()+" divergem das coordenadas de "+entity.name+": "+entity.geo_location+".",ref(entity));
+  else add("confirmar","Coordenadas do "+who,"A localização geográfica de "+entity.name+" consta na referência, mas não foi possível comparar todos os caracteres impressos.",ref(entity));
+ }
+
  const cep=v=>digits((str(v).match(/(?:CEP)\s*[:\-]?\s*(\d{5}[-\s]?\d{3})/i)||[])[1]||"");
  for(const [label,partText,entity] of [["CEP do produtor",produced,producer],["CEP do comerciante",marketed,merchant]]){
   const read=cep(partText),reference=entity?cep(entity.address):"";
@@ -815,7 +843,7 @@ function diagnosticV4(){
   if(f.cnpj&&!validCnpj(f.cnpj))add("error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
   if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
   if(f.ggn&&digits(f.ggn).length!==13)add("error","GGN","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
-  if(/\bGLN\b/i.test(state.text))add("pending","GLN sem base de comparação","O manual consultado não fornece GLN de referência para essa empresa. Não é seguro aprovar esse identificador apenas por possuir 13 dígitos.");
+  if(/\bGLN\b/i.test(state.text)&&!f.gln&&!f.glnComercial)add("pending","GLN ilegível","Há indicação de GLN na etiqueta, mas os dígitos não foram reconhecidos com segurança.");
  }
  if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
