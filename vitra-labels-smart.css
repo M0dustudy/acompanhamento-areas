@@ -481,3 +481,32 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
  .vl2-gallery-tools button{font-size:11px!important;padding:7px 3px!important}
  .vl2-photo{max-width:100%}
 }
+
+/* v5 — identidade com contraste real, margens coerentes e ações administrativas */
+.vl2-header{background:#fff!important;color:#254a34!important;border:1px solid #dce7dd!important;
+ border-radius:16px!important;padding:19px 21px!important;box-shadow:0 5px 20px #122e1b0a!important}
+.vl2-header h2{color:#173d2b!important;-webkit-text-fill-color:#173d2b!important;
+ font-weight:780!important;font-size:clamp(25px,3.1vw,35px)!important;line-height:1.15!important;margin:8px 0!important}
+.vl2-header p{color:#617b68!important;-webkit-text-fill-color:#617b68!important;font-size:12px!important;line-height:1.55!important}
+.vl2-header .vl2-kicker{color:#427055!important;-webkit-text-fill-color:#427055!important;font-size:10px!important}
+.vl2-photo{background:#111e17!important}
+.vl2-photo>img{object-fit:contain!important;object-position:center center!important}
+.vl2-history-actions{display:flex;flex:0 0 auto;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.vl2-history-delete{background:#fff5f3!important;color:#995143!important;-webkit-text-fill-color:#995143!important;border-color:#ead0c9!important}
+.vl2-history-delete:hover{background:#fae9e5!important}
+.vl2-delete-confirm{max-width:500px;overflow-y:auto}
+.vl2-delete-confirm>p{color:#5e7865;font-size:12px;line-height:1.65;margin:18px 0}
+.vl2-delete-confirm>label{display:grid;gap:8px;color:#385940;font-size:12px;font-weight:680}
+.vl2-delete-confirm input{display:block;width:100%;font-size:15px!important;min-height:45px;border:1px solid #cbdccc;
+ border-radius:10px;padding:9px 12px;margin-top:2px}
+.vl2-delete-buttons{display:flex;gap:9px;margin-top:19px}
+.vl2-delete-buttons button{flex:1;min-height:45px;border-radius:10px!important;padding:9px!important;font-size:12px!important;font-weight:750!important}
+#vl2-delete-cancel{background:#f0f5f0!important;border:1px solid #d6e5d6!important;color:#2b5a3c!important;-webkit-text-fill-color:#2b5a3c!important}
+#vl2-delete-final{background:#a64439!important;border:1px solid #a64439!important;color:#fff!important;-webkit-text-fill-color:#fff!important}
+#vl2-delete-final:disabled{opacity:.5;cursor:not-allowed}
+.vl2-delete-error{color:#a64439;font-size:11px;margin:10px 0}
+@media(max-width:700px){.vl2-header{padding:17px!important}.vl2-header h2{font-size:27px!important}
+ .vl2-history-line{flex-wrap:wrap;padding-bottom:7px}.vl2-history-line .vl2-history-entry{flex:1 1 100%;width:100%}
+ .vl2-history-actions{width:100%;padding:0 6px 4px;justify-content:flex-end}
+ .vl2-history-action{min-width:80px;font-size:11px!important}
+}
