@@ -537,3 +537,11 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
  .vl2-reading-failure{padding:16px}
 }
 @media(max-width:350px){.vl2-reading-facts{grid-template-columns:1fr}.vl2-reading-facts .vl2-reading-barcode{grid-column:auto}}
+
+
+.vl2-order-class{margin:14px 0 2px;border:1px solid #dce9de;border-radius:12px;background:#fff;padding:14px}
+.vl2-order-class>strong{display:block;font-size:12px;font-weight:800;color:#27533a;margin-bottom:5px}
+.vl2-order-class>p{font-size:11px;line-height:1.5;color:#698274;margin:0 0 11px}
+.vl2-order-class .vl2-lookup{max-width:440px}
+.vl2-order-class .vl2-lookup>summary{background:#fff;min-height:46px}
+@media(max-width:520px){.vl2-order-class{padding:12px}.vl2-order-class .vl2-lookup{max-width:none}}
