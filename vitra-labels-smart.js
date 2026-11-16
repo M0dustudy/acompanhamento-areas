@@ -60,9 +60,17 @@ function parseTrace(value){
  return m?{year:m[1],areaValve:m[2],area:"",valve:"",day:m[3],month:m[4],method:m[5],variety:m[6]}:null;
 }
 function expectedCode(){
- const x=state.expected;
- if(!x.year||!x.area||!x.valve||!x.day||!x.month||!x.method||!x.variety)return "";
- return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+x.method+"-"+x.variety;
+ const x=state.expected,unit=category()==="unit",box=category()==="box";
+ if(!(unit||box)||!x.year||!x.area||!x.valve||!x.day||!x.month||!x.variety||(box&&!x.method))return "";
+ return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+(unit?"*":x.method)+"-"+x.variety;
+}
+function codeMatchesReference(reference,printed){
+ const expected=norm(reference).replace(/\s/g,""),actual=norm(printed).replace(/\s/g,"");
+ if(!expected||!actual)return false;
+ if(!expected.includes("-*-"))return expected===actual;
+ const ref=expected.match(/^R-(\d{2})-([0-9A-Z_./]{1,40})-(\d{4})-\*-([A-Z0-9]{2,5})$/);
+ const code=parseTrace(actual);
+ return !!(ref&&code&&ref[1]===code.year&&ref[2]===code.areaValve&&ref[3]===code.day+code.month&&ref[4]===code.variety);
 }
 function expectedVariety(){
  return varieties.find(x=>x[2]===state.expected.variety)?.[0]||"";
@@ -101,7 +109,7 @@ function extract(raw,barcode){
  const weightPhoto=printedWeight?printedWeight[1].replace(".",",")+" "+printedWeight[2].toLowerCase():"";
  const weightCatalog=codeWeights.length===1?codeWeights[0]+" g":"";
  const peso=weightPhoto||weightCatalog;
- const classCode=n.match(/\b(MEI|EX)\s*[-]?\s*([VPA]{1,2})(50|80)([A-Z]{2,3})(10|20|21)\b/);
+ const classCode=n.match(/\b(MEI|EX)\s*[-]?\s*(PA|V|P)(50|80)([A-Z]{2,3})(10|20|21)\b/);
  let kind="";
  const explicitCinta=/\bCINTA\b/.test(n),explicitCumbuca=/\bCUMBUCA\b/.test(n);
  const printedCnpj=/\bCNPJ\b/.test(n),printedGgn=/\bGGN\b/.test(n);
@@ -139,11 +147,12 @@ function extract(raw,barcode){
  const producer=producers.find(p=>producedSection&&norm(producedSection).includes(norm(p[0])))||producers.find(p=>p[1]&&digits(cnpj)===p[1])||producers.find(p=>p[2]&&ggnNumber===p[2])||(!companySection?producers.find(p=>n.includes(norm(p[0]))):null)||null;
  const commer=producers.find(p=>companySection&&norm(companySection).includes(norm(p[0])))||null;
  const refWeight=classCode?classCode[3]==="50"?"5 kg":classCode[3]==="80"?"8 kg":"":"";
+ const boxModel=classCode?{market:classCode[1],color:classCode[2],weight:classCode[3],variety:classCode[4],package:classCode[5],code:classCode[0]}:null;
  return {
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
-  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||ggnNumber,ggnComercial,gln:glnProdutor,glnComercial,produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
+  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||(!companySection?ggnNumber:""),ggnComercial,gln:glnProdutor,glnComercial,produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
-  producer,commer,weightPhoto,weightCatalog,refWeight,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high"
+  producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high"
  };
 }
 function registryAudit(){
@@ -167,15 +176,15 @@ function registryAudit(){
  const sameCNPJ=digits(f.cnpj)?producers.filter(p=>p.cnpj===digits(f.cnpj)):[];
  const named=produced?producers.filter(e=>entityName(produced,e)):[];
  const choose=(set)=>set.length===1?set[0]:null;
- const producer=choose(sameCNPJ)||choose(named)||choose(sameGGN)||null;
+ const producer=choose(named)||choose(sameCNPJ)||choose(sameGGN)||null;
  const ref=e=>"DOC.CQ.056, p. "+e.source_page;
  const compare=(key,label,read,expected,entity)=>{
   if(!expected)return;
-  if(!read){add("confirmar",label,"Referência de "+entity.name+" conhecida, mas o número não foi lido para comparar.",ref(entity));return;}
+  if(!read)return;
   if(digits(read)===digits(expected))add("ok",label,entity.name+" · "+digits(read)+" confere com a referência.",ref(entity));
   else add("atencao",label,"Lido: "+digits(read)+" · cadastrado para "+entity.name+": "+digits(expected)+". Confira o número impresso.",ref(entity));
  };
- if(!f.ggn&&/\bGGN\b/i.test(full))add("confirmar","GGN","O identificador aparece na etiqueta, mas os 13 dígitos não foram reconhecidos.");
+ if(!f.ggn&&/\bGGN\b/i.test(produced))add("confirmar","GGN do produtor","Há indicação de GGN do produtor, mas os 13 dígitos não foram reconhecidos.");
  if(f.ggn){
   if(sameGGN.length>1&&!choose(named)&&!choose(sameCNPJ))add("confirmar","GGN compartilhado","O mesmo GGN está associado a "+sameGGN.map(x=>x.name).join(" / ")+". A numeração sozinha não identifica um produtor exclusivo.");
   else if(!sameGGN.length&&!producer)add("confirmar","GGN sem referência","O número "+digits(f.ggn)+" não consta nos registros atualmente disponíveis; não foi considerado incorreto por ausência de cadastro.");
@@ -193,18 +202,18 @@ function registryAudit(){
  }
  const merchantByCnpj=digits(f.cnpjComercial)?merchants.filter(e=>e.cnpj===digits(f.cnpjComercial)):[];
  const namedMerchant=marketed?merchants.filter(e=>entityName(marketed,e)):[];
- const merchant=choose(merchantByCnpj)||choose(namedMerchant)||null;
+ const merchant=choose(namedMerchant)||choose(merchantByCnpj)||null;
  if(f.cnpjComercial){
   if(merchant?.cnpj)compare("cnpjComercial","CNPJ do comerciante",f.cnpjComercial,merchant.cnpj,merchant);
   else add("confirmar","CNPJ do comerciante","Número lido, mas não foi possível confirmar a empresa responsável na base.");
  }
  if(merchant)add("ok","Comercializado por",merchant.name+" · endereço cadastrado: "+(merchant.address||"sem endereço"),ref(merchant));
  if(producer){
-  if(!f.cnpj&&producer.cnpj)add("confirmar","CNPJ do produtor","Existe CNPJ de referência para "+producer.name+", mas o número impresso não foi lido integralmente.",ref(producer));
-  if(!f.ggn&&producer.ggn)add("confirmar","GGN do produtor","Não foi possível ler o GGN de "+producer.name+" para compará-lo ao cadastro.",ref(producer));
+  if(!f.cnpj&&/\bCNPJ\b/i.test(produced))add("confirmar","CNPJ do produtor","O CNPJ aparece impresso, mas o OCR não identificou os dígitos completos.",ref(producer));
+  if(!f.ggn&&/\bGGN\b/i.test(produced))add("confirmar","GGN do produtor","O GGN aparece impresso, mas os dígitos não foram lidos com segurança.",ref(producer));
  }
  if(merchant){
-  if(!f.cnpjComercial&&merchant.cnpj)add("confirmar","CNPJ do comerciante","CNPJ do comercializador não foi reconhecido; existe uma referência cadastrada para "+merchant.name+".",ref(merchant));
+  if(!f.cnpjComercial&&/\bCNPJ\b/i.test(marketed))add("confirmar","CNPJ do comerciante","O CNPJ está na etiqueta, mas não foi lido integralmente.",ref(merchant));
   if(f.ggnComercial&&merchant.ggn)compare("ggnComercial","GGN comercial",f.ggnComercial,merchant.ggn,merchant);
   else if(f.ggnComercial)add("confirmar","GGN comercial","Número impresso, mas o cadastro consultado não contém GGN comercial para conferir.",ref(merchant));
  }
@@ -220,7 +229,9 @@ function registryAudit(){
  compareGLN("GLN do comerciante",f.glnComercial,merchant);
  const geoContent=(block)=>norm(block).match(/LOCALIZACAO\s+GEOGRAFICA\s*[:\-]?\s*([0-9°'’"”“\sSNWE.,-]{9,60})/)?.[1]||"";
  for(const [who,block,entity] of [["produtor",produced,producer],["comerciante",marketed,merchant]]){
-  if(!entity?.geo_location)continue;
+  const geoPrinted=/LOCALIZA(?:C|Ç)(?:A|Ã)O\s+GEOGRAFICA/i.test(norm(block));
+  if(!geoPrinted)continue;
+  if(!entity?.geo_location){add("confirmar","Coordenadas do "+who,"A etiqueta contém coordenadas geográficas, mas o cadastro da empresa não possui uma referência para confirmá-las.",entity?ref(entity):"Cadastro institucional");continue;}
   const read=geoContent(block),digitsRead=digits(read),digitsExpected=digits(entity.geo_location);
   if(digitsRead&&digitsRead===digitsExpected)add("ok","Coordenadas do "+who,"Localização geográfica coincide com a referência de "+entity.name+".",ref(entity));
   else if(digitsRead&&digitsRead.length===digitsExpected.length)add("atencao","Coordenadas do "+who,"Coordenadas lidas "+read.trim()+" divergem das coordenadas de "+entity.name+": "+entity.geo_location+".",ref(entity));
@@ -250,7 +261,9 @@ function registryAudit(){
   .replace(/\bKM\s*[-–]?\s*(\d+)/g,"KM $1")
   .replace(/[^A-Z0-9]+/g," ").replace(/\s+/g," ").trim();
  for(const [title,printed,entity] of [["Endereço completo do produtor",produced,producer],["Endereço completo do comerciante",marketed,merchant]]){
-  if(!entity?.address)continue;
+  const addressPrinted=/\b(?:END|ENDERECO|CEP|RUA|RODOVIA|BR\s*[-]?\s*\d{2,3}|LOTE|PROJETO|ESTRADA)\b/i.test(norm(printed));
+  if(!addressPrinted)continue;
+  if(!entity?.address){add("confirmar",title,"O endereço está impresso na etiqueta, mas ainda não existe endereço de referência cadastrado para comparar.",entity?ref(entity):"Cadastro institucional");continue;}
   const expected=normalizeAddress(entity.address),actual=normalizeAddress(printed);
   const normalizedStop=new Set(["DE","DO","DA","DAS","DOS","NO","NA","EM","S","N","END","ENDERECO","BRASIL","CEP"]);
   const tokens=distinct(expected.split(" ").filter(x=>x.length>=3&&!normalizedStop.has(x)));
@@ -258,6 +271,15 @@ function registryAudit(){
   const targetNums=distinct(expected.split(" ").filter(x=>/^\d{2,}$/.test(x)));
   const shownNums=actual.split(" ");
   const matchedNums=targetNums.every(x=>shownNums.includes(x));
+  const taggedNumber=(v,label)=>{
+   const pattern=new RegExp("\\b"+label+"\\s*[:#º°N.,-]*\\s*(\\d{1,5})","i");
+   return norm(v).match(pattern)?.[1]||"";
+  };
+  const markers=[["KM","KM"],["LOTE","LOTE"],["N(?:UMERO|RO)?","N(?:UMERO|RO)?"]];
+  const discrepancy=markers.map(([label,pattern])=>({label,expected:taggedNumber(entity.address,pattern),observed:taggedNumber(printed,pattern)}))
+   .find(x=>x.expected&&x.observed&&x.expected!==x.observed);
+  if(discrepancy){add("atencao",title,discrepancy.label+" impresso: "+discrepancy.observed+" · cadastro de "+entity.name+": "+discrepancy.expected+".",ref(entity));continue;}
+
   if(!printed||!/(?:END|ENDERECO|CEP|RUA|RODOVIA|BR|LOTE|PROJETO|FAZENDA)/i.test(norm(printed))){
    add("confirmar",title,"O endereço não foi reconhecido integralmente na foto para comparação com o cadastro.",ref(entity));continue;
   }
@@ -754,8 +776,8 @@ function traceBuilder(){
  const letters=["A","B","C","D","1","2","3","4"].map(x=>[x,x]);
  const varietiesCodes=varieties.filter(x=>x[2]).slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(x=>[x[2],x[2]+" · "+x[1]]);
  const siteAreas=(()=>{try{return typeof A==="object"&&A?Object.keys(A).map(digits).filter(x=>x.length>=3&&x.length<=5):[];}catch{return [];}})();
- const expected=expectedCode(),observed=state.fields.rastreio||"";
- const same=expected&&observed&&norm(expected)===norm(observed);
+ const expected=expectedCode(),observed=state.fields.rastreio||"",box=category()==="box";
+ const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
  return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
   '<p>Informe a rastreabilidade real da produção. O código lido na foto será comparado separadamente.</p>'+
@@ -766,9 +788,9 @@ function traceBuilder(){
   '<label>Válvula'+'<input data-vl2-trace="valve" maxlength="16" list="vl2-valves" value="'+esc(state.expected.valve)+'" placeholder="Letra ou número"><datalist id="vl2-valves">'+letters.map(x=>'<option value="'+x[0]+'"></option>').join("")+'</datalist>'+'</label>'+
   '<div class="vl2-trace-field"><span>Dia</span>'+traceOptions(day,"day","Dia")+'</div>'+
   '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
-  '<div class="vl2-trace-field"><span>Pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Método")+'</div>'+
+  (box?'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>':"")+
   '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
-  '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected||"Preenchimento incompleto")+'</strong></div></div>'+
+  '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
 }
 function fact(label,value,source){
@@ -885,9 +907,9 @@ function diagnosticV4(){
   if(!trace)add("error","Formato de rastreabilidade","O código impresso "+printed+" não segue o formato R-ANO-ÁREA/VÁLVULA-DDMM-MÉTODO-SIGLA.");
   else if(!varieties.some(v=>v[2]===trace.variety))add("pending","Sigla desconhecida","A sigla '"+trace.variety+"' não foi encontrada no glossário; confira a impressão e a referência atualizada do produtor.");
   if(expected){
-   if(norm(expected).replace(/\s/g,"")!==norm(printed).replace(/\s/g,""))
+   if(!codeMatchesReference(expected,printed))
     add("error","Rastreabilidade divergente","Etiqueta: "+printed+" · ordem de produção: "+expected+".","DOC.CQ.056, pp. 2–3, 7");
-   else add("ok","Rastreabilidade","O código impresso confere integralmente com a ordem de produção: "+expected+".");
+   else add("ok","Rastreabilidade",unit?"Ano, área/válvula, data e variedade conferem com a ordem. A pesagem impressa segue um código válido do manual e não exige identificação de caixa da cumbuca.":"O código impresso confere integralmente com a ordem de produção: "+expected+".");
   }
  }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
  const photoVar=state.detected?.identity?.variety||"",referenceVar=expectedVariety();
@@ -922,6 +944,28 @@ function diagnosticV4(){
   }else if(!expectation)add("pending","Peso / modelo da cumbuca","Peso da cumbuca não pôde ser confirmado. Confira 250 g ou 500 g conforme o modelo aprovado.");
  }
  if(box){
+  const model=state.detected?.boxModel;
+  if(model){
+   const colors={V:"verde",P:"preta",PA:"parda"};
+   const title="Código da cor da caixa";
+   add("ok",title,model.color+" corresponde à caixa "+colors[model.color]+" no manual. Essa verificação identifica a sigla impressa; não confirma a cor física da caixa.","DOC.CQ.056, p. 5–6");
+   const codeVar=varieties.find(v=>v[2]===model.variety)?.[0]||"";
+   if(!codeVar)add("pending","Sigla de variedade no modelo","A sigla "+model.variety+" não consta no glossário consultado.");
+   else if(state.detected?.identity?.variety&&state.detected.identity.variety!==codeVar)
+     add("error","Modelo e variedade","O código "+model.code+" indica "+nameOf(varieties,codeVar)+", enquanto o nome impresso indica "+nameOf(varieties,state.detected.identity.variety)+".");
+   if(state.detected?.weightPhoto){
+    const kg=Number(state.detected.weightPhoto.match(/[\d,.]+/)?.[0]?.replace(",",".")||0);
+    const modelKg=model.weight==="80"?8:5;
+    if(/\bKG\b/i.test(state.detected.weightPhoto)&&kg!==modelKg)
+     add("error","Peso da caixa","No código "+model.code+" o peso é "+modelKg+" kg, mas o rótulo indica "+state.detected.weightPhoto+".");
+   }
+   const printedColor=norm(state.text).match(/(?:COR\s*(?:DA\s*CAIXA)?|CAIXA\s*COR)\s*[:\-]?\s*(VERDE|PRETA|PARDA)\b/)?.[1]||"";
+   if(printedColor&&printedColor!==colors[model.color].toUpperCase())
+    add("error","Cor indicada no rótulo","O texto diz "+printedColor+", porém a sigla "+model.color+" corresponde a "+colors[model.color]+".");
+   const pack={10:"sacola",20:"cumbuca de 500 g",21:"cumbuca de 250 g"}[model.package];
+   add("ok","Modelo da embalagem",model.market+" · "+model.weight+" · "+model.variety+" · "+model.package+" identifica "+pack+" pelo glossário, sem exigir preenchimento manual.","DOC.CQ.056, p. 3, 5");
+  }else if(/\b(?:MEI|EX)\s*[-]?\s*[A-Z]{1,3}\d{2}[A-Z]{2,3}\d{2}\b/.test(norm(state.text)))
+   add("pending","Código do modelo da caixa","Há um código de modelo, mas o texto não corresponde ao glossário. Confira a impressão ou refaça a leitura.");
   const chosenClass=state.expected.klass||"",readClass=state.identity.klass||"";
   if(!chosenClass)add("pending","Classificação da ordem","Informe a classificação real da ordem de produção para compará-la com a classe impressa na caixa.");
   if(!readClass)add("pending","Classificação impressa","O sistema não conseguiu ler a classe impressa na caixa. Uma nova fotografia poderá permitir a comparação.");
@@ -945,7 +989,8 @@ function diagnosticV4(){
   }
   if(f.cnpj&&!validCnpj(f.cnpj))add("error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
   if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
-  if(f.ggn&&digits(f.ggn).length!==13)add("error","GGN","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
+  if(f.ggn&&digits(f.ggn).length!==13)add("error","GGN do produtor","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
+  if(f.ggnComercial&&digits(f.ggnComercial).length!==13)add("error","GGN do comerciante","Lidos "+digits(f.ggnComercial).length+" dígitos no campo comercial; confira os 13 dígitos.");
   if(/\bGLN\b/i.test(state.text)&&!f.gln&&!f.glnComercial)add("pending","GLN ilegível","Há indicação de GLN na etiqueta, mas os dígitos não foram reconhecidos com segurança.");
  }
  if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
