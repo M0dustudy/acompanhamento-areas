@@ -602,6 +602,7 @@ function diagnosticV4(){
  if(!state.clientConfirmed||!selected)add("pending","Cliente","Confirme o cliente da ordem de produção para comparar o EAN da fotografia.");
  if(!expected)add("pending","Rastreabilidade de referência","Informe o código correto da ordem de produção. O VITRA vai comparar com o código impresso, sem copiar um para o outro.");
  if(!kind)add("pending","Tipo de etiqueta","Não foi possível identificar o modelo com segurança. Selecione o tipo em Ajustar leitura.");
+ if(category()==="other")add("pending","Modelo da etiqueta","O modelo informado não é identificado como etiqueta de caixa ou de cumbuca; exige uma regra específica de validação.");
  if(f.barcode){
   if(!eanValid(f.barcode))add("error","Código de barras","EAN lido: "+f.barcode+". Dígito verificador inválido; confira os 13 números.");
   else if(!matches.length)add("pending","EAN não catalogado","EAN-13 "+f.barcode+" válido, mas ausente das referências cadastradas. É necessária a confirmação do padrão autorizado.");
@@ -628,7 +629,7 @@ function diagnosticV4(){
  else if(printedVar)add("ok","Sigla reconhecida",trace.variety+" corresponde a "+nameOf(varieties,printedVar)+" no manual.");
  else add("pending","Variedade","Não foi possível confirmar nome e sigla da uva na fotografia.");
  if(referenceVar&&((photoVar&&photoVar!==referenceVar)||(printedVar&&printedVar!==referenceVar)))
-   add("error","Variedade da ordem de produção","A referência exige "+nameOf(varieties,referenceVar)+", enquanto a etiqueta indica "+nameOf(varieties,photoVar||printedVar)+".");
+   add("error","Variedade da ordem de produção","A referência exige "+nameOf(varieties,referenceVar)+", mas a sigla impressa corresponde a "+nameOf(varieties,printedVar||photoVar)+".");
  const validateDate=(d,m,y)=>{const dt=new Date(Number(y),Number(m)-1,Number(d));return dt.getFullYear()===Number(y)&&dt.getMonth()===Number(m)-1&&dt.getDate()===Number(d);};
  if(trace){
   const year=2000+Number(trace.year);
