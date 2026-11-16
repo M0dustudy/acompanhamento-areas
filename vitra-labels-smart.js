@@ -147,15 +147,15 @@ function extract(raw,barcode){
  const dateMatch=str(raw).match(/\b([0-3]?\d)[.\/-]([01]?\d)[.\/-]((?:20)?\d{2})\b/);
  const date=dateMatch?dateMatch[1].padStart(2,"0")+"/"+dateMatch[2].padStart(2,"0")+"/"+(dateMatch[3].length===2?"20"+dateMatch[3]:dateMatch[3]):track?track.day+"/"+track.month+"/20"+track.year:"";
  const lot=str(raw).match(/\b(?:LOTE|LOT)\s*[:#-]?\s*([0-9A-Z./-]{2,24})\b/i)?.[1]||"";
- const cnpjPattern=/\bCNPJ\s*[:#-]?\s*(\d{2}[.\s]?\d{3}[.\s]?\d{3}[/\s]?\d{4}[-\s]?\d{2})/gi;
+ const cnpjPattern=/\bCNPJ\s*[:#-]?\s*([0-9][0-9.\/ \t-]{10,25})/gi;
  const candidates=[...str(raw).matchAll(cnpjPattern)].map(x=>digits(x[1]));
  const producedSection=str(raw).split(/PRODUZIDO POR/i)[1]?.split(/COMERCIALIZADO POR|RASTREABILIDADE/i)[0]||"";
  const companySection=str(raw).split(/COMERCIALIZADO POR/i)[1]?.split(/PRODUZIDO POR|RASTREABILIDADE/i)[0]||"";
  const producerCnpj=digits(producedSection.match(cnpjPattern)?.[0]||"");
  const companyCnpj=digits(companySection.match(cnpjPattern)?.[0]||"");
  const cnpj=producerCnpj||(candidates.length===1&&!companySection?candidates[0]:"");
- const ggn=str(raw).match(/\b(?:GGN|GLOBALGAP|GLOBAL\s*G\.?A\.?P\.?)\s*[:#-]?\s*(\d[\d\s-]{11,18})/i)?.[1]||"";
- const ggnNumber=digits(ggn).slice(0,13);
+ const ggn=str(raw).match(/\b(?:GGN|GLOBALGAP|GLOBAL\s*G\.?A\.?P\.?)\s*[:#-]?\s*([0-9][0-9 \t-]{10,20})/i)?.[1]||"";
+ const ggnNumber=digits(ggn);
  const producer=producers.find(p=>producedSection&&norm(producedSection).includes(norm(p[0])))||producers.find(p=>p[1]&&digits(cnpj)===p[1])||producers.find(p=>p[2]&&ggnNumber===p[2])||(!companySection?producers.find(p=>n.includes(norm(p[0]))):null)||null;
  const commer=producers.find(p=>companySection&&norm(companySection).includes(norm(p[0])))||null;
  const refWeight=classCode?classCode[3]==="50"?"5 kg":classCode[3]==="80"?"8 kg":"":"";
@@ -276,11 +276,13 @@ function computeIssues(){
    const w=digits(f.peso),expectedUnit=detected.packedKindCode==="20"?"500":"250";
    if(w!==expectedUnit)add("atencao","Tipo de embalagem","O código da embalagem indica "+expectedUnit+" g, mas o peso lido é "+w+" g.");
  }
- if(f.cnpj&&!validCnpj(f.cnpj))add("atencao","CNPJ","Os dígitos do CNPJ reconhecido não passaram na validação. Confira a impressão.");
+ if(f.cnpj&&!validCnpj(f.cnpj))add("atencao","CNPJ","O CNPJ do produtor está incorreto: quantidade de dígitos ou verificadores não conferem.");
+ if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("atencao","CNPJ do comerciante","A numeração comercial não passou na validação.");
+ if(f.ggn&&digits(f.ggn).length!==13)add("atencao","GGN","Foram lidos "+digits(f.ggn).length+" dígitos; a referência do manual utiliza 13. Confira dígitos extras ou ausentes.");
  if(/\bCNPJ\b/i.test(state.text)&&!f.cnpj&&!f.cnpjComercial)add("confirmar","CNPJ ilegível","Há referência a CNPJ na etiqueta, mas nenhum número foi identificado com segurança.");
  if(/\bGGN\b/i.test(state.text)&&!f.ggn)add("confirmar","GGN ilegível","Há referência a GGN, mas o número não foi recuperado com segurança.");
  if(!state.refsLoaded&&detected?.producer?.[1]&&f.cnpj&&f.cnpj!==detected.producer[1])add("atencao","CNPJ do produtor","O CNPJ reconhecido difere do cadastro de "+detected.producer[0]+" no DOC.CQ.056.");
- if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("atencao","CNPJ do comerciante","O dígito verificador do CNPJ comercial não confere.");
+ // A validação do CNPJ comercial já foi realizada acima.
  if(!state.refsLoaded&&detected?.commer?.[1]&&f.cnpjComercial&&f.cnpjComercial!==detected.commer[1])add("atencao","CNPJ do comerciante","CNPJ impresso diferente da referência para "+detected.commer[0]+".");
  if(!state.refsLoaded&&detected?.producer?.[2]&&f.ggn&&f.ggn!==detected.producer[2])add("atencao","GGN do produtor","O GGN reconhecido difere da referência de "+detected.producer[0]+" no DOC.CQ.056.");
  if(!state.refsLoaded&&(f.cnpj||f.ggn)&&!detected?.producer)add("confirmar","Cadastro do produtor","Identificação numérica detectada, mas não foi possível associá-la com segurança a um produtor do manual.");
