@@ -642,7 +642,7 @@ async function scanBarcode(file,token=state.sequence){
   if(typeof BarcodeDetector!=="undefined"){
    try{
     const detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a"]});
-    const codes=await limitWork(detector.detect(canvas),3300,"Tempo esgotado no leitor nativo");
+    const codes=await limitWork(detector.detect(canvas),1300,"Tempo esgotado no leitor nativo");
     for(const x of codes){
      const value=digits(x.rawValue),ean=value.length===12?"0"+value:value;
      if(!eanValid(ean))continue;
@@ -653,13 +653,13 @@ async function scanBarcode(file,token=state.sequence){
    }catch{}
   }
   try{
-   const mod=await limitWork(import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm"),4800,"Biblioteca de barras não respondeu");
+   const mod=await limitWork(import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm"),2300,"Biblioteca de barras não respondeu");
    const reader=new mod.BrowserMultiFormatOneDReader();
    const samples=[canvas];
    const rotated=rotateBitmapCanvas(canvas,90,2300);samples.push(rotated);
    for(const sample of samples){
     try{
-     const code=await limitWork(reader.decodeFromCanvas(sample),3200,"O leitor não localizou as barras");
+     const code=await limitWork(reader.decodeFromCanvas(sample),1900,"O leitor não localizou as barras");
      const value=digits(code?.getText?.()||code?.text||"");
      const ean=value.length===12?"0"+value:value;
      if(eanValid(ean)){
@@ -787,8 +787,16 @@ function mergeOCRPassages(passages){
  return out.join("\n").slice(0,16000);
 }
 function shouldScanOCRBands(raw,deep=false){
- const text=norm(raw);
- return deep||!ocrTraceCandidates(raw).length||/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CAIXA)\b/.test(text);
+ if(deep)return true;
+ const text=norm(raw);if(text.length<18)return true;
+ const scanned=extract(raw,""),f=scanned.fields;
+ if(!f.rastreio||(!scanned.identity.variety&&!f.produto))return true;
+ if(/\bCNPJ\b/.test(text)&&!f.cnpj&&!f.cnpjComercial)return true;
+ if(/\bGGN\b/.test(text)&&!f.ggn&&!f.ggnComercial)return true;
+ if(/\bGLN\b/.test(text)&&!f.gln&&!f.glnComercial)return true;
+ if(/LOCALIZACAO\s+GEOGRAFICA/.test(text)&&!/[NS][\s\d°'".]*[EWO]/.test(text))return true;
+ if(/\b(?:CLASSIFICACAO|CLASSIFICA[CÇ][AÃ]O)\b/.test(text)&&!scanned.identity.klass)return true;
+ return false;
 }
 function ocrEvidenceScore(value){
  const text=norm(value);let score=Math.min(200,text.length)/20;
@@ -819,8 +827,8 @@ async function readPhoto(deep=false){
    update("Inicializando o leitor de texto…");
    await ensureOCR();worker=await getOCRWorker();if(seq!==state.sequence)return;
    update("Lendo todas as informações da etiqueta…");
-   const canvas=await limitWork(prepareOCRImage(photo,2700),6500,"Falha ao preparar foto.");
-   try{const original=await readPass(canvas,23000);if(original)passages.push(original);}
+   const canvas=await limitWork(prepareOCRImage(photo,2100),3500,"Falha ao preparar foto.");
+   try{const original=await readPass(canvas,12000);if(original)passages.push(original);}
    catch(e){failure=e?.message||"A leitura inicial não foi concluída.";discardOCRWorker(worker);worker=null;}
    if(seq!==state.sequence)return;
    if(!worker){
@@ -834,8 +842,8 @@ async function readPhoto(deep=false){
      if(seq!==state.sequence||!worker)break;
      update("Ampliando e verificando a região "+band.name+"…");
      try{
-      const canvas=await limitWork(prepareOCRBand(photo,band.a,band.b,band.contrast),5500,"Falha ao ampliar a região.");
-      const recognizedBand=await readPass(canvas,14500);
+      const canvas=await limitWork(prepareOCRBand(photo,band.a,band.b,band.contrast),3500,"Falha ao ampliar a região.");
+      const recognizedBand=await readPass(canvas,8500);
       if(recognizedBand)passages.push(recognizedBand);
      }catch(e){
       failure=failure||"Uma região não pôde ser lida por completo.";
@@ -847,9 +855,9 @@ async function readPhoto(deep=false){
    recognized=mergeOCRPassages(passages);
    if(worker&&(!ocrTraceCandidates(recognized).length||(deep&&passages.length<2))){
     update("Realçando pequenos caracteres e a linha de rastreabilidade…");
-    const improved=await limitWork(enhanceForOCR(photo),5500,"Falha no contraste.").catch(()=>null);
+    const improved=await limitWork(enhanceForOCR(photo),3500,"Falha no contraste.").catch(()=>null);
     if(improved){
-     try{const enhanced=await readPass(improved,11500);if(enhanced)passages.push(enhanced);recognized=mergeOCRPassages(passages);}
+     try{const enhanced=await readPass(improved,7500);if(enhanced)passages.push(enhanced);recognized=mergeOCRPassages(passages);}
      catch{failure=failure||"Leitura complementar incompleta.";discardOCRWorker(worker);worker=null;}
     }
    }
@@ -857,7 +865,7 @@ async function readPhoto(deep=false){
   if(seq!==state.sequence)return;
   state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;state.ocrRawPassages=passages.slice();
   const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
-  if(!likelyBox){update("Decodificando o código de barras…");barcode=await limitWork(scanBarcode(photo,seq),10500,"Tempo de leitura do código de barras excedido.").catch(()=>"");}
+  if(!likelyBox){update("Decodificando o código de barras…");barcode=await limitWork(scanBarcode(photo,seq),6500,"Tempo de leitura do código de barras excedido.").catch(()=>"");}
   if(seq!==state.sequence)return;
   printedNumber=getEAN(recognized);
   if(!likelyBox&&barcode&&worker&&!printedNumber){
@@ -865,7 +873,7 @@ async function readPhoto(deep=false){
    printedNumber=await printedEANNearBarcode(photo,worker);
   }
  };
- try{await limitWork(run(),93000,"Limite de leitura atingido. A foto foi preservada.");}
+ try{await limitWork(run(),33000,"Limite de leitura atingido. A foto foi preservada.");}
  catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
