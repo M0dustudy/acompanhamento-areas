@@ -421,12 +421,13 @@
     return {fields,checklist:result,review_status:result.some(x=>x[0]==="atencao")?"atencao":"pendente"};
   }
   function labelRender(){
-    const p=q("#panel");if(!p||me?.role!=="master")return;
+    const p=q("#panel");if(!p||(me?.role!=="master"&&me?.module_access?.labels!==true))return;
     if(typeof window.VITRA_LABEL_SMART?.mount!=="function"){
       p.innerHTML='<section class="va-error" role="alert">O leitor de etiquetas não foi carregado. Atualize a página para tentar novamente.</section>';return;
     }
     window.VITRA_LABEL_SMART.mount({
       canAccess:()=>(me?.role==="master"||me?.module_access?.labels===true)&&!!session?.access_token,
+      isMaster:()=>me?.role==="master",
       api:labelApi,stamp,
       back:()=>{if(typeof window.showHome==="function")window.showHome();}
     });
