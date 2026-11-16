@@ -175,11 +175,11 @@ function registryAudit(){
  const sameCNPJ=digits(f.cnpj)?producers.filter(p=>p.cnpj===digits(f.cnpj)):[];
  const named=produced?producers.filter(e=>entityName(produced,e)):[];
  const choose=(set)=>set.length===1?set[0]:null;
- const producer=choose(sameCNPJ)||choose(named)||choose(sameGGN)||null;
+ const producer=choose(named)||choose(sameCNPJ)||choose(sameGGN)||null;
  const ref=e=>"DOC.CQ.056, p. "+e.source_page;
  const compare=(key,label,read,expected,entity)=>{
   if(!expected)return;
-  if(!read){add("confirmar",label,"Referência de "+entity.name+" conhecida, mas o número não foi lido para comparar.",ref(entity));return;}
+  if(!read)return;
   if(digits(read)===digits(expected))add("ok",label,entity.name+" · "+digits(read)+" confere com a referência.",ref(entity));
   else add("atencao",label,"Lido: "+digits(read)+" · cadastrado para "+entity.name+": "+digits(expected)+". Confira o número impresso.",ref(entity));
  };
@@ -201,18 +201,18 @@ function registryAudit(){
  }
  const merchantByCnpj=digits(f.cnpjComercial)?merchants.filter(e=>e.cnpj===digits(f.cnpjComercial)):[];
  const namedMerchant=marketed?merchants.filter(e=>entityName(marketed,e)):[];
- const merchant=choose(merchantByCnpj)||choose(namedMerchant)||null;
+ const merchant=choose(namedMerchant)||choose(merchantByCnpj)||null;
  if(f.cnpjComercial){
   if(merchant?.cnpj)compare("cnpjComercial","CNPJ do comerciante",f.cnpjComercial,merchant.cnpj,merchant);
   else add("confirmar","CNPJ do comerciante","Número lido, mas não foi possível confirmar a empresa responsável na base.");
  }
  if(merchant)add("ok","Comercializado por",merchant.name+" · endereço cadastrado: "+(merchant.address||"sem endereço"),ref(merchant));
  if(producer){
-  if(!f.cnpj&&producer.cnpj)add("confirmar","CNPJ do produtor","Existe CNPJ de referência para "+producer.name+", mas o número impresso não foi lido integralmente.",ref(producer));
-  if(!f.ggn&&producer.ggn)add("confirmar","GGN do produtor","Não foi possível ler o GGN de "+producer.name+" para compará-lo ao cadastro.",ref(producer));
+  if(!f.cnpj&&/\bCNPJ\b/i.test(produced))add("confirmar","CNPJ do produtor","O CNPJ aparece impresso, mas o OCR não identificou os dígitos completos.",ref(producer));
+  if(!f.ggn&&/\bGGN\b/i.test(produced))add("confirmar","GGN do produtor","O GGN aparece impresso, mas os dígitos não foram lidos com segurança.",ref(producer));
  }
  if(merchant){
-  if(!f.cnpjComercial&&merchant.cnpj)add("confirmar","CNPJ do comerciante","CNPJ do comercializador não foi reconhecido; existe uma referência cadastrada para "+merchant.name+".",ref(merchant));
+  if(!f.cnpjComercial&&/\bCNPJ\b/i.test(marketed))add("confirmar","CNPJ do comerciante","O CNPJ está na etiqueta, mas não foi lido integralmente.",ref(merchant));
   if(f.ggnComercial&&merchant.ggn)compare("ggnComercial","GGN comercial",f.ggnComercial,merchant.ggn,merchant);
   else if(f.ggnComercial)add("confirmar","GGN comercial","Número impresso, mas o cadastro consultado não contém GGN comercial para conferir.",ref(merchant));
  }
@@ -229,6 +229,8 @@ function registryAudit(){
  const geoContent=(block)=>norm(block).match(/LOCALIZACAO\s+GEOGRAFICA\s*[:\-]?\s*([0-9°'’"”“\sSNWE.,-]{9,60})/)?.[1]||"";
  for(const [who,block,entity] of [["produtor",produced,producer],["comerciante",marketed,merchant]]){
   if(!entity?.geo_location)continue;
+  const geoPrinted=/LOCALIZA(?:C|Ç)(?:A|Ã)O\s+GEOGRAFICA/i.test(norm(block));
+  if(!geoPrinted)continue;
   const read=geoContent(block),digitsRead=digits(read),digitsExpected=digits(entity.geo_location);
   if(digitsRead&&digitsRead===digitsExpected)add("ok","Coordenadas do "+who,"Localização geográfica coincide com a referência de "+entity.name+".",ref(entity));
   else if(digitsRead&&digitsRead.length===digitsExpected.length)add("atencao","Coordenadas do "+who,"Coordenadas lidas "+read.trim()+" divergem das coordenadas de "+entity.name+": "+entity.geo_location+".",ref(entity));
@@ -259,6 +261,8 @@ function registryAudit(){
   .replace(/[^A-Z0-9]+/g," ").replace(/\s+/g," ").trim();
  for(const [title,printed,entity] of [["Endereço completo do produtor",produced,producer],["Endereço completo do comerciante",marketed,merchant]]){
   if(!entity?.address)continue;
+  const addressPrinted=/\b(?:END|ENDERECO|CEP|RUA|RODOVIA|BR\s*[-]?\s*\d{2,3}|LOTE|PROJETO|ESTRADA)\b/i.test(norm(printed));
+  if(!addressPrinted)continue;
   const expected=normalizeAddress(entity.address),actual=normalizeAddress(printed);
   const normalizedStop=new Set(["DE","DO","DA","DAS","DOS","NO","NA","EM","S","N","END","ENDERECO","BRASIL","CEP"]);
   const tokens=distinct(expected.split(" ").filter(x=>x.length>=3&&!normalizedStop.has(x)));
@@ -266,6 +270,15 @@ function registryAudit(){
   const targetNums=distinct(expected.split(" ").filter(x=>/^\d{2,}$/.test(x)));
   const shownNums=actual.split(" ");
   const matchedNums=targetNums.every(x=>shownNums.includes(x));
+  const taggedNumber=(v,label)=>{
+   const pattern=new RegExp("\\b"+label+"\\s*[:#º°N.,-]*\\s*(\\d{1,5})","i");
+   return norm(v).match(pattern)?.[1]||"";
+  };
+  const markers=[["KM","KM"],["LOTE","LOTE"],["N(?:UMERO|RO)?","N(?:UMERO|RO)?"]];
+  const discrepancy=markers.map(([label,pattern])=>({label,expected:taggedNumber(entity.address,pattern),observed:taggedNumber(printed,pattern)}))
+   .find(x=>x.expected&&x.observed&&x.expected!==x.observed);
+  if(discrepancy){add("atencao",title,discrepancy.label+" impresso: "+discrepancy.observed+" · cadastro de "+entity.name+": "+discrepancy.expected+".",ref(entity));continue;}
+
   if(!printed||!/(?:END|ENDERECO|CEP|RUA|RODOVIA|BR|LOTE|PROJETO|FAZENDA)/i.test(norm(printed))){
    add("confirmar",title,"O endereço não foi reconhecido integralmente na foto para comparação com o cadastro.",ref(entity));continue;
   }
