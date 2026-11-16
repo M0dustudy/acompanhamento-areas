@@ -1285,6 +1285,7 @@ function mount(adapter){
  el("vl2-zoom")?.addEventListener("input",e=>{state.crop.scale=Number(e.target.value)/100;drawCrop();});
  el("vl2-archive")?.addEventListener("toggle",e=>{if(e.target.open)fetchArchived();});
  bindFrame();showResult();loadPatterns();loadEntities();fetchHistory();
+ Promise.resolve().then(async()=>{if(!ctx?.canAccess?.())return;await ensureOCR();await getOCRWorker();}).catch(()=>{});
 }
 window.VITRA_LABEL_SMART={mount,catalogCount:catalog.length,reference:"DOC.CQ.056"};
 })();
