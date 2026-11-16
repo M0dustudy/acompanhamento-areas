@@ -8,38 +8,8 @@ const clients=[["expofrut","Expofrut / Novo Rumo",["EXPOFRUT","NOVO RUMO"]],["ca
 const classes=["Campesita","Happy Tree / Extra A","Extra","Sacola","Selecionada","Sabor","Exportação","Outra"];
 
 /* Conferência por foto — interface isolada do piloto administrativo. */
-const producers=[
- ["EXPOFRUT BRASIL","04420687000256",""],
- ["FAZENDA NOVO RUMO","03438392000163","4069453004221"],
- ["AGROFRUTAS QUINTA DOS FERREIRAS","44396716000125","4063651217490"],
- ["BOA SORTE AGRICOLA","45955581000153",""],
- ["C&S GRAPE","32217363000170",""],
- ["FAZENDA ANDORINHAS","01258267000146","4049929471245"],
- ["SAINT RAISIN","52789137000170","4063651803235"],
- ["TERRITORIO DAS FRUTAS","23694327000106","4063061472472"],
- ["FAZENDA POTIGUARA","20658319000116",""],
- ["PURAFRUTA","08112538000108",""],
- ["AGRO COELHO","","4063651790115"],
- ["ANA CARIA STELITANO","","4049928881991"],
- ["ANTONIO AVERLAGEM NUNES CORCINO","","4063651344820"],
- ["EUDES BARBOSA","","4069453297081"],
- ["FABIO PASSOS","","4050373194062"],
- ["FLAVIO ANDRE FELLOWS","","4059883713985"],
- ["FLORINDA DO VALE","","4050373293741"],
- ["FRANCISCO DE ASSIS DE SA CARVALHO","","4063061990754"],
- ["GLEICEMERE BEZERRA","","4063061862044"],
- ["ITAMARA SOUZA","","4069453325159"],
- ["IVAN FERREIRA SOARES","","4063651649888"],
- ["JOSE ANTONIO ROMEIRA COELHO","","4063061376909"],
- ["JOSE DE SOUZA COELHO NETO","","4063061650405"],
- ["JOSE MARIA MENDES","","4049929471436"],
- ["LUZINEIDE NUNES SOARES","","4063061593177"],
- ["MARCIO AMORIM RODRIGUES","","4063651290475"],
- ["MARIA ODETE","","4049928205612"],
- ["NILSON COSTA GUIRAO","","4050373221607"],
- ["VANIA VIDAL SAMPAIO","","4063651803235"],
- ["WILKER OLIVEIRA TORRES","","4063061901446"]
-];
+// Entidades institucionais são consultadas somente no cadastro privado autenticado.
+const producers=[];
 const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{sensitivity:"base"}));
 const state={
  photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",detected:null,
@@ -85,13 +55,13 @@ function validCnpj(raw){
  return check(12)===Number(n[12])&&check(13)===Number(n[13]);
 }
 function parseTrace(value){
- const m=norm(value).replace(/[–—]/g,"-").replace(/\s/g,"").match(/^R-(\d{2})-([0-9A-Z]{1,24})-(\d{2})(\d{2})-([C58])-([A-Z0-9]{2,5})$/);
+ const m=norm(value).replace(/[–—]/g,"-").replace(/\s/g,"").match(/^R-(\d{2})-([0-9A-Z_./]{1,40})-(\d{2})(\d{2})-([C58])-([A-Z0-9]{2,5})$/);
  return m?{year:m[1],areaValve:m[2],area:"",valve:"",day:m[3],month:m[4],method:m[5],variety:m[6]}:null;
 }
 function expectedCode(){
  const x=state.expected;
  if(!x.year||!x.area||!x.valve||!x.day||!x.month||!x.method||!x.variety)return "";
- return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9]/g,"")+norm(x.valve).replace(/[^A-Z0-9]/g,"")+"-"+x.day+x.month+"-"+x.method+"-"+x.variety;
+ return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+x.method+"-"+x.variety;
 }
 function expectedVariety(){
  return varieties.find(x=>x[2]===state.expected.variety)?.[0]||"";
@@ -111,7 +81,7 @@ function extract(raw,barcode){
  const words=rawWords.filter(x=>x!=="expofrut"||!n.includes("COMERCIALIZADO POR")||candidateClients.length===1&&candidateClients[0]==="expofrut");
  const agreed=candidateClients.filter(x=>words.includes(x));
  const foundClient=agreed.length===1?agreed[0]:words.length===1?words[0]:candidateClients.length===1?candidateClients[0]:"";
- const traceMatch=str(raw).match(/\bR[\s\-–—]*(\d{2})[\s\-–—]*([0-9A-Za-z]{2,24})[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z0-9]{2,5})\b/i);
+ const traceMatch=str(raw).match(/\bR[\s\-–—]*(\d{2})[\s\-–—]*([0-9A-Za-z_./]{2,40})[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z0-9]{2,5})\b/i);
  const trace=traceMatch?"R-"+traceMatch[1]+"-"+traceMatch[2].toUpperCase()+"-"+traceMatch[3]+"-"+traceMatch[4].toUpperCase()+"-"+traceMatch[5].toUpperCase():"";
  const track=parseTrace(trace),group=matches.filter(x=>!foundClient||x.client===foundClient);
  const wordVar=varieties.filter(x=>x[3].some(alias=>n.includes(norm(alias))));
@@ -177,7 +147,7 @@ function registryAudit(){
  const marketed=part(/COMERCIALIZADO\s+POR\s*[:\-]?\s*([\s\S]*)/i,/PRODUZIDO\s+POR|RASTREABILIDADE/i);
  const entityName=(fragment,e)=>{
   if(!fragment)return false;
-  const clean=v=>norm(v).replace(/[^A-Z0-9]/g,"");
+  const clean=v=>norm(v).replace(/[^A-Z0-9_./]/g,"");
   const needle=clean(e.name),hay=clean(fragment);
   return needle.length>=10&&hay.includes(needle);
  };
@@ -607,7 +577,7 @@ function showResult(){
  root.querySelectorAll("[data-vl2-trace]").forEach(input=>input.addEventListener("change",e=>{
   const key=e.target.dataset.vl2Trace;
   let value=e.target.value;
-  if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9]/g,"").slice(0,key==="area"?20:16);
+  if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
   state.expected[key]=value;
   if(key==="area"||key==="valve")e.target.value=value;
   if(!state.identity.variety&&key==="variety")state.identity.variety=expectedVariety();
