@@ -340,7 +340,7 @@ function registryAudit(){
   if(!printed||!/(?:END|ENDERECO|CEP|RUA|RODOVIA|BR|LOTE|PROJETO|FAZENDA)/i.test(norm(printed))){
    add("confirmar",title,"O endereço não foi reconhecido integralmente na foto para comparação com o cadastro.",ref(entity));continue;
   }
-  if(matchedNums&&tokens.length>=3&&common.length/tokens.length>=.8){
+  if(matchedNums&&tokens.length>=3&&common.length===tokens.length){
    add("ok",title,"Endereço impresso compatível com a referência de "+entity.name+".",ref(entity));
   }else{
    const postal=cep(printed),known=cep(entity.address);
@@ -821,7 +821,7 @@ async function readPhoto(deep=false){
  state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
  state.ocrConflicts=[];state.ocrPasses=0;showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
- let worker=null,recognized="",barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
+ let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
  const passages=existingPasses;
  const update=message=>{if(seq===state.sequence&&progress)progress.textContent=message;};
  const readPass=async(canvas,ms)=>!worker||seq!==state.sequence?"":str((await limitWork(worker.recognize(canvas),ms,"Tempo de leitura excedido.")).data?.text||"").trim();
@@ -1042,6 +1042,10 @@ function diagnosticV4(){
    else add("ok","Barras e números","O leitor identificou "+bars+" nas barras e os mesmos 13 dígitos foram reconhecidos no texto impresso.");
   }
   if(ean&&eanValid(ean)){
+   const catalogVarieties=distinct(matches.filter(x=>x.client===catalogClient(selected)).map(x=>x.variety).filter(Boolean));
+   const observedVariety=state.detected?.identity?.variety||"";
+   if(observedVariety&&catalogVarieties.length===1&&observedVariety!==catalogVarieties[0])
+    add("error","Variedade incompatível com o código","Etiqueta: "+nameOf(varieties,observedVariety)+" · referência EAN para o cliente: "+nameOf(varieties,catalogVarieties[0])+".");
    const documentedClass=classFromCatalog(),readClass=state.identity.klass||"";
    if(documentedClass&&readClass&&readClass!==documentedClass)
     add(state.ocrConflicts.includes("classificacao")?"pending":"error","Classe incompatível com o EAN","Classe impressa: "+readClass+" · classe autorizada para este EAN e cliente: "+documentedClass+".","DOC.CQ.056 · EAN por cliente");
@@ -1211,7 +1215,7 @@ function showResult(){
  const line=errors.length?errors.length+" divergência(s) entre a etiqueta e as referências disponíveis.":
   checkDone?"Os parâmetros conferidos coincidem com as referências cadastradas.":
   pendings.length?pendings.length+" item(ns) ainda precisam ser comprovados.":"Confirme a referência da produção para concluir.";
- const concise='<section class="vl2-quick-alerts vl2-concise-result" role="status"><div class="vl2-concise-head"><small>CONFERÊNCIA DA ETIQUETA</small><strong>'+esc(head)+'</strong><p>'+esc(line)+'</p></div>'+
+ const concise='<section class="vl2-quick-alerts vl2-concise-result vl2-summary-'+(errors.length?"error":checkDone?"ok":"pending")+'" role="status"><div class="vl2-concise-head"><small>CONFERÊNCIA DA ETIQUETA</small><strong>'+esc(head)+'</strong><p>'+esc(line)+'</p></div>'+
   (errors.length?'<div class="vl2-quick-items">'+errors.slice(0,6).map(x=>'<div><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p></div>').join("")+'</div>':"")+
   (pendings.length?'<div class="vl2-pending-short"><small>A confirmar</small><p>'+esc(pendings.slice(0,6).map(x=>x.title).join(" · "))+'</p></div>':"")+
   '<small>'+(report.ready?"Consulte as verificações completas abaixo.":"A análise é preliminar até confirmar os dados da ordem de produção.")+'</small></section>';
@@ -1226,7 +1230,7 @@ function showResult(){
   outcome='<section class="vl2-decision-prompt"><div class="vl2-reading-head"><div><strong>Conferência da etiqueta</strong><small>O parecer depende das confirmações acima.</small></div></div><p>'+esc(report.ready?"As referências estão preenchidas. Compare agora com a foto.":"Complete as referências da ordem de produção para habilitar a conferência.")+'</p><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?"disabled":"")+'>Conferir dados da etiqueta</button></section>';
  }else{
   const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
-  outcome='<section class="vl2-outcome" id="vl2-outcome"><div class="vl2-status vl2-status-'+report.status+'"><div><small>RESULTADO DA CONFERÊNCIA</small><strong>'+esc(title)+'</strong></div><p>'+esc(report.summary)+'</p></div>'+
+  outcome='<section class="vl2-outcome" id="vl2-outcome">'+
   '<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>'+esc(issues.length?"Itens para corrigir ou confirmar":"Itens conferidos")+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
   (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência encontrada nos dados que puderam ser verificados.</p>')+
   (passed.length?'<details class="vl2-passed"><summary>'+passed.length+' conferência(s) com a referência</summary><div class="vl2-check-list">'+passed.map(item).join("")+'</div></details>':"")+'</section></section>';
