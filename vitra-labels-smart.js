@@ -97,7 +97,7 @@ function expectedVariety(){
 }
 function getEAN(raw){
  const plain=str(raw).replace(/(?:GGN|GLOBALGAP|GLOBAL G A P)\s*:?\s*(\d[\d\s-]{11,20})/gi," ");
- const codes=(plain.match(/(?:\d[\s-]*){13}/g)||[]).map(digits);
+ const codes=(plain.match(/(?<!\d)(?:\d[\s-]*){13}(?!\d)/g)||[]).map(digits);
  const matches=codes.filter(x=>catalog.some(p=>p.barcode===x));
  return matches.find(eanValid)||codes.find(eanValid)||matches[0]||"";
 }
