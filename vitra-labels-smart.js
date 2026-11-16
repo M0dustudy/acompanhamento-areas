@@ -115,7 +115,7 @@ function extract(raw,barcode){
  else if(wG&&b&&!printedCnpj&&!printedGgn)kind="cumbuca"+wG;
  else if(!boxEvidence&&b&&state.photoAspect>0&&state.photoAspect<1.72)kind=wG?"cumbuca"+wG:"cumbuca";
  else if(boxEvidence&&state.photoAspect>1.25)kind="caixa";
- const shapeSuggestion=Boolean(kind&&!boxEvidence&&!explicitCumbuca&&!explicitCinta&&!catalogKind.some(Boolean)&&!/\\bSELO\\b/.test(n));
+ const shapeSuggestion=Boolean(kind&&!boxEvidence&&!explicitCumbuca&&!explicitCinta&&!catalogKind.some(Boolean)&&!/\bSELO\b/.test(n));
  // Códigos 20/21 identificam a embalagem, mas não comprovam o tamanho físico da etiqueta.
  const dateMatch=str(raw).match(/\b([0-3]?\d)[.\/-]([01]?\d)[.\/-]((?:20)?\d{2})\b/);
  const date=dateMatch?dateMatch[1].padStart(2,"0")+"/"+dateMatch[2].padStart(2,"0")+"/"+(dateMatch[3].length===2?"20"+dateMatch[3]:dateMatch[3]):track?track.day+"/"+track.month+"/20"+track.year:"";
@@ -208,6 +208,30 @@ function registryAudit(){
    readCities[0]===expectedCity?"Município impresso coincide com "+entity.name+".":"Município lido: "+readCities[0]+"; cadastro de "+entity.name+": "+expectedCity+".",ref(entity));
   }else if(/(?:ENDERECO|ENDEREÇO|END:|CEP:)/i.test(block)&&!cep(block)){
    add("confirmar",label,"Endereço presente, mas sem leitura confiável para comparação.",ref(entity));
+  }
+ }
+ const normalizeAddress=v=>norm(v)
+  .replace(/\bBR\s*[-–]?\s*(\d{2,3})/g,"BR $1")
+  .replace(/\bKM\s*[-–]?\s*(\d+)/g,"KM $1")
+  .replace(/[^A-Z0-9]+/g," ").replace(/\s+/g," ").trim();
+ for(const [title,printed,entity] of [["Endereço completo do produtor",produced,producer],["Endereço completo do comerciante",marketed,merchant]]){
+  if(!entity?.address)continue;
+  const expected=normalizeAddress(entity.address),actual=normalizeAddress(printed);
+  const normalizedStop=new Set(["DE","DO","DA","DAS","DOS","NO","NA","EM","S","N","END","ENDERECO","BRASIL","CEP"]);
+  const tokens=distinct(expected.split(" ").filter(x=>x.length>=3&&!normalizedStop.has(x)));
+  const common=tokens.filter(x=>actual.split(" ").includes(x));
+  const targetNums=distinct(expected.split(" ").filter(x=>/^\d{2,}$/.test(x)));
+  const shownNums=actual.split(" ");
+  const matchedNums=targetNums.every(x=>shownNums.includes(x));
+  if(!printed||!/(?:END|ENDERECO|CEP|RUA|RODOVIA|BR|LOTE|PROJETO|FAZENDA)/i.test(norm(printed))){
+   add("confirmar",title,"O endereço não foi reconhecido integralmente na foto para comparação com o cadastro.",ref(entity));continue;
+  }
+  if(matchedNums&&tokens.length>=3&&common.length/tokens.length>=.8){
+   add("ok",title,"Endereço impresso compatível com a referência de "+entity.name+".",ref(entity));
+  }else{
+   const postal=cep(printed),known=cep(entity.address);
+   if(postal&&known&&postal!==known)add("atencao",title,"CEP impresso "+postal+" difere de "+known+" no cadastro de "+entity.name+".",ref(entity));
+   else add("confirmar",title,"O endereço não pôde ser conferido por completo. Confira rua/rodovia, número ou lote, localidade e CEP de "+entity.name+".",ref(entity));
   }
  }
  return {rows:out,producer,merchant};
