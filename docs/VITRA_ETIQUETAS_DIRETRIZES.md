@@ -122,3 +122,12 @@ Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes
 - Não alterar nem excluir avaliações anteriores, fotos, códigos ou catálogos para acelerar a conferência. Toda alteração das regras deve permitir verificar os fundamentos de cada inferência.
 
 **Validação em uso ainda necessária:** testar etiqueta pequena de duas linhas, caixa sem EAN, cumbucas de clientes diferentes que compartilham EAN, divergências de classe e de pesagem, fotos com cores distintas e falhas de OCR em celular. A revisão do código não substitui esses testes físicos.
+
+
+### Interface v10 — referência de produção em um campo
+
+- O caminho principal aceita colar/digitar **um código de rastreabilidade completo da ordem de produção**, reduzindo o formulário. As partes individuais permanecem acessíveis em uma seção recolhida, para casos sem código completo.
+- A referência completa é obrigatoriamente **independente da fotografia**; o programa nunca a preenche com a rastreabilidade lida na etiqueta. Em cumbucas, o método C/5/8 é desconsiderado apenas na comparação em que o manual dispensa informar esse método; nos demais modelos, é verificado integralmente.
+- Código informado com formato inválido não habilita aprovação, mesmo que os demais campos antigos estejam preenchidos. A edição de uma das partes limpa o código completo anterior para impedir duas referências contraditórias.
+- Na interface, uma mesma sequência EAN aparece uma única vez. A checagem técnica e o histórico preservam a distinção entre barras lidas e dígitos impressos. Sem ambas as leituras, a aprovação da cumbuca permanece pendente.
+- Há uma ação explícita para guardar fotografias de modelos desconhecidos ou de leitura falha como **amostras pendentes**. Amostras não entram no catálogo aprovado; exigem estudo e validação humana antes de virar regra.
