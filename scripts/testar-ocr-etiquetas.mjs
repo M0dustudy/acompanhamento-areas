@@ -26,7 +26,8 @@ assert(!t.shouldScanOCRBands("PRODUZIDO POR\nCNPJ: 12345678901234\n"+trace));
 assert(t.shouldScanOCRBands("PRODUZIDO POR\nCNPJ:\n"+trace));
 assert(t.shouldScanOCRBands("PRODUZIDO POR\nCNPJ: 12345678901234\n"));
 assert(t.shouldScanOCRBands("UVA VITORIA\n"+trace,true));
-assert(!t.shouldScanOCRBands("UVA VITORIA\n"+trace));
+assert(t.shouldScanOCRBands("UVA VITORIA\n"+trace)); // Variedade divergente do sufixo SR; precisa reexaminar.
+assert(!t.shouldScanOCRBands("UVA VITORIA\nR-26-109A5-1611-5-VI"));
 assert(t.mergeOCRPassages(["LOTE 123\n"+trace,"GGN 1234567890123\n"+trace]).includes("GGN"));
 const a="PRODUZIDO POR FAZENDA TESTE\nCNPJ: 12345678000190\nGGN: 1234567890123";
 const b="PRODUZIDO POR FAZENDA TESTE\nCNPJ: 12345678000191\nGGN: 1234567890123";
