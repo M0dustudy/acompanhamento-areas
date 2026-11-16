@@ -178,6 +178,16 @@ function extract(raw,barcode){
   producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high"
  };
 }
+function canonicalCoordinates(value){
+ const normalized=norm(value).replace(/[’‘′]/g,"'").replace(/[“”″]/g,'"');
+ const matches=[...normalized.matchAll(/(\d{1,3})\s*[°º]\s*(\d{1,2})\s*'?\s*(\d{1,2})\s*"?\s*([NSEWO])/g)];
+ if(matches.length!==2)return null;
+ const pieces=matches.map(m=>({degree:Number(m[1]),minute:Number(m[2]),second:Number(m[3]),direction:m[4]==="O"?"W":m[4]}));
+ const lat=pieces[0],long=pieces[1];
+ if(!["N","S"].includes(lat.direction)||!["E","W"].includes(long.direction)||
+    lat.degree>90||long.degree>180||pieces.some(x=>x.minute>=60||x.second>=60))return null;
+ return pieces.map(p=>[p.degree,p.minute,p.second,p.direction].join(":")).join("|");
+}
 function registryAudit(){
  const out=[],f=state.fields,rows=state.entities;
  const add=(type,title,body,reference="DOC.CQ.056")=>out.push({type,title,body,reference});
@@ -250,15 +260,19 @@ function registryAudit(){
  };
  compareGLN("GLN do produtor",f.gln,producer);
  compareGLN("GLN do comerciante",f.glnComercial,merchant);
- const geoContent=(block)=>norm(block).match(/LOCALIZACAO\s+GEOGRAFICA\s*[:\-]?\s*([0-9°'’"”“\sSNWE.,-]{9,60})/)?.[1]||"";
+ const geoContent=(block)=>norm(block).match(/LOCALIZACAO\s+GEOGRAFICA\s*[:\-]?\s*([0-9°º'’′"”“″\sSNWEO.,+-]{9,80})/)?.[1]||"";
+ // Comparar números E hemisférios: a mesma sequência de dígitos com N/S ou E/W trocados é divergência.
  for(const [who,block,entity] of [["produtor",produced,producer],["comerciante",marketed,merchant]]){
   const geoPrinted=/LOCALIZA(?:C|Ç)(?:A|Ã)O\s+GEOGRAFICA/i.test(norm(block));
   if(!geoPrinted)continue;
   if(!entity?.geo_location){add("confirmar","Coordenadas do "+who,"A etiqueta contém coordenadas geográficas, mas o cadastro da empresa não possui uma referência para confirmá-las.",entity?ref(entity):"Cadastro institucional");continue;}
-  const read=geoContent(block),digitsRead=digits(read),digitsExpected=digits(entity.geo_location);
-  if(digitsRead&&digitsRead===digitsExpected)add("ok","Coordenadas do "+who,"Localização geográfica coincide com a referência de "+entity.name+".",ref(entity));
-  else if(digitsRead&&digitsRead.length===digitsExpected.length)add("atencao","Coordenadas do "+who,"Coordenadas lidas "+read.trim()+" divergem das coordenadas de "+entity.name+": "+entity.geo_location+".",ref(entity));
-  else add("confirmar","Coordenadas do "+who,"A localização geográfica de "+entity.name+" consta na referência, mas não foi possível comparar todos os caracteres impressos.",ref(entity));
+  const read=geoContent(block),actual=canonicalCoordinates(read),reference=canonicalCoordinates(entity.geo_location);
+  if(actual&&reference&&actual===reference)
+   add("ok","Coordenadas do "+who,"Graus, minutos, segundos e hemisférios coincidem com a referência de "+entity.name+".",ref(entity));
+  else if(actual&&reference)
+   add("atencao","Coordenadas do "+who,"Lido: "+read.trim()+" · cadastrado para "+entity.name+": "+entity.geo_location+". Confira os hemisférios e os números.",ref(entity));
+  else
+   add("confirmar","Coordenadas do "+who,"A localização geográfica não foi lida integralmente em graus, minutos, segundos e hemisférios; não pode ser aprovada.",ref(entity));
  }
 
  const cep=v=>digits((str(v).match(/(?:CEP)\s*[:\-]?\s*(\d{5}[-\s]?\d{3})/i)||[])[1]||"");
