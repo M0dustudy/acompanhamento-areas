@@ -17,6 +17,7 @@ jobs:
           sparse-checkout: |
             index.html
             visualizador.html
+            vitra-labels-smart.js
             scripts
       - uses: actions/setup-node@v7
         with:
@@ -24,3 +25,5 @@ jobs:
           package-manager-cache: false
       - name: Verificar integridade sem alterar registros
         run: node scripts/validar-vitra.mjs
+      - name: Conferir reconhecimento e regras de etiquetas
+        run: node scripts/testar-ocr-etiquetas.mjs
