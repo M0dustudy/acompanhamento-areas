@@ -790,7 +790,7 @@ function traceBuilder(){
   '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
   (box?'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>':"")+
   '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
-  '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-'", "-'-")):"Preenchimento incompleto")+'</strong></div></div>'+
+  '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
 }
 function fact(label,value,source){
