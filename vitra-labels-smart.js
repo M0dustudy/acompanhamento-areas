@@ -526,26 +526,63 @@ function correctionPanel(){
     '<label>'+esc(x[1])+'<input data-vl2-field="'+x[0]+'" value="'+esc(state.fields[x[0]]||"")+'"></label>').join("")+'</div>'+
   '<details class="vl2-raw"><summary>Texto bruto extraído</summary><pre>'+esc(state.text||"Sem leitura")+'</pre></details></details>';
 }
+function diagnose(){
+ const issues=computeIssues(),additional=[],f=state.fields,client=state.identity.client,expected=expectedCode(),model=state.identity.kind;
+ const add=(type,title,body)=>additional.push({type,title,body});
+ if(state.photo){
+  if(!state.catalogLoaded)add("confirmar","Catálogo","Não foi possível consultar os padrões confirmados no banco de dados.");
+  if(!f.barcode)add("confirmar","Código de barras","Não reconhecido; o cliente e o modelo não podem ser confirmados pelo EAN.");
+  else if(!eanValid(f.barcode)){} // já sinalizado pelo validador
+  else{
+   const matched=state.matches.filter(x=>x.client===client);
+   if(!matched.length)add("confirmar","Modelo do cliente","O código de barras não está vinculado ao cliente escolhido nas referências disponíveis. Pode exigir autorização de uso do código da fazenda.");
+   else if(matched.length&&state.detected?.codeClients?.length>1&&!state.detected?.wordClients?.includes(client))add("confirmar","Cliente pelo código","EAN utilizado por mais de um cliente; a marca precisa ser confirmada na própria etiqueta.");
+  }
+  if(!state.identity.variety)add("confirmar","Variedade","Não foi possível confirmar a variedade por texto, sigla ou referência comercial.");
+  if(model==="caixa"&&!state.identity.klass)add("confirmar","Classificação","A classe da caixa não foi identificada na foto nem no modelo do cliente.");
+  if(model==="caixa"&&!f.ggn&&!f.cnpj)add("confirmar","Identificação do produtor","CNPJ ou GGN não foram reconhecidos; não é possível validar dados fixos do produtor.");
+  if(/\b(?:LOTE|LOT)\b/i.test(state.text)&&!f.lote)add("confirmar","Lote","A palavra lote aparece na etiqueta, mas o número não foi recuperado.");
+  if(!expected||!f.rastreio){} // o validador já registra a pendência
+  if(["barcode","rastreio","cnpj","cnpjComercial","ggn"].some(key=>state.sources[key]==="Corrigido manualmente"))add("confirmar","Leitura retificada","Foi corrigido manualmente um identificador. Confira o número na foto antes de validar.");
+ }
+ const all=issues.concat(additional.map(x=>[x.type,x.title,x.body]));
+ const errors=all.filter(x=>x[0]==="atencao"),pending=all.filter(x=>x[0]==="confirmar");
+ const checks=[
+  ...all.map(x=>({status:x[0]==="atencao"?"error":"pending",title:x[1],detail:x[2]})),
+  ...(state.referenceChecks||[]).filter(x=>x.type==="ok").map(x=>({status:"ok",title:x.title,detail:x.body,reference:x.reference}))
+ ];
+ if(state.photo){
+  if(f.barcode&&eanValid(f.barcode)&&state.matches.some(x=>x.client===client))checks.push({status:"ok",title:"Código de barras",detail:"EAN-13 validado e localizado na referência do cliente."});
+  if(expected&&f.rastreio&&norm(expected)===norm(f.rastreio))checks.push({status:"ok",title:"Rastreabilidade",detail:"Código informado corresponde à sequência lida na etiqueta."});
+  if(model)checks.push({status:"ok",title:"Tipo identificado",detail:nameOf(kinds,model)+" identificado na imagem ou no catálogo; confirme o aspecto do modelo."});
+ }
+ const status=!state.photo?"inicial":errors.length?"reprovado":pending.length?"pendente":"aprovado";
+ const summary=status==="reprovado"
+  ?errors.length+" divergência(s) detectada(s). "+errors.slice(0,2).map(x=>x[1]).join(" e ")+". Confira os itens antes de utilizar a etiqueta."
+  :status==="pendente"?"A leitura ainda não permite validar todos os dados exigidos. "+pending.length+" item(ns) precisam de confirmação."
+  :status==="aprovado"?"Os dados reconhecidos coincidem com as referências consultadas. A aplicação física e a ordem de produção ainda exigem conferência.":"Posicione uma única etiqueta na câmera para iniciar o diagnóstico.";
+ return {status,summary,checks,errors:errors.length,pending:pending.length,ok:checks.filter(x=>x.status==="ok").length,referenceComplete:status==="aprovado"&&state.refsLoaded&&state.catalogLoaded};
+}
 function showResult(){
  const root=el("vl2-results");if(!root)return;
- state.issues=computeIssues();
- const alerts=state.issues.filter(x=>x.type==="atencao"),pending=state.issues.filter(x=>x.type==="confirmar");
- const overall=!state.photo?"Pronto para começar":alerts.length?"Divergências encontradas":pending.length?"Conferência pendente":"Nenhuma divergência identificada";
- const count=state.photo?'<span>'+alerts.length+' divergência(s) · '+pending.length+' pendência(s)</span>':"";
- const status='<div class="vl2-status '+(alerts.length?"vl2-alert":pending.length?"vl2-partial":"")+'"><div><small>CONFERÊNCIA DA ETIQUETA</small><strong>'+overall+'</strong></div>'+count+'</div>';
- const issues=state.issues.length?'<div class="vl2-alerts">'+state.issues.map(x=>'<div class="vl2-message vl2-'+x.type+'"><strong>'+esc(x.title)+'</strong><p>'+esc(x.body)+'</p></div>').join("")+'</div>':"";
+ const report=diagnose();state.diag=report;
+ const title=report.status==="aprovado"?"Aprovado na leitura":report.status==="reprovado"?"Reprovado: divergências detectadas":report.status==="pendente"?"Conferência pendente":"Aguardando fotografia";
+ const count=state.photo?'<span>'+report.errors+' divergência(s) · '+report.pending+' pendência(s) · '+report.ok+' conferência(s)</span>':"";
+ const status='<div class="vl2-status vl2-status-'+report.status+'"><div><small>DIAGNÓSTICO DA ETIQUETA</small><strong>'+title+'</strong></div>'+count+'<p>'+esc(report.summary)+'</p></div>';
+ const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
+ const checks=state.photo?'<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Verificações</strong><small>'+report.checks.length+' itens analisados</small></div>'+
+   '<div class="vl2-check-list">'+visual.map(x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>').join("")+'</div></section>':"";
+ const verification=state.photo?'<details class="vl2-read-panel"><summary>Consultar todos os dados lidos</summary>'+detailsView()+'</details>':detailsView();
  const canSave=state.photo&&state.identity.client&&state.clientConfirmed&&(state.identity.variety||expectedVariety())&&state.identity.kind&&expectedCode();
- root.innerHTML=clientChooser()+traceBuilder()+status+detailsView()+issues+
-  correctionPanel()+'<section class="vl2-closeout"><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a etiqueta com o modelo aprovado e a ordem de produção.</span></label>'+
-  '<textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea>'+
-  '<button type="button" class="vl2-save" id="vl2-save" '+(!canSave||state.saved?"disabled":"")+'>'+(state.saved?"Conferência já salva":"Salvar conferência")+'</button></section>';
+ root.innerHTML=status+clientChooser()+traceBuilder()+checks+verification+
+ correctionPanel()+'<section class="vl2-closeout"><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a fotografia, o modelo aprovado e a ordem de produção. Este registro não substitui a liberação física.</span></label>'+
+ '<textarea id="vl2-notes" rows="2" placeholder="Observação da conferência (opcional)">'+esc(state.notes)+'</textarea>'+
+ '<button type="button" class="vl2-save" id="vl2-save" '+(!canSave||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Salvar diagnóstico no histórico")+'</button></section>';
  el("vl2-client-search")?.addEventListener("input",e=>{
-  const t=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(t));
+  const search=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(search));
  });
- root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{
-  state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;showResult();
- }));
- root.querySelectorAll("[data-vl2-trace]").forEach(inp=>inp.addEventListener("change",e=>{
+ root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;showResult();}));
+ root.querySelectorAll("[data-vl2-trace]").forEach(input=>input.addEventListener("change",e=>{
   const key=e.target.dataset.vl2Trace;
   let value=e.target.value;
   if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9]/g,"").slice(0,key==="area"?20:16);
@@ -554,21 +591,16 @@ function showResult(){
   if(!state.identity.variety&&key==="variety")state.identity.variety=expectedVariety();
   showResult();
  }));
- root.querySelectorAll("[data-vl2-identity]").forEach(input=>input.addEventListener("change",e=>{
-  state.identity[e.target.dataset.vl2Identity]=e.target.value;showResult();
- }));
+ root.querySelectorAll("[data-vl2-identity]").forEach(inp=>inp.addEventListener("change",e=>{state.identity[e.target.dataset.vl2Identity]=e.target.value;showResult();}));
  root.querySelectorAll("[data-vl2-search-choice]").forEach(inp=>inp.addEventListener("input",e=>{
- const query=norm(e.target.value);
- e.target.closest(".vl2-lookup-pop").querySelectorAll("[data-pick-label]").forEach(b=>b.hidden=!b.dataset.pickLabel.includes(query));
+  const search=norm(e.target.value);e.target.closest(".vl2-lookup-pop").querySelectorAll("[data-pick-label]").forEach(b=>b.hidden=!b.dataset.pickLabel.includes(search));
  }));
- root.querySelectorAll("[data-vl2-option-trace]").forEach(btn=>btn.addEventListener("click",()=>{
- const key=btn.dataset.vl2OptionTrace;state.expected[key]=btn.dataset.pickValue;
- if(key==="variety"&&!state.identity.variety)state.identity.variety=expectedVariety();showResult();
+ root.querySelectorAll("[data-vl2-option-trace]").forEach(b=>b.addEventListener("click",()=>{
+  const key=b.dataset.vl2OptionTrace;state.expected[key]=b.dataset.pickValue;
+  if(key==="variety"&&!state.identity.variety)state.identity.variety=expectedVariety();showResult();
  }));
- root.querySelectorAll("[data-vl2-option-identity]").forEach(btn=>btn.addEventListener("click",()=>{
- state.identity[btn.dataset.vl2OptionIdentity]=btn.dataset.pickValue;showResult();
- }));
- root.querySelectorAll("[data-vl2-field]").forEach(input=>input.addEventListener("change",e=>{
+ root.querySelectorAll("[data-vl2-option-identity]").forEach(b=>b.addEventListener("click",()=>{state.identity[b.dataset.vl2OptionIdentity]=b.dataset.pickValue;showResult();}));
+ root.querySelectorAll("[data-vl2-field]").forEach(inp=>inp.addEventListener("change",e=>{
   state.fields[e.target.dataset.vl2Field]=e.target.value.trim();state.sources[e.target.dataset.vl2Field]="Corrigido manualmente";showResult();
  }));
  el("vl2-verified")?.addEventListener("change",e=>state.reviewed=e.target.checked);
