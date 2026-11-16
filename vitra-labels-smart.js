@@ -1152,9 +1152,10 @@ function showResult(){
   return;
  }
  if(state.analysisError&&!state.text&&!state.barcodeBars){
-  root.innerHTML='<section class="vl2-reading-failure" role="status"><strong>Não foi possível ler esta etiqueta</strong><p>'+esc(state.analysisError)+'</p><p>A foto continua disponível. Confira a orientação, aproxime a etiqueta ou tente novamente.</p><button type="button" id="vl2-retry-read">Tentar leitura novamente</button></section>'+
+  root.innerHTML='<section class="vl2-reading-failure" role="status"><strong>Não foi possível ler esta etiqueta</strong><p>'+esc(state.analysisError)+'</p><p>A foto continua disponível. Confira a orientação, aproxime a etiqueta ou tente novamente.</p><button type="button" id="vl2-retry-read">Tentar leitura novamente</button><button type="button" id="vl2-deep-failure" class="vl2-retry-deep">Reexaminar em alta resolução</button></section>'+
    (state.sampleSaved?'<p class="vl2-hint">Fotografia registrada como amostra pendente, sem aprovação.</p>':'<details class="vl2-refine vl2-sample"><summary>Guardar esta etiqueta para ampliar o catálogo</summary><p class="vl2-refine-hint">A foto fica armazenada para estudo. Nenhuma informação ilegível será aprovada.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>');
   el("vl2-retry-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto().finally(()=>{state.processing=false;});});
+  el("vl2-deep-failure")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto(true).finally(()=>{state.processing=false;});});
   el("vl2-save-sample")?.addEventListener("click",saveSample);
   return;
  }
