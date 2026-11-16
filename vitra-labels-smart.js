@@ -915,6 +915,11 @@ function diagnosticV4(){
    else add("ok","Barras e números","O leitor identificou "+bars+" nas barras e os mesmos 13 dígitos foram reconhecidos no texto impresso.");
   }
   if(ean&&eanValid(ean)){
+   const documentedClass=classFromCatalog(),readClass=state.identity.klass||"";
+   if(documentedClass&&readClass&&readClass!==documentedClass)
+    add("error","Classe incompatível com o EAN","Classe impressa: "+readClass+" · classe autorizada para este EAN e cliente: "+documentedClass+".","DOC.CQ.056 · EAN por cliente");
+   else if(documentedClass&&readClass)
+    add("ok","Classe e EAN","A classe impressa "+readClass+" confere com o catálogo do código.");
    if(selected?.startsWith("cia-"))add("pending","Padrão regional da CIA PA","O manual apresenta as unidades SP, RJ, PE e CE, mas o catálogo disponível não especifica a autorização do código por filial.");
    if(!matches.length)add("pending","EAN sem padrão aprovado","EAN-13 "+ean+" válido, mas não localizado no catálogo de clientes ou produtores autorizados.");
    else if(selected&&state.clientConfirmed&&!owners.includes(catalogClient(selected))){
@@ -1306,7 +1311,7 @@ async function saveReview(){
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
   verification:{workflowVersion:5,validated:true,referenceComplete:true,barcodeOrigin:"photo",reviewedByHuman:true}};
  const payload={client:state.identity.client,variety:state.identity.variety||state.detected?.identity?.variety||expectedVariety(),
-  label_kind:state.identity.kind,label_class:category()==="box"?(state.identity.klass||""):"",
+  label_kind:state.identity.kind,label_class:state.identity.klass||"",
   packaging:nameOf(kinds,state.identity.kind),review_status:"conferido",
   detected_text:state.text.slice(0,12000),fields,
   checklist:report.checks.filter(x=>x.status!=="ok").map(x=>[x.status==="error"?"atencao":"pendente",x.title,x.detail]),
