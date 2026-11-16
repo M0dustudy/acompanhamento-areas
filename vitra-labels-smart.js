@@ -17,7 +17,7 @@ const state={
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0,ocrRawPassages:[]
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -48,7 +48,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
- state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.reviewRequested=false;state.kindConfirmed=false;
+ state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -474,7 +474,7 @@ function invalidatePhotoReading(){
  state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.barcodeRegion=null;
  state.detected=null;state.fields={};state.sources={};state.matches=[];state.referenceChecks=[];
  state.referenceProducer=null;state.referenceMerchant=null;
- state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.analysisError="";
+ state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.analysisError="";
  state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;
  state.identity.kind="";state.identity.variety="";state.identity.klass="";
 }
@@ -734,11 +734,27 @@ function ocrTraceCandidates(raw){
  return distinct([...str(raw).matchAll(re)].map(m=>"R-"+m[1]+"-"+m[2].toUpperCase()+"-"+m[3]+"-"+m[4].toUpperCase()+"-"+m[5].toUpperCase()));
 }
 function ocrConflictKeys(passages){
- const values={rastreio:ocrTraceCandidates(passages.join("\n"))};
+ const values={rastreio:ocrTraceCandidates(passages.join("\n")),data:distinct(passages.map(p=>extract(p,"").printedDate).filter(Boolean)),classificacao:distinct(passages.map(p=>extract(p,"").identity.klass).filter(Boolean))};
  for(const key of ["cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial"]){
   values[key]=distinct(passages.filter(Boolean).map(p=>extract(p,"").fields[key]).filter(Boolean));
  }
  return Object.entries(values).filter(([key,list])=>list.length>1).map(([key])=>key);
+}
+function supplementExtractedFields(data,passages,barcode){
+ const fields=["rastreio","cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial","lote"];
+ const candidates=passages.map(text=>extract(text,barcode).fields);
+ for(const key of fields){
+  const readings=distinct(candidates.map(x=>x[key]).filter(Boolean));
+  if(!data.fields[key]&&readings.length===1){
+   data.fields[key]=readings[0];
+   data.sources[key]="Leitura ampliada da fotografia";
+  }
+ }
+ const printed=distinct(passages.map(x=>extract(x,barcode).printedDate).filter(Boolean));
+ if(!data.printedDate&&printed.length===1){
+  data.printedDate=printed[0];data.fields.data=printed[0];data.sources.data="Leitura ampliada da fotografia";
+ }
+ return data;
 }
 function mergeOCRPassages(passages){
  const seen=new Set(),out=[];
@@ -819,7 +835,7 @@ async function readPhoto(deep=false){
    }
   }catch(e){failure=e?.message||"Reconhecimento não concluído.";}
   if(seq!==state.sequence)return;
-  state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;
+  state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;state.ocrRawPassages=passages.slice();
   const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
   if(!likelyBox){update("Decodificando o código de barras…");barcode=await limitWork(scanBarcode(photo,seq),10500,"Tempo de leitura do código de barras excedido.").catch(()=>"");}
   if(seq!==state.sequence)return;
@@ -834,7 +850,7 @@ async function readPhoto(deep=false){
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
    try{
-    const data=extract(recognized,barcode);
+    const data=supplementExtractedFields(extract(recognized,barcode),passages,barcode);
     state.text=recognized;state.barcode=barcode||data.fields.barcode;
     state.barcodeBars=barcode;state.barcodePrinted=printedNumber||getEAN(recognized);
     state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
