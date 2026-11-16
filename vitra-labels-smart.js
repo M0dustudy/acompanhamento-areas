@@ -396,6 +396,7 @@ function traceBuilder(){
  const month=Array.from({length:12},(_,i)=>[String(i+1).padStart(2,"0"),String(i+1).padStart(2,"0")]);
  const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(x=>[x,x]);
  const varietiesCodes=varieties.filter(x=>x[2]).slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(x=>[x[2],x[1]]);
+ const siteAreas=(()=>{try{return typeof A==="object"&&A?Object.keys(A).map(digits).filter(x=>x.length>=3&&x.length<=5):[];}catch{return [];}})();
  const expected=expectedCode(),observed=state.fields.rastreio||"";
  const same=expected&&observed&&norm(expected)===norm(observed);
  const status=expected?(observed?(same?"Conferida: códigos correspondem":"Divergência com a foto"):"Referência completa; aguardando leitura da foto"):"Selecione os campos da produção";
@@ -404,7 +405,7 @@ function traceBuilder(){
   '<div class="vl2-trace-grid">'+
   '<label>Prefixo<input readonly value="R" aria-label="Prefixo R"></label>'+
   '<label>Ano'+traceOptions(years,"year","Ano")+'</label>'+
-  '<label class="vl2-trace-area">Área<input data-vl2-trace="area" inputmode="numeric" maxlength="5" list="vl2-areas" value="'+esc(state.expected.area)+'" placeholder="Ex.: 0210"><datalist id="vl2-areas">'+distinct([state.detected?.track?.area,...(state.history||[]).map(x=>parseTrace(x?.fields?.rastreio||"")?.area)]).filter(Boolean).map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist></label>'+
+  '<label class="vl2-trace-area">Área<input data-vl2-trace="area" inputmode="numeric" maxlength="5" list="vl2-areas" value="'+esc(state.expected.area)+'" placeholder="Ex.: 0210"><datalist id="vl2-areas">'+distinct([...siteAreas,state.detected?.track?.area,...(state.history||[]).map(x=>parseTrace(x?.fields?.rastreio||"")?.area)]).filter(Boolean).map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist></label>'+
   '<label>Válvula'+traceOptions(letters,"valve","Válvula")+'</label>'+
   '<label>Dia'+traceOptions(day,"day","Dia")+'</label>'+
   '<label>Mês'+traceOptions(month,"month","Mês")+'</label>'+
