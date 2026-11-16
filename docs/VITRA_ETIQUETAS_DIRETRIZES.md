@@ -145,3 +145,33 @@ Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes
 - A rastreabilidade da ordem de produção é fonte **independente** da foto. Diferença comprovada reprova; dúvida de OCR permanece pendente.
 - O histórico guarda o número de passagens e os campos com leituras conflitantes. Fotografias e registros anteriores permanecem preservados.
 - O teste automatizado scripts/testar-ocr-etiquetas.mjs protege extração de rastreabilidade, documentos e bloqueios de aprovação, mas não mede a qualidade com fotos reais. A leitura em celulares, etiquetas pequenas, cores diferentes e impressões pouco legíveis continua pendente de ensaios físicos.
+
+
+## Redesenho operacional da conferência — 16/11/2026, versão v16
+
+### Problemas que motivaram a revisão
+- O campo de digitar a rastreabilidade completa foi rejeitado no uso. Restaurar o formulário estruturado com ano, área, válvula, dia, mês, modalidade quando aplicável e variedade visíveis.
+- As leituras em faixas adicionais estavam sendo disparadas mesmo quando a fotografia já oferecia identificadores suficientes, causando espera desnecessária em conferências repetidas.
+- O resumo inicial priorizava o CNPJ de origem, deixando em segundo plano o parecer completo e as eventuais divergências da comercialização, dos endereços e de outros campos.
+- Variedades impressas podiam não ser reconhecidas como nome ou sigla; deve-se procurar evidência na fotografia, no código de modelo e no EAN autorizado, mantendo a distinção entre reconhecimento fotográfico e dado cadastrado.
+
+### Comportamento atual
+- Mostrar primeiro uma **conclusão única**, com quantidade de divergências e pendências, e os campos divergentes em leitura rápida. O detalhamento completo permanece disponível.
+- Conferir produtor e comercializador separadamente, incluindo documentos, endereço, CEP e localização geográfica quando houver esses dados e referências documentais. Nunca concluir que campo não existe apenas porque o OCR não o reconheceu.
+- Para a variedade, consultar nome impresso, código final de rastreabilidade, sigla do modelo de embalagem e catálogo de EAN. Quando fontes independentes forem incompatíveis, bloquear aprovação e apresentar divergência, sem escolher uma fonte arbitrariamente.
+- **Leitura rápida:** uma passagem integral com dimensão limitada; só executar automaticamente uma passagem adicional em região ampliada quando faltar informação importante. OCR profundo, com mais regiões, é opcional e reaproveita resultados já encontrados.
+- Mantém-se o motor OCR local por Tesseract.js; não foi acrescentado serviço externo, licença paga ou transferência não prevista de fotografias. A primeira carga de linguagem ainda pode ser mais lenta que as leituras seguintes.
+- Pequenas fotografias podem ser ampliadas moderadamente antes do reconhecimento. A qualidade real continua dependente do foco, da iluminação e da quantidade de pixels nos caracteres.
+- O código do modelo pode identificar caixa/sacola, e o EAN com texto e ausência de indicadores de caixa pode sugerir cumbuca estreita; sugestões baseadas apenas em forma permanecem sujeitas a confirmação.
+- Comparar todos os componentes documentados do endereço para classificá-lo como integralmente conferido. Leitura parcial ou ambígua não equivale a aprovação.
+- Proteger registros históricos, fotos e padrões. Registros legados sem a verificação da versão atual não devem ser apresentados como aprovações recentes.
+
+### Referências de desenho consultadas
+- Scandit Smart Label Capture / MatrixScan Batch: captura em alto volume e feedback visual de ocorrências (https://docs.scandit.com/sdks/web/batch-scanning/).
+- Google ML Kit Text Recognition: exigência de pixels por caractere e dimensionamento adequado para OCR móvel (https://developers.google.com/ml-kit/vision/text-recognition/v2/android).
+- Amazon Textract e Google Document AI: separação entre reconhecimento, vínculo do campo e valor, nível de confiança e revisão de exceções; **não foram integrados ao VITRA** (https://aws.amazon.com/textract/features/ e https://docs.cloud.google.com/document-ai/docs/custom-extractor-overview).
+
+### Verificação e limites
+- A integridade das avaliações históricas é checada pelo fluxo automático no GitHub.
+- Testes não fotográficos exercitam identificação de variedade, reconhecimento de modelos, formulário e uma passagem OCR quando a leitura simulada está completa, com segunda passagem seletiva quando não está.
+- **Não declarar taxa de acerto nem tempo real por etiqueta sem ensaio com fotos e celulares da operação.** O resultado verdadeiro só pode ser confirmado com exemplos reais de todas as famílias e tamanhos de etiqueta. Em caso de dúvida, apresentar pendência e preservar a foto.
