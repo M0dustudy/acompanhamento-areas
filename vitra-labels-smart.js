@@ -965,7 +965,7 @@ function askDeleteReview(id){
  if(!ctx?.isMaster?.())return;
  const host=el("vl2-dialog-host");if(!host)return;
  host.innerHTML='<div class="vl2-overlay" role="dialog" aria-modal="true" aria-label="Excluir definitivamente"><div class="vl2-dialog vl2-delete-confirm"><header><div><small>ADMINISTRADOR</small><h3>Excluir definitivamente?</h3></div><button type="button" id="vl2-delete-close" aria-label="Fechar">×</button></header>'+
-  '<p>Esta ação apaga o registro e a fotografia do histórico. A operação será registrada na auditoria e não poderá ser desfeita.</p>'+
+  '<p>Esta ação remove definitivamente a conferência, sua fotografia e qualquer padrão aprendido exclusivamente a partir dela. O identificador e a ação permanecem no registro de auditoria. Não poderá ser desfeita.</p>'+
   '<label>Digite <strong>EXCLUIR</strong> para confirmar<input id="vl2-delete-phrase" type="text" autocomplete="off" placeholder="EXCLUIR"></label>'+
   '<div class="vl2-delete-buttons"><button type="button" id="vl2-delete-cancel">Cancelar</button><button type="button" id="vl2-delete-final" disabled>Excluir definitivamente</button></div></div></div>';
  const close=()=>host.replaceChildren();
