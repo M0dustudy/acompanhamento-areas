@@ -713,18 +713,45 @@ function showResult(){
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
  el("vl2-save")?.addEventListener("click",saveReview);
 }
+function renderHistoryRows(rows,archive=false){
+ return rows.map(x=>{
+  const status=x.review_status==="atencao"?"Divergência":x.review_status==="conferido"?"Aprovado":"Pendente";
+  return '<div class="vl2-history-line"><button class="vl2-history-entry" type="button" data-history-id="'+esc(x.id)+'">'+
+   '<span class="vl2-history-dot vl2-history-'+esc(x.review_status)+'"></span>'+
+   '<span class="vl2-history-main"><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(kinds,x.label_kind))+' · '+esc(nameOf(varieties,x.variety))+'</small><small>Responsável: '+esc(x.reviewer_name||"Não identificado")+'</small></span>'+
+   '<span class="vl2-history-meta"><b>'+status+'</b><small>'+esc(ctx.stamp(x.created_at))+'</small></span><span class="vl2-history-arrow">›</span></button>'+
+   (ctx?.isMaster?.()?'<button type="button" class="vl2-history-action" data-history-action="'+(archive?"restore":"hide")+'" data-history-target="'+esc(x.id)+'">'+(archive?"Restaurar":"Ocultar")+'</button>':"")+
+   '</div>';
+ }).join("");
+}
+function bindHistoryActions(pane){
+ pane.querySelectorAll("[data-history-id]").forEach(b=>b.addEventListener("click",()=>openHistory(b.dataset.historyId)));
+ pane.querySelectorAll("[data-history-action]").forEach(b=>b.addEventListener("click",async()=>{
+  if(!ctx?.isMaster?.())return;
+  const action=b.dataset.historyAction,id=b.dataset.historyTarget;
+  const question=action==="hide"?"Ocultar esta conferência da lista? A fotografia e os dados serão preservados para auditoria e poderão ser restaurados.":"Restaurar esta conferência ao histórico?";
+  if(!window.confirm(question))return;
+  b.disabled=true;
+  try{await ctx.api(action,{id});await fetchHistory();if(el("vl2-archive")?.open)await fetchArchived();}
+  catch(e){notice(e.message||"Não foi possível alterar o histórico.",true);b.disabled=false;}
+ }));
+}
 async function fetchHistory(){
  if(!ctx?.canAccess?.())return;
  const pane=el("vl2-history");if(!pane)return;
  try{
   const data=await ctx.api("history");state.history=Array.isArray(data.rows)?data.rows:[];
   if(!el("vl2-history"))return;
-  pane.innerHTML=state.history.length?state.history.slice(0,20).map(x=>{
-   const status=x.review_status==="atencao"?"Reprovado / revisar":x.review_status==="conferido"?"Conferido":"Pendente";
-   return '<button class="vl2-history-entry" type="button" data-history-id="'+esc(x.id)+'"><span class="vl2-history-dot vl2-history-'+esc(x.review_status)+'"></span><span class="vl2-history-main"><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(kinds,x.label_kind))+' · '+esc(nameOf(varieties,x.variety))+'</small></span><span class="vl2-history-meta"><b>'+status+'</b><small>'+esc(ctx.stamp(x.created_at))+'</small></span><span class="vl2-history-arrow" aria-hidden="true">›</span></button>';
-  }).join(""):'<p>Nenhuma conferência registrada.</p>';
-  pane.querySelectorAll("[data-history-id]").forEach(btn=>btn.addEventListener("click",()=>openHistory(btn.dataset.historyId)));
+  pane.innerHTML=state.history.length?renderHistoryRows(state.history.slice(0,30)):'<p class="vl2-hint">Nenhuma conferência registrada.</p>';
+  bindHistoryActions(pane);
  }catch{pane.textContent="Não foi possível carregar o histórico.";}
+}
+async function fetchArchived(){
+ if(!ctx?.isMaster?.())return;
+ const pane=el("vl2-archived-list");if(!pane)return;
+ try{const response=await ctx.api("archived");const rows=Array.isArray(response.rows)?response.rows:[];
+  pane.innerHTML=rows.length?renderHistoryRows(rows,true):'<p class="vl2-hint">Nenhum registro ocultado.</p>';bindHistoryActions(pane);}
+ catch(e){pane.textContent=e.message||"Não foi possível carregar os registros ocultados.";}
 }
 async function openHistory(id){
  if(!ctx?.canAccess?.()||!/^[0-9a-f-]{36}$/i.test(id))return;
@@ -748,7 +775,7 @@ async function openHistory(id){
   const items=checks.length?checks.map(x=>'<div class="vl2-check-item vl2-check-'+esc(x.status||"pending")+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>').join(""):Array.isArray(record.checklist)?record.checklist.map(x=>'<div class="vl2-check-item vl2-check-'+(x[0]==="atencao"?"error":"pending")+'"><span aria-hidden="true">?</span><div><strong>'+esc(x[1])+'</strong><p>'+esc(x[2])+'</p></div></div>').join(""):"";
   const vals=[["Cliente",nameOf(clients,record.client)],["Tipo de etiqueta",nameOf(kinds,record.label_kind)],["Variedade",nameOf(varieties,record.variety)],["Classificação",record.label_class],["Rastreabilidade lida",f.rastreio],["Rastreabilidade de referência",f.expectedRastreio],["GGN",f.ggn],["CNPJ do produtor",f.cnpj],["CNPJ comercial",f.cnpjComercial],["Produtor",f.produtor],["Lote",f.lote],["Data",f.data],["Peso",f.peso],["Código de barras",f.barcode]];
   host.innerHTML='<div class="vl2-overlay" role="dialog" aria-modal="true" aria-label="Diagnóstico registrado"><div class="vl2-dialog"><header><div><small>CONFERÊNCIA REGISTRADA · '+esc(ctx.stamp(record.created_at))+'</small><h3>Diagnóstico da etiqueta</h3></div><button id="vl2-close-detail" type="button" aria-label="Fechar">×</button></header>'+
-   '<div class="vl2-detail-status vl2-status-'+esc(status)+'"><strong>'+esc(names[status]||"Registro de conferência")+'</strong><p>'+esc(summaries)+'</p></div>'+
+   '<div class="vl2-detail-status vl2-status-'+esc(status)+'"><strong>'+esc(names[status]||"Registro de conferência")+'</strong><p>'+esc(summaries)+'</p><small>Responsável: '+esc(record.reviewer_name||"Não identificado")+'</small></div>'+
    (image||"")+'<div class="vl2-detail-facts">'+vals.filter(x=>x[1]).map(x=>'<div><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>').join("")+'</div>'+
    '<h4>Itens da conferência</h4><div class="vl2-check-list">'+(items||'<p class="vl2-hint">O relatório antigo não contém diagnóstico detalhado.</p>')+'</div>'+
    (record.notes?'<div class="vl2-detail-note"><strong>Observação registrada</strong><p>'+esc(record.notes)+'</p></div>':"")+
@@ -862,7 +889,8 @@ function mount(adapter){
   '<div id="vl2-progress" class="vl2-progress" hidden>Reconhecendo dados…</div><div id="vl2-notice" class="vl2-notice" hidden></div>'+
   '<p class="vl2-photo-foot">A foto é analisada após o recorte. O reconhecimento pode falhar com reflexos, letras pequenas ou imagens desfocadas.</p></section>'+
   '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Dados e conferência</h3><p>Somente cliente e rastreabilidade precisam de confirmação habitual.</p></div></div><div id="vl2-results"></div></section></div>'+
-  '<section class="vl2-recent"><div class="vl2-history-head"><h3>Histórico de diagnósticos</h3><small>Toque em um registro para abrir os resultados e a foto</small></div><div id="vl2-history">Carregando histórico…</div></section><div id="vl2-dialog-host"></div>'+
+  '<section class="vl2-recent"><div class="vl2-history-head"><h3>Histórico de conferências</h3><small>Fotografias, resultados e responsáveis</small></div><div id="vl2-history">Carregando histórico…</div>'+
+  (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">Teste restrito ao administrador. Verificações dependem da qualidade da foto e das regras disponíveis para o cliente. Nenhum resultado é aprovado apenas por OCR.</p></section>';
  el("vl2-back")?.addEventListener("click",()=>{releasePhoto();ctx.back();});
  el("vl2-open-camera")?.addEventListener("click",beginCamera);
@@ -874,6 +902,7 @@ function mount(adapter){
  el("vl2-portrait")?.addEventListener("click",()=>{state.crop.ratio=.68;setCropShape("vl2-portrait");drawCrop();});
  el("vl2-center")?.addEventListener("click",()=>{state.crop.cx=.5;state.crop.cy=.5;drawCrop();});
  el("vl2-zoom")?.addEventListener("input",e=>{state.crop.scale=Number(e.target.value)/100;drawCrop();});
+ el("vl2-archive")?.addEventListener("toggle",e=>{if(e.target.open)fetchArchived();});
  bindFrame();showResult();loadPatterns();loadEntities();fetchHistory();
 }
 window.VITRA_LABEL_SMART={mount,catalogCount:catalog.length,reference:"DOC.CQ.056"};
