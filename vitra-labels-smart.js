@@ -583,7 +583,22 @@ async function scanBarcode(file,token=state.sequence){
      const code=await limitWork(reader.decodeFromCanvas(sample),3200,"O leitor não localizou as barras");
      const value=digits(code?.getText?.()||code?.text||"");
      const ean=value.length===12?"0"+value:value;
-     if(eanValid(ean))return ean;
+     if(eanValid(ean)){
+      const points=code?.getResultPoints?.()||[];
+      if(state.sequence===token&&points.length>=2){
+       const rect=points.map(p=>{
+        let x=p.getX?.()??p.x??0,y=p.getY?.()??p.y??0;
+        if(sample!==canvas){const originalX=y,originalY=canvas.height-x;x=originalX;y=originalY;}
+        return {x,y};
+       });
+       const minX=Math.min(...rect.map(p=>p.x)),maxX=Math.max(...rect.map(p=>p.x));
+       const centerY=rect.reduce((n,p)=>n+p.y,0)/rect.length;
+       state.barcodeRegion={x:Math.max(0,minX-canvas.width*.04),y:Math.max(0,centerY-canvas.height*.075),
+        w:Math.max(canvas.width*.24,maxX-minX+canvas.width*.08),
+        h:Math.max(20,canvas.height*.15),iw:canvas.width,ih:canvas.height};
+      }
+      return ean;
+     }
     }catch{}
    }
   }catch{}
