@@ -572,3 +572,23 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
 .vl2-quick-alerts>div{padding:9px 0;border-top:1px solid #edd9c9}
 .vl2-quick-alerts>div b{display:block;font-size:12px}
 .vl2-quick-alerts>div p{font-size:12px;line-height:1.5;margin:4px 0 0;overflow-wrap:anywhere}
+
+
+/* Conferência de alto volume: uma conclusão única e rastreabilidade estruturada. */
+.vl2-concise-result{margin:0 0 14px;padding:15px 17px;background:#fff;border:1px solid #d9e3de;border-left:4px solid #91aaa0;border-radius:13px;color:#243b31}
+.vl2-concise-head small{display:block;font-size:10px;letter-spacing:.07em;color:#6c7b73;font-weight:700}
+.vl2-concise-head strong{display:block;margin:5px 0;font-size:18px;line-height:1.25;letter-spacing:-.018em}
+.vl2-concise-head p{font-size:13px;line-height:1.55;margin:0 0 8px}
+.vl2-summary-error{border-left-color:#be6c50}
+.vl2-summary-ok{border-left-color:#4b9170}
+.vl2-summary-pending{border-left-color:#c7a15e}
+.vl2-quick-items{margin:8px 0}
+.vl2-quick-items>div{padding:8px 0;border-top:1px solid #e6ece8}
+.vl2-quick-items b{font-size:12px;color:#743e30}
+.vl2-quick-items p{margin:3px 0 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.vl2-pending-short{padding:10px 0;border-top:1px solid #e6ece8}
+.vl2-pending-short small{font-weight:750;font-size:11px;color:#62573f}
+.vl2-pending-short p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#4d5c52}
+.vl2-concise-result>small:last-child{display:block;margin-top:8px;font-size:11px;line-height:1.4;color:#718178}
+.vl2-trace>.vl2-trace-grid{margin:10px 0 12px}
+@media(max-width:600px){.vl2-concise-result{padding:13px 14px}.vl2-concise-head strong{font-size:16px}}
