@@ -438,3 +438,29 @@
  .vl2-crop-tools label input{flex:1;max-width:none}
 }
 @media(max-width:360px){.vl2-lookup[open]>.vl2-lookup-pop,.vl2-client-combo[open]>.vl2-client-pop{width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important}.vl2-reading-barcode strong{font-size:12px}}
+
+/* Histórico administrativo: ações reversíveis e identificação de responsável. */
+.vl2-history-line{display:flex;align-items:center;gap:9px;border-top:1px solid #ebf0eb;min-width:0}
+.vl2-history-line .vl2-history-entry{flex:1;min-width:0;border-top:0!important}
+.vl2-history-line .vl2-history-main{white-space:normal}
+.vl2-history-line .vl2-history-main small{overflow-wrap:anywhere}
+.vl2-history-action{flex:0 0 auto;border:1px solid #d9e6db!important;background:#f7faf7!important;
+ color:#5f7764!important;-webkit-text-fill-color:#5f7764!important;font-size:10px!important;
+ border-radius:8px!important;padding:7px 10px!important;min-height:33px;font-weight:700!important}
+.vl2-history-action:hover{background:#eaf3ed!important}
+.vl2-history-action:disabled{opacity:.5;pointer-events:none}
+.vl2-archive{margin-top:18px;padding-top:12px;border-top:1px solid #e3ede4}
+.vl2-archive>summary{cursor:pointer;font-size:11px;color:#687f6d;line-height:1.5;padding:8px 2px;list-style:none}
+.vl2-archive>summary:before{content:"▸";display:inline-block;margin-right:7px}
+.vl2-archive[open]>summary:before{content:"▾"}
+.vl2-archive>summary::-webkit-details-marker{display:none}
+.vl2-archive>.vl2-hint{margin:8px 0}
+.vl2-detail-status>small{font-size:10px;color:#708b77;display:block;margin-top:9px}
+.vl2-details-body .vl2-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:480px){
+ .vl2-history-line{gap:5px}
+ .vl2-history-line .vl2-history-entry{gap:8px;padding:10px 3px!important}
+ .vl2-history-line .vl2-history-meta{flex:0 0 78px;max-width:78px}
+ .vl2-history-action{padding:5px 7px!important}
+ .vl2-details-body .vl2-facts{grid-template-columns:1fr}
+}
