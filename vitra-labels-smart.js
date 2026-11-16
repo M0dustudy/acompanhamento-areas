@@ -194,7 +194,21 @@ function registryAudit(){
  if(!state.photo)return {rows:out,producer:null,merchant:null};
  if(!state.refsLoaded){add("confirmar","Base de produtores","Consulta privada indisponível; não foi possível comparar GGN, CNPJ e endereços.");return {rows:out,producer:null,merchant:null};}
  const full=state.text||"";
- const part=(pattern,stop)=>full.match(pattern)?.[1]?.split(stop)[0]||"";
+ // Usar a região cuja seção do produtor/comercializador foi lida mais completamente.
+ // Nunca combinar números de duas empresas em uma única referência.
+ const scoreSection=part=>{
+  const n=norm(part);
+  let score=Math.min(220,n.length)/20;
+  for(const tag of ["CNPJ","GGN","GLN","CEP","LOCALIZACAO","ENDERECO","RODOVIA","LOTE","PROJETO"])
+   if(n.includes(tag))score+=5;
+  score+=(n.match(/\d/g)||[]).length/12;
+  return score;
+ };
+ const part=(pattern,stop)=>{
+  const reads=state.ocrRawPassages?.length?state.ocrRawPassages:[full];
+  const candidates=reads.map(raw=>raw.match(pattern)?.[1]?.split(stop)[0]||"").filter(Boolean);
+  return candidates.sort((a,b)=>scoreSection(b)-scoreSection(a))[0]||full.match(pattern)?.[1]?.split(stop)[0]||"";
+ };
  const produced=part(/(?:PRODUZIDO\s+POR|PRODUTOR)\s*[:\-]?\s*([\s\S]*)/i,/COMERCIALIZADO\s+POR|RASTREABILIDADE|C[ÓO]DIGO\s+DE\s+BARRAS/i);
  const marketed=part(/COMERCIALIZADO\s+POR\s*[:\-]?\s*([\s\S]*)/i,/PRODUZIDO\s+POR|RASTREABILIDADE/i);
  const entityName=(fragment,e)=>{
