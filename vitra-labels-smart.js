@@ -74,8 +74,9 @@ function releasePhoto(){
 function resetScan(){
  state.sequence++;state.photo=null;state.text="";state.barcode="";state.detected=null;
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.reviewed=false;state.saved=false;
- state.identity.kind="";state.identity.variety="";state.identity.klass="";
- state.mode="empty";
+ state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
+ state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
+ state.notes="";state.mode="empty";
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -104,7 +105,9 @@ function extract(raw,barcode){
  const n=norm(raw), b=barcode||getEAN(raw);
  const matches=catalog.filter(x=>x.barcode===b);
  const candidateClients=distinct(matches.map(x=>x.client));
- const words=distinct(clients.filter(x=>x[2].some(a=>a&&n.includes(norm(a)))).map(x=>x[0]));
+ const rawWords=distinct(clients.filter(x=>x[2].some(a=>a&&n.includes(norm(a)))).map(x=>x[0]));
+ // EXPOFRUT pode aparecer apenas como comerciante, sem ser o cliente da marca.
+ const words=rawWords.filter(x=>x!=="expofrut"||!n.includes("COMERCIALIZADO POR")||candidateClients.length===1&&candidateClients[0]==="expofrut");
  const agreed=candidateClients.filter(x=>words.includes(x));
  const foundClient=agreed.length===1?agreed[0]:words.length===1?words[0]:candidateClients.length===1?candidateClients[0]:"";
  const traceMatch=str(raw).match(/\bR[\s\-–—]*(\d{2})[\s\-–—]*(\d{3,5}[A-Za-z])[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z]{2,3})\b/i);
@@ -143,16 +146,23 @@ function extract(raw,barcode){
  const dateMatch=str(raw).match(/\b([0-3]?\d)[.\/-]([01]?\d)[.\/-]((?:20)?\d{2})\b/);
  const date=dateMatch?dateMatch[1].padStart(2,"0")+"/"+dateMatch[2].padStart(2,"0")+"/"+(dateMatch[3].length===2?"20"+dateMatch[3]:dateMatch[3]):track?track.day+"/"+track.month+"/20"+track.year:"";
  const lot=str(raw).match(/\b(?:LOTE|LOT)\s*[:#-]?\s*([0-9A-Z./-]{2,24})\b/i)?.[1]||"";
- const cnpj=str(raw).match(/\bCNPJ\s*[:#-]?\s*(\d{2}[.\s]?\d{3}[.\s]?\d{3}[/\s]?\d{4}[-\s]?\d{2})/i)?.[1]||"";
+ const cnpjPattern=/\bCNPJ\s*[:#-]?\s*(\d{2}[.\s]?\d{3}[.\s]?\d{3}[/\s]?\d{4}[-\s]?\d{2})/gi;
+ const candidates=[...str(raw).matchAll(cnpjPattern)].map(x=>digits(x[1]));
+ const producedSection=str(raw).split(/PRODUZIDO POR/i)[1]?.split(/COMERCIALIZADO POR|RASTREABILIDADE/i)[0]||"";
+ const companySection=str(raw).split(/COMERCIALIZADO POR/i)[1]?.split(/PRODUZIDO POR|RASTREABILIDADE/i)[0]||"";
+ const producerCnpj=digits(producedSection.match(cnpjPattern)?.[0]||"");
+ const companyCnpj=digits(companySection.match(cnpjPattern)?.[0]||"");
+ const cnpj=producerCnpj||candidates.length===1&&!companySection?candidates[0]:"";
  const ggn=str(raw).match(/\b(?:GGN|GLOBALGAP|GLOBAL\s*G\.?A\.?P\.?)\s*[:#-]?\s*(\d[\d\s-]{11,18})/i)?.[1]||"";
  const ggnNumber=digits(ggn).slice(0,13);
  const producer=producers.find(p=>n.includes(norm(p[0])))||producers.find(p=>p[1]&&digits(cnpj)===p[1])||null;
+ const commer=producers.find(p=>companySection&&norm(companySection).includes(norm(p[0])))||null;
  const refWeight=classCode?classCode[3]==="50"?"5 kg":classCode[3]==="80"?"8 kg":"":"";
  return {
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
-  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",ggn:ggnNumber,produtor:producer?.[0]||""},
+  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnNumber,produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
-  producer,weightPhoto,weightCatalog,refWeight,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1
+  producer,commer,weightPhoto,weightCatalog,refWeight,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1
  };
 }
 function computeIssues(){
@@ -183,15 +193,20 @@ function computeIssues(){
  }
  if(detected?.printedDate&&detected.track&&detected.printedDate!==detected.track.day+"/"+detected.track.month+"/20"+detected.track.year)add("atencao","Data da embalagem","A data impressa não coincide com o dia e mês codificados na rastreabilidade.");
  if(detected?.weightPhoto&&detected?.refWeight&&norm(detected.weightPhoto)!==norm(detected.refWeight))add("confirmar","Peso e identificação","O peso individual e o código da caixa representam grandezas diferentes. Confira o modelo correspondente.");
- if(detected?.weightPhoto&&detected?.weightCatalog&&norm(detected.weightPhoto.replace(",", "."))!==norm(detected.weightCatalog.replace(",",".")))add("atencao","Peso","O peso impresso difere do cadastrado para o código de barras.");
+ if(category()==="unit"&&detected?.weightPhoto&&detected?.weightCatalog&&/\bG\b/i.test(detected.weightPhoto)&&norm(detected.weightPhoto.replace(",", "."))!==norm(detected.weightCatalog.replace(",",".")))add("atencao","Peso","O peso impresso difere do cadastrado para o código de barras.");
  if(detected?.packedKindCode&&["20","21"].includes(detected.packedKindCode)&&/^\d+ G$/i.test(norm(f.peso))){
    const w=digits(f.peso),expectedUnit=detected.packedKindCode==="20"?"500":"250";
    if(w!==expectedUnit)add("atencao","Tipo de embalagem","O código da embalagem indica "+expectedUnit+" g, mas o peso lido é "+w+" g.");
  }
  if(f.cnpj&&!validCnpj(f.cnpj))add("atencao","CNPJ","Os dígitos do CNPJ reconhecido não passaram na validação. Confira a impressão.");
  if(detected?.producer?.[1]&&f.cnpj&&f.cnpj!==detected.producer[1])add("atencao","CNPJ do produtor","O CNPJ reconhecido difere do cadastro de "+detected.producer[0]+" no DOC.CQ.056.");
+ if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("atencao","CNPJ do comerciante","O dígito verificador do CNPJ comercial não confere.");
+ if(detected?.commer?.[1]&&f.cnpjComercial&&f.cnpjComercial!==detected.commer[1])add("atencao","CNPJ do comerciante","CNPJ impresso diferente da referência para "+detected.commer[0]+".");
  if(detected?.producer?.[2]&&f.ggn&&f.ggn!==detected.producer[2])add("atencao","GGN do produtor","O GGN reconhecido difere da referência de "+detected.producer[0]+" no DOC.CQ.056.");
  if((f.cnpj||f.ggn)&&!detected?.producer)add("confirmar","Cadastro do produtor","Identificação numérica detectada, mas não foi possível associá-la com segurança a um produtor do manual.");
+ const relevantMatches=state.matches.filter(m=>m.client===chosen);
+ const uniqueClass=distinct(relevantMatches.map(m=>m.klass));
+ if(state.identity.klass&&uniqueClass.length===1&&uniqueClass[0]!==state.identity.klass)add("atencao","Classificação","A classe impressa difere do padrão cadastrado para o código e cliente selecionados.");
  if(!state.text&&!state.barcode)add("confirmar","Imagem","Nenhuma informação legível foi reconhecida. Fotografe novamente com melhor iluminação.");
  return out;
 }
@@ -275,29 +290,6 @@ async function useFile(file){
  state.crop={cx:.5,cy:.5,scale:.82,ratio:1.5};
  positionMode("crop");notice("Mova o quadro para cobrir apenas a etiqueta. Depois toque em «Recortar e analisar».");
  showResult();
-}
-async function openCamera(){
- if(state.processing)return;
- stopCamera();
- if(!navigator.mediaDevices?.getUserMedia){notice("O navegador não permite abrir a câmera diretamente. Escolha uma foto da câmera traseira.",true);return;}
- const constraints={audio:false,video:{facingMode:{exact:"environment"},width:{ideal:1920},height:{ideal:1440}}};
- try{
-  cameraStream=await navigator.mediaDevices.getUserMedia(constraints);
- }catch(e){
-  try{
-   const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");
-   const rear=devices.find(d=>/back|rear|traseira|environment|posterior/i.test(d.label));
-   if(!rear)throw Error("Câmera traseira não encontrada");
-   cameraStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{deviceId:{exact:rear.deviceId}}});
-  }catch{notice("Não consegui acessar a câmera traseira. Verifique as permissões ou envie uma foto salva. A câmera frontal não será usada.",true);return;}
- }
- const v=el("vl2-video");if(!v){stopCamera();return;}
- const track=cameraStream.getVideoTracks()[0],settings=track?.getSettings?.()||{};
- if(settings.facingMode==="user"||/front|frontal|selfie/i.test(track?.label||"")){
-  stopCamera();notice("O dispositivo selecionou a câmera frontal. Capture com a traseira pelo aplicativo da câmera e use «Escolher foto».",true);return;
- }
- resetScan();releasePhoto(); // não reutiliza a imagem anterior
- // releasePhoto encerra a câmera; o fluxo mantém apenas as trilhas recém-obtidas
 }
 async function beginCamera(){
  if(!navigator.mediaDevices?.getUserMedia){notice("Câmera integrada indisponível. Use «Escolher foto».",true);return;}
@@ -429,7 +421,8 @@ function detailsView(){
   fact("Classificação",state.identity.klass,"Identificada quando disponível");
  if(category()==="box"){
   facts+=fact("Peso da caixa",f.peso,src.peso)+fact("Lote",f.lote,src.lote)+
-    fact("Produtor",f.produtor,src.produtor)+fact("CNPJ",f.cnpj,src.cnpj)+fact("GGN",f.ggn,src.ggn)+
+    fact("Produtor",f.produtor,src.produtor)+fact("CNPJ do produtor",f.cnpj,src.cnpj)+fact("GGN",f.ggn,src.ggn)+
+    fact("Comercializado por",f.comercializado,src.comercializado)+fact("CNPJ comercial",f.cnpjComercial,src.cnpjComercial)+
     fact("Data de embalagem",f.data,src.data)+fact("Código de barras",f.barcode,src.barcode);
  }else if(category()==="unit"){
   facts+=fact("Peso da unidade",f.peso,src.peso)+fact("Código de barras",f.barcode,src.barcode)+
@@ -445,7 +438,7 @@ function correctionPanel(){
   '<label>Variedade reconhecida<select data-vl2-identity="variety">'+opts(varieties,state.identity.variety,"Não identificada")+'</select></label>'+
   '<label>Classificação reconhecida<select data-vl2-identity="klass">'+opts(classes.map(x=>[x,x]),state.identity.klass,"Não identificada")+'</select></label></div>'+
   '<p class="vl2-refine-hint">Os dados abaixo são extraídos da foto. Corrija apenas erros de leitura; não é necessário preenchê-los para realizar a conferência.</p>'+
-  '<div class="vl2-correction-grid">'+[["rastreio","Rastreabilidade lida"],["peso","Peso"],["barcode","EAN"],["data","Data"],["lote","Lote"],["produtor","Produtor"],["cnpj","CNPJ"],["ggn","GGN"],["produto","Produto"]].map(x=>
+  '<div class="vl2-correction-grid">'+[["rastreio","Rastreabilidade lida"],["peso","Peso"],["barcode","EAN"],["data","Data"],["lote","Lote"],["produtor","Produtor"],["cnpj","CNPJ do produtor"],["cnpjComercial","CNPJ comercial"],["ggn","GGN"],["produto","Produto"]].map(x=>
     '<label>'+esc(x[1])+'<input data-vl2-field="'+x[0]+'" value="'+esc(state.fields[x[0]]||"")+'"></label>').join("")+'</div>'+
   '<details class="vl2-raw"><summary>Texto bruto extraído</summary><pre>'+esc(state.text||"Sem leitura")+'</pre></details></details>';
 }
@@ -453,7 +446,7 @@ function showResult(){
  const root=el("vl2-results");if(!root)return;
  state.issues=computeIssues();
  const alerts=state.issues.filter(x=>x.type==="atencao"),pending=state.issues.filter(x=>x.type==="confirmar");
- const overall=!state.photo?"Pronto para começar":alerts.length?"Divergências encontradas":pending.length?"Conferência pendente":"Dados conferidos";
+ const overall=!state.photo?"Pronto para começar":alerts.length?"Divergências encontradas":pending.length?"Conferência pendente":"Nenhuma divergência identificada";
  const count=state.photo?'<span>'+alerts.length+' divergência(s) · '+pending.length+' pendência(s)</span>':"";
  const status='<div class="vl2-status '+(alerts.length?"vl2-alert":pending.length?"vl2-partial":"")+'"><div><small>CONFERÊNCIA DA ETIQUETA</small><strong>'+overall+'</strong></div>'+count+'</div>';
  const issues=state.issues.length?'<div class="vl2-alerts">'+state.issues.map(x=>'<div class="vl2-message vl2-'+x.type+'"><strong>'+esc(x.title)+'</strong><p>'+esc(x.body)+'</p></div>').join("")+'</div>':"";
@@ -481,7 +474,7 @@ function showResult(){
   state.identity[e.target.dataset.vl2Identity]=e.target.value;showResult();
  }));
  root.querySelectorAll("[data-vl2-field]").forEach(input=>input.addEventListener("change",e=>{
-  state.fields[e.target.dataset.vl2Field]=e.target.value.trim();showResult();
+  state.fields[e.target.dataset.vl2Field]=e.target.value.trim();state.sources[e.target.dataset.vl2Field]="Corrigido manualmente";showResult();
  }));
  el("vl2-verified")?.addEventListener("change",e=>state.reviewed=e.target.checked);
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
@@ -504,7 +497,7 @@ async function saveReview(){
  }
  const btn=el("vl2-save");if(btn)btn.disabled=true;
  const issues=computeIssues(),hasAlert=issues.some(x=>x.type==="atencao"),hasPending=issues.some(x=>x.type==="confirmar");
- const status=hasAlert?"atencao":state.reviewed&&!hasPending&&state.fields.barcode&&eanValid(state.fields.barcode)?"conferido":"pendente";
+ const status=hasAlert?"atencao":state.reviewed&&!hasPending&&state.fields.barcode&&eanValid(state.fields.barcode)&&state.sources.barcode!=="Corrigido manualmente"?"conferido":"pendente";
  const fields={...state.fields,expectedRastreio:expectedCode(),clientConfirmed:state.clientConfirmed,
   sources:state.sources,barcodeMatched:state.matches.length>0,producerReference:state.detected?.producer?.[0]||""};
  const payload={client:state.identity.client,variety:state.identity.variety||expectedVariety(),
