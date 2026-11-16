@@ -133,3 +133,15 @@ Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes
 - Há uma ação explícita para guardar fotografias de modelos desconhecidos ou de leitura falha como **amostras pendentes**. Amostras não entram no catálogo aprovado; exigem estudo e validação humana antes de virar regra.
 - Em cumbucas, se a fotografia contiver classificação reconhecível e o EAN/cliente tiver classe única documentada, comparar as duas e reprovar divergência. A classe da foto deve ser registrada com sua origem, e não inventada a partir do cadastro.
 - A comparação de coordenadas geográficas deve conferir graus, minutos, segundos **e hemisférios** (N/S, E/W/O); números iguais com direções opostas não são iguais. Formato parcialmente ilegível permanece pendente, sem aprovação por comparação apenas dos dígitos.
+
+
+## Leitura detalhada de etiquetas — revisão de 16/11/2026, OCR v14
+- A leitura principal usa a fotografia completa com resolução ampliada. Quando identifica dados institucionais ou não localiza rastreabilidade, examina faixas superior e inferior parcialmente sobrepostas, uma delas com contraste adaptado; há releitura de contraste para rastreabilidade não reconhecida.
+- A quantidade de passagens é limitada por tempo e recursos do celular. Repetições ilimitadas não melhoram necessariamente a precisão; em caso de falha, preservar a foto e permitir reexame aprofundado por decisão do usuário.
+- Preservar separadamente os resultados das passagens durante a análise, reaproveitar campos identificados em faixas ampliadas e usar a seção individual mais completa para comparar informações do produtor e comercializador. Não copiar números faltantes do banco para fingir que foram lidos da etiqueta.
+- Identificar discordâncias entre passagens de OCR em rastreabilidade, CNPJ, GGN, GLN, data e classificação. Leituras conflitantes geram alerta **pendente**, não aprovação ou reprovação automática com base em caracteres incertos.
+- Exibir previamente divergências institucionais relevantes que já foram encontradas na leitura, sem substituir a decisão final baseada na ordem de produção e nas referências disponíveis.
+- Comparar CNPJ, GGN, GLN, endereço, CEP e coordenadas somente quando a fotografia e a referência cadastrada oferecem evidência suficiente; campos opcionais não impressos não são automaticamente erro. "Não localizado pelo OCR" não equivale a "ausente na etiqueta".
+- A rastreabilidade da ordem de produção é fonte **independente** da foto. Diferença comprovada reprova; dúvida de OCR permanece pendente.
+- O histórico guarda o número de passagens e os campos com leituras conflitantes. Fotografias e registros anteriores permanecem preservados.
+- O teste automatizado scripts/testar-ocr-etiquetas.mjs protege extração de rastreabilidade, documentos e bloqueios de aprovação, mas não mede a qualidade com fotos reais. A leitura em celulares, etiquetas pequenas, cores diferentes e impressões pouco legíveis continua pendente de ensaios físicos.
