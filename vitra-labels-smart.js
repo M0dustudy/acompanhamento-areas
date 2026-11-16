@@ -229,9 +229,9 @@ function registryAudit(){
  compareGLN("GLN do comerciante",f.glnComercial,merchant);
  const geoContent=(block)=>norm(block).match(/LOCALIZACAO\s+GEOGRAFICA\s*[:\-]?\s*([0-9°'’"”“\sSNWE.,-]{9,60})/)?.[1]||"";
  for(const [who,block,entity] of [["produtor",produced,producer],["comerciante",marketed,merchant]]){
-  if(!entity?.geo_location)continue;
   const geoPrinted=/LOCALIZA(?:C|Ç)(?:A|Ã)O\s+GEOGRAFICA/i.test(norm(block));
   if(!geoPrinted)continue;
+  if(!entity?.geo_location){add("confirmar","Coordenadas do "+who,"A etiqueta contém coordenadas geográficas, mas o cadastro da empresa não possui uma referência para confirmá-las.",entity?ref(entity):"Cadastro institucional");continue;}
   const read=geoContent(block),digitsRead=digits(read),digitsExpected=digits(entity.geo_location);
   if(digitsRead&&digitsRead===digitsExpected)add("ok","Coordenadas do "+who,"Localização geográfica coincide com a referência de "+entity.name+".",ref(entity));
   else if(digitsRead&&digitsRead.length===digitsExpected.length)add("atencao","Coordenadas do "+who,"Coordenadas lidas "+read.trim()+" divergem das coordenadas de "+entity.name+": "+entity.geo_location+".",ref(entity));
@@ -261,9 +261,9 @@ function registryAudit(){
   .replace(/\bKM\s*[-–]?\s*(\d+)/g,"KM $1")
   .replace(/[^A-Z0-9]+/g," ").replace(/\s+/g," ").trim();
  for(const [title,printed,entity] of [["Endereço completo do produtor",produced,producer],["Endereço completo do comerciante",marketed,merchant]]){
-  if(!entity?.address)continue;
   const addressPrinted=/\b(?:END|ENDERECO|CEP|RUA|RODOVIA|BR\s*[-]?\s*\d{2,3}|LOTE|PROJETO|ESTRADA)\b/i.test(norm(printed));
   if(!addressPrinted)continue;
+  if(!entity?.address){add("confirmar",title,"O endereço está impresso na etiqueta, mas ainda não existe endereço de referência cadastrado para comparar.",entity?ref(entity):"Cadastro institucional");continue;}
   const expected=normalizeAddress(entity.address),actual=normalizeAddress(printed);
   const normalizedStop=new Set(["DE","DO","DA","DAS","DOS","NO","NA","EM","S","N","END","ENDERECO","BRASIL","CEP"]);
   const tokens=distinct(expected.split(" ").filter(x=>x.length>=3&&!normalizedStop.has(x)));
