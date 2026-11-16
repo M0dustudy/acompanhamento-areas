@@ -109,7 +109,7 @@ function extract(raw,barcode){
  const weightPhoto=printedWeight?printedWeight[1].replace(".",",")+" "+printedWeight[2].toLowerCase():"";
  const weightCatalog=codeWeights.length===1?codeWeights[0]+" g":"";
  const peso=weightPhoto||weightCatalog;
- const classCode=n.match(/\b(MEI|EX)\s*[-]?\s*([VPA]{1,2})(50|80)([A-Z]{2,3})(10|20|21)\b/);
+ const classCode=n.match(/\b(MEI|EX)\s*[-]?\s*(PA|V|P)(50|80)([A-Z]{2,3})(10|20|21)\b/);
  let kind="";
  const explicitCinta=/\bCINTA\b/.test(n),explicitCumbuca=/\bCUMBUCA\b/.test(n);
  const printedCnpj=/\bCNPJ\b/.test(n),printedGgn=/\bGGN\b/.test(n);
@@ -147,11 +147,12 @@ function extract(raw,barcode){
  const producer=producers.find(p=>producedSection&&norm(producedSection).includes(norm(p[0])))||producers.find(p=>p[1]&&digits(cnpj)===p[1])||producers.find(p=>p[2]&&ggnNumber===p[2])||(!companySection?producers.find(p=>n.includes(norm(p[0]))):null)||null;
  const commer=producers.find(p=>companySection&&norm(companySection).includes(norm(p[0])))||null;
  const refWeight=classCode?classCode[3]==="50"?"5 kg":classCode[3]==="80"?"8 kg":"":"";
+ const boxModel=classCode?{market:classCode[1],color:classCode[2],weight:classCode[3],variety:classCode[4],package:classCode[5],code:classCode[0]}:null;
  return {
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
   fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||ggnNumber,ggnComercial,gln:glnProdutor,glnComercial,produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
-  producer,commer,weightPhoto,weightCatalog,refWeight,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high"
+  producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high"
  };
 }
 function registryAudit(){
@@ -943,6 +944,28 @@ function diagnosticV4(){
   }else if(!expectation)add("pending","Peso / modelo da cumbuca","Peso da cumbuca não pôde ser confirmado. Confira 250 g ou 500 g conforme o modelo aprovado.");
  }
  if(box){
+  const model=state.detected?.boxModel;
+  if(model){
+   const colors={V:"verde",P:"preta",PA:"parda"};
+   const title="Código da cor da caixa";
+   add("ok",title,model.color+" corresponde à caixa "+colors[model.color]+" no manual. Essa verificação identifica a sigla impressa; não confirma a cor física da caixa.","DOC.CQ.056, p. 5–6");
+   const codeVar=varieties.find(v=>v[2]===model.variety)?.[0]||"";
+   if(!codeVar)add("pending","Sigla de variedade no modelo","A sigla "+model.variety+" não consta no glossário consultado.");
+   else if(state.detected?.identity?.variety&&state.detected.identity.variety!==codeVar)
+     add("error","Modelo e variedade","O código "+model.code+" indica "+nameOf(varieties,codeVar)+", enquanto o nome impresso indica "+nameOf(varieties,state.detected.identity.variety)+".");
+   if(state.detected?.weightPhoto){
+    const kg=Number(state.detected.weightPhoto.match(/[\d,.]+/)?.[0]?.replace(",",".")||0);
+    const modelKg=model.weight==="80"?8:5;
+    if(/\bKG\b/i.test(state.detected.weightPhoto)&&kg!==modelKg)
+     add("error","Peso da caixa","No código "+model.code+" o peso é "+modelKg+" kg, mas o rótulo indica "+state.detected.weightPhoto+".");
+   }
+   const printedColor=norm(state.text).match(/(?:COR\s*(?:DA\s*CAIXA)?|CAIXA\s*COR)\s*[:\-]?\s*(VERDE|PRETA|PARDA)\b/)?.[1]||"";
+   if(printedColor&&printedColor!==colors[model.color].toUpperCase())
+    add("error","Cor indicada no rótulo","O texto diz "+printedColor+", porém a sigla "+model.color+" corresponde a "+colors[model.color]+".");
+   const pack={10:"sacola",20:"cumbuca de 500 g",21:"cumbuca de 250 g"}[model.package];
+   add("ok","Modelo da embalagem",model.market+" · "+model.weight+" · "+model.variety+" · "+model.package+" identifica "+pack+" pelo glossário, sem exigir preenchimento manual.","DOC.CQ.056, p. 3, 5");
+  }else if(/\b(?:MEI|EX)\s*[-]?\s*[A-Z]{1,3}\d{2}[A-Z]{2,3}\d{2}\b/.test(norm(state.text)))
+   add("pending","Código do modelo da caixa","Há um código de modelo, mas o texto não corresponde ao glossário. Confira a impressão ou refaça a leitura.");
   const chosenClass=state.expected.klass||"",readClass=state.identity.klass||"";
   if(!chosenClass)add("pending","Classificação da ordem","Informe a classificação real da ordem de produção para compará-la com a classe impressa na caixa.");
   if(!readClass)add("pending","Classificação impressa","O sistema não conseguiu ler a classe impressa na caixa. Uma nova fotografia poderá permitir a comparação.");
