@@ -175,6 +175,8 @@ function computeIssues(){
   add(certain?"atencao":"confirmar","Cliente divergente","O cliente selecionado é "+nameOf(clients,chosen)+", mas a identificação da foto sugere "+nameOf(clients,real)+".");
  }
  if(!real&&detected?.clientAmbiguous)add("confirmar","Cliente compartilhado","Esse código de barras aparece em mais de um cliente do catálogo. Confira a marca impressa.");
+ if(!real&&state.clientConfirmed)add("confirmar","Cliente não reconhecido na foto","O cliente foi informado, mas a imagem não permitiu identificá-lo para confirmar a correspondência.");
+ if(detected?.wordClients?.length>1&&!detected.codeClients.length)add("confirmar","Marcas diferentes","A imagem contém nomes de mais de um cliente. Confira o modelo correto.");
  if(f.barcode&&!eanValid(f.barcode))add("atencao","Código de barras","O dígito verificador do EAN-13 não corresponde.");
  if(f.barcode&&chosen&&detected?.codeClients.length===1&&detected.codeClients[0]!==chosen&&detected.wordClients.length===0){
   add("confirmar","Referência comercial","O código está associado a outro cliente no catálogo, mas pode haver autorização para usar o código do produtor.");
@@ -191,6 +193,8 @@ function computeIssues(){
   const foundVar=varieties.find(v=>v[0]===variety)?.[2]||"";
   if(foundVar&&foundVar!==detected.track.variety)add("atencao","Sigla da variedade","A rastreabilidade apresenta "+detected.track.variety+"; a variedade identificada corresponde a "+foundVar+".");
  }
+ if(state.identity.variety&&expectedVariety()&&state.identity.variety!==expectedVariety())add("atencao","Variedade de referência","A sigla selecionada na rastreabilidade não corresponde à variedade identificada na foto.");
+ if(detected?.track&&(Number(detected.track.day)>31||Number(detected.track.day)<1||Number(detected.track.month)>12||Number(detected.track.month)<1))add("atencao","Data na rastreabilidade","A data lida apresenta dia ou mês inválido.");
  if(detected?.printedDate&&detected.track&&detected.printedDate!==detected.track.day+"/"+detected.track.month+"/20"+detected.track.year)add("atencao","Data da embalagem","A data impressa não coincide com o dia e mês codificados na rastreabilidade.");
  if(detected?.weightPhoto&&detected?.refWeight&&norm(detected.weightPhoto)!==norm(detected.refWeight))add("confirmar","Peso e identificação","O peso individual e o código da caixa representam grandezas diferentes. Confira o modelo correspondente.");
  if(category()==="unit"&&detected?.weightPhoto&&detected?.weightCatalog&&/\bG\b/i.test(detected.weightPhoto)&&norm(detected.weightPhoto.replace(",", "."))!==norm(detected.weightCatalog.replace(",",".")))add("atencao","Peso","O peso impresso difere do cadastrado para o código de barras.");
@@ -199,6 +203,8 @@ function computeIssues(){
    if(w!==expectedUnit)add("atencao","Tipo de embalagem","O código da embalagem indica "+expectedUnit+" g, mas o peso lido é "+w+" g.");
  }
  if(f.cnpj&&!validCnpj(f.cnpj))add("atencao","CNPJ","Os dígitos do CNPJ reconhecido não passaram na validação. Confira a impressão.");
+ if(/\bCNPJ\b/i.test(state.text)&&!f.cnpj&&!f.cnpjComercial)add("confirmar","CNPJ ilegível","Há referência a CNPJ na etiqueta, mas nenhum número foi identificado com segurança.");
+ if(/\bGGN\b/i.test(state.text)&&!f.ggn)add("confirmar","GGN ilegível","Há referência a GGN, mas o número não foi recuperado com segurança.");
  if(detected?.producer?.[1]&&f.cnpj&&f.cnpj!==detected.producer[1])add("atencao","CNPJ do produtor","O CNPJ reconhecido difere do cadastro de "+detected.producer[0]+" no DOC.CQ.056.");
  if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("atencao","CNPJ do comerciante","O dígito verificador do CNPJ comercial não confere.");
  if(detected?.commer?.[1]&&f.cnpjComercial&&f.cnpjComercial!==detected.commer[1])add("atencao","CNPJ do comerciante","CNPJ impresso diferente da referência para "+detected.commer[0]+".");
