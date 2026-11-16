@@ -14,6 +14,22 @@ const escape=v=>text(v).replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;
 const norm=v=>text(v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\s+/g," ").trim();
 const eanValid=v=>{const x=text(v).replace(/\D/g,"");if(x.length!==13)return false;let sum=0;for(let k=0;k<12;k++)sum+=Number(x[k])*(k%2?3:1);return (10-sum%10)%10===Number(x[12]);};
 const distinct=a=>[...new Set(a.filter(Boolean))];
+async function loadPatterns(){
+ if(!ctx?.canAccess?.())return;
+ try{
+  const data=await ctx.api("patterns"),rows=Array.isArray(data.rows)?data.rows:[];
+  for(const row of rows){
+   if(!/^\d{13}$/.test(row.barcode||"")||!eanValid(row.barcode))continue;
+   if(!clients.some(x=>x[0]===row.client)||!kinds.some(x=>x[0]===row.label_kind)||!varieties.some(x=>x[0]===row.variety))continue;
+   const w=text(row.weight||"");
+   const item={barcode:row.barcode,client:row.client,product:text(row.product||"").slice(0,120),
+     variety:row.variety,color:"",weight:/\bG\b/i.test(w)&&!(/\bKG\b/i.test(w))?w.replace(/[^0-9]/g,"").slice(0,4):"",
+     klass:row.label_class||"",kind:row.label_kind,source:"conferência administrativa"};
+   if(!catalog.some(x=>x.barcode===item.barcode&&x.client===item.client&&x.variety===item.variety&&x.kind===item.kind&&x.klass===item.klass))catalog.push(item);
+  }
+ }catch(e){/* Consulta ao catálogo complementar não impede a leitura da etiqueta. */}
+}
+
 const getName=(rows,id)=>rows.find(x=>x[0]===id)?.[1]||"Não identificado";
 const pick=(items,prompt,value)=>'<option value="">'+escape(prompt)+'</option>'+items.map(x=>'<option value="'+escape(x[0])+'"'+(value===x[0]?" selected":"")+'>'+escape(x[1])+'</option>').join("");
 function setNotice(message,error=false){const el=byId("vl2-notice");if(!el)return;el.hidden=!message;el.textContent=message||"";el.className=error?"vl2-notice vl2-error":"vl2-notice";}
@@ -34,6 +50,7 @@ function extract(raw,barcode){
  function assign(k,v,reason){if(v&&!identified[k]){identified[k]=v;reasons[k]=reason;}}
  const codeClients=distinct(matches.map(x=>x.client));
  const wordClients=clients.filter(c=>c[2].some(alias=>n.includes(norm(alias)))).map(x=>x[0]);
+ if(codeClients.length===1&&wordClients.length===1&&codeClients[0]!==wordClients[0])reasons.clientConflict="O nome detectado não coincide com o cadastro do código. Confirme o cliente antes de validar.";
  const agreed=codeClients.filter(x=>wordClients.includes(x));
  if(agreed.length===1)assign("client",agreed[0],"Foto e referência");
  else if(codeClients.length===1)assign("client",codeClients[0],"Código cadastrado");
@@ -62,14 +79,14 @@ function extract(raw,barcode){
  const weightRef=listedWeights.length===1?(listedWeights[0]+" g"):"";
  const weight=weightPhoto||weightRef;
  const gtin=ean;
- const traceClass=(n.match(/\b(MEI|EX)\s*[-]?\s*[VPA]{1,2}[A-Z0-9]*[-]?\s*(50|80)\s*[-]?\s*(10|20|21)\b/)||[]);
+ const traceClass=(n.match(/\b(MEI|EX)\s*[-]?\s*[VPA]{1,2}(50|80)([A-Z]{2,3})(10|20|21)\b/)||[]);
  const hasCinta=/\bCINTA\b/.test(n),hasSelo=/\bSELO\b/.test(n);
  const hasCumbuca=/\bCUMBUCA\b/.test(n);
  const containsBox=/\bCAIXA\b|\bPESO\s*:\s*(?:5|8)\s*KG\b/.test(n);
  let proposedKind="";
- if(traceClass.length&&traceClass[3]==="20")proposedKind="cumbuca500";
- else if(traceClass.length&&traceClass[3]==="21")proposedKind="cumbuca250";
- else if(traceClass.length&&traceClass[3]==="10")proposedKind="sacola";
+ if(traceClass.length&&traceClass[4]==="20")proposedKind="cumbuca500";
+ else if(traceClass.length&&traceClass[4]==="21")proposedKind="cumbuca250";
+ else if(traceClass.length&&traceClass[4]==="10")proposedKind="sacola";
  else if(hasCinta&&/\b250\s*G\b/.test(n))proposedKind="cinta250";
  else if(hasCinta&&/\b500\s*G\b/.test(n))proposedKind="cinta500";
  else if(hasSelo&&/FRUTANA|DATA/.test(n))proposedKind="selo";
@@ -97,6 +114,7 @@ function issueList(data){
  const i=state.identity,f=state.fields;
  if(!i.client&&data?.codeClients?.length>1)add("confirmar","Cliente não definido","O código de barras é compartilhado por clientes. Confirme o cliente impresso.");
  if(f.barcode&&!eanValid(f.barcode))add("atencao","Código de barras","A leitura contém 13 dígitos, mas o dígito verificador não corresponde.");
+ if(data?.reasons?.clientConflict)add("atencao","Cliente","O nome reconhecido na foto difere do cadastro associado ao código de barras.");
  if(data?.weightPhoto&&data?.weightRef&&norm(data.weightPhoto.replace(",","."))!==norm(data.weightRef.replace(",",".")))add("atencao","Peso declarado","A foto e o cadastro indicam pesos diferentes. Confira a embalagem.");
  if(i.variety&&f.traceSuffix){const sig=varieties.find(x=>x[0]===i.variety)?.[2]||"";if(sig&&sig!==f.traceSuffix)add("atencao","Rastreabilidade","A sigla da rastreabilidade não coincide com a variedade identificada.");}
  const matching=state.matches.filter(x=>!i.client||x.client===i.client);
@@ -234,7 +252,7 @@ async function saveReview(){
   fields:{...fields,readingSource:state.source,autoIdentified:true,barcodeMatched:state.matches.length>0},
   checklist,notes:state.notes||""};
  form.append("action","save");form.append("payload",JSON.stringify(payload));form.append("photo",state.photo,state.photo.name);
- try{setNotice("Gravando conferência e foto no histórico privado…");await ctx.api("save",form);setNotice("Conferência salva. Os registros de estoque não foram alterados.");state.reviewed=false;await fetchHistory();}
+ try{setNotice("Gravando conferência e foto no histórico privado…");const response=await ctx.api("save",form);setNotice(response.pattern_learned?"Conferência salva. O padrão validado foi incluído nas próximas identificações.":"Conferência salva sem alterar os relatórios de estoque.");state.reviewed=false;await loadPatterns();await fetchHistory();}
  catch(e){setNotice(e.message||"Não foi possível salvar.",true);}
  finally{if(button.isConnected)button.disabled=false;}
 }
@@ -253,11 +271,11 @@ function mount(adapter){
  '<div class="vl2-capture-foot"><span>Leitura automática por imagem</span><span>Referência: DOC.CQ.056</span></div>'+
  '</section><section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Conferência assistida</h3><p>O que está correto, o que precisa ser confirmado e os dados variáveis.</p></div></div><div id="vl2-results"></div></section></div>'+
  '<section class="vl2-recent"><div><span>REGISTROS</span><h3>Últimas conferências</h3></div><div id="vl2-history">Carregando histórico…</div></section>'+
- '<p class="vl2-foot">Verificação em teste. O reconhecimento por foto não substitui a aprovação do modelo comercial nem a inspeção física exigida pelo manual.</p></section>';
+ '<p class="vl2-foot">Teste exclusivo do administrador. Uma conferência visual confirmada, salva sem divergências e com EAN válido alimenta as próximas identificações. A foto não substitui a inspeção física nem a aprovação do modelo comercial.</p></section>';
  byId("vl2-back")?.addEventListener("click",()=>{endPhoto();ctx.back();});
  byId("vl2-snap")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)takePhoto(file);});
  byId("vl2-gallery")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)takePhoto(file);});
- showResult();fetchHistory();
+ showResult();loadPatterns();fetchHistory();
 }
 window.VITRA_LABEL_SMART={mount,catalogCount:catalog.length,reference:"DOC.CQ.056"};
 })();
