@@ -1022,7 +1022,7 @@ function diagnosticV4(){
   if(ean&&eanValid(ean)){
    const documentedClass=classFromCatalog(),readClass=state.identity.klass||"";
    if(documentedClass&&readClass&&readClass!==documentedClass)
-    add("error","Classe incompatível com o EAN","Classe impressa: "+readClass+" · classe autorizada para este EAN e cliente: "+documentedClass+".","DOC.CQ.056 · EAN por cliente");
+    add(state.ocrConflicts.includes("classificacao")?"pending":"error","Classe incompatível com o EAN","Classe impressa: "+readClass+" · classe autorizada para este EAN e cliente: "+documentedClass+".","DOC.CQ.056 · EAN por cliente");
    else if(documentedClass&&readClass)
     add("ok","Classe e EAN","A classe impressa "+readClass+" confere com o catálogo do código.");
    if(selected?.startsWith("cia-"))add("pending","Padrão regional da CIA PA","O manual apresenta as unidades SP, RJ, PE e CE, mas o catálogo disponível não especifica a autorização do código por filial.");
@@ -1065,7 +1065,7 @@ function diagnosticV4(){
  if(datePhoto){
   const dd=datePhoto.split("/");
   if(dd.length===3&&!validateDate(dd[0],dd[1],dd[2]))add("error","Data de embalagem","A data impressa "+datePhoto+" não é válida.");
-  else if(trace&&datePhoto!==trace.day+"/"+trace.month+"/20"+trace.year)add("error","Data divergente","Data impressa: "+datePhoto+" · data na rastreabilidade: "+trace.day+"/"+trace.month+"/20"+trace.year+".");
+  else if(trace&&datePhoto!==trace.day+"/"+trace.month+"/20"+trace.year)add(state.ocrConflicts.includes("data")?"pending":"error","Data divergente","Data impressa: "+datePhoto+" · data na rastreabilidade: "+trace.day+"/"+trace.month+"/20"+trace.year+".");
   else if(trace)add("ok","Data","A data "+datePhoto+" coincide com a data codificada na rastreabilidade.");
  }else if(unit)add("pending","Data impressa","A data de embalagem não foi lida separadamente. O dia e o mês do código não comprovam, por si sós, que a data impressa está correta.");
  if(unit){
@@ -1104,7 +1104,7 @@ function diagnosticV4(){
   if(!chosenClass)add("pending","Classificação da ordem","Não há classe única comprovada no catálogo para este EAN e cliente. Informe a classificação da produção.");
   if(!readClass)add("pending","Classificação impressa","O sistema não conseguiu ler a classe impressa na caixa. Uma nova fotografia poderá permitir a comparação.");
   else if(chosenClass&&readClass!==chosenClass)
-   add("error","Classificação divergente","Caixa impressa: "+readClass+" · ordem de produção: "+chosenClass+".");
+   add(state.ocrConflicts.includes("classificacao")?"pending":"error","Classificação divergente","Caixa impressa: "+readClass+" · ordem de produção: "+chosenClass+".");
   else if(chosenClass)add("ok","Classificação","A caixa indica "+readClass+", conforme a ordem de produção.");
   const same=matches.filter(x=>x.client===catalogClient(selected));
   const classesFromCatalog=distinct(same.map(x=>x.klass).filter(Boolean));
@@ -1126,10 +1126,10 @@ function diagnosticV4(){
    if(!ref.producer)add("pending","Produtor da caixa","Não foi possível identificar e validar o produtor com uma referência documental.");
    if(!ref.merchant)add("pending","Comercializador da caixa","Não foi possível identificar e validar a empresa responsável pela comercialização.");
   }
-  if(f.cnpj&&!validCnpj(f.cnpj))add("error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
-  if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
-  if(f.ggn&&digits(f.ggn).length!==13)add("error","GGN do produtor","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
-  if(f.ggnComercial&&digits(f.ggnComercial).length!==13)add("error","GGN do comerciante","Lidos "+digits(f.ggnComercial).length+" dígitos no campo comercial; confira os 13 dígitos.");
+  if(f.cnpj&&!validCnpj(f.cnpj))add(state.ocrConflicts.includes("cnpj")?"pending":"error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
+  if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add(state.ocrConflicts.includes("cnpjComercial")?"pending":"error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
+  if(f.ggn&&digits(f.ggn).length!==13)add(state.ocrConflicts.includes("ggn")?"pending":"error","GGN do produtor","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
+  if(f.ggnComercial&&digits(f.ggnComercial).length!==13)add(state.ocrConflicts.includes("ggnComercial")?"pending":"error","GGN do comerciante","Lidos "+digits(f.ggnComercial).length+" dígitos no campo comercial; confira os 13 dígitos.");
   if(/\bGLN\b/i.test(state.text)&&!f.gln&&!f.glnComercial)add("pending","GLN ilegível","Há indicação de GLN na etiqueta, mas os dígitos não foram reconhecidos com segurança.");
  }
  if(state.ocrConflicts.length)add("pending","Leituras diferentes na fotografia","O reconhecimento encontrou valores conflitantes para: "+state.ocrConflicts.join(", ")+". É necessário conferir a foto antes de aprovar.");
