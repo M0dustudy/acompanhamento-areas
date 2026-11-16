@@ -15,7 +15,7 @@ const state={
  photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,
  identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
  expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
- fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
+ fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
  entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null
 };
@@ -45,7 +45,7 @@ function releasePhoto(){
 }
 function resetScan(){
  state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;
- state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
+ state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
  state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;state.kindConfirmed=false;
@@ -1029,8 +1029,10 @@ function showResult(){
   return;
  }
  if(state.analysisError&&!state.text&&!state.barcodeBars){
-  root.innerHTML='<section class="vl2-reading-failure" role="status"><strong>Não foi possível ler esta etiqueta</strong><p>'+esc(state.analysisError)+'</p><p>A foto continua disponível. Confira a orientação, aproxime a etiqueta ou tente novamente.</p><button type="button" id="vl2-retry-read">Tentar leitura novamente</button></section>';
+  root.innerHTML='<section class="vl2-reading-failure" role="status"><strong>Não foi possível ler esta etiqueta</strong><p>'+esc(state.analysisError)+'</p><p>A foto continua disponível. Confira a orientação, aproxime a etiqueta ou tente novamente.</p><button type="button" id="vl2-retry-read">Tentar leitura novamente</button></section>'+
+   (state.sampleSaved?'<p class="vl2-hint">Fotografia registrada como amostra pendente, sem aprovação.</p>':'<details class="vl2-refine vl2-sample"><summary>Guardar esta etiqueta para ampliar o catálogo</summary><p class="vl2-refine-hint">A foto fica armazenada para estudo. Nenhuma informação ilegível será aprovada.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>');
   el("vl2-retry-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto().finally(()=>{state.processing=false;});});
+  el("vl2-save-sample")?.addEventListener("click",saveSample);
   return;
  }
  const report=diagnosticV4();state.diag=report;
@@ -1077,7 +1079,9 @@ function showResult(){
  }
  const retry=state.analysisError?
  '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
- root.innerHTML=retry+reading+reference+outcome+
+ const sampleOption=state.sampleSaved?'<p class="vl2-hint">Amostra registrada como pendente no histórico, sem aprovação.</p>':
+  !state.saved&&report.status!=="aprovado"?'<details class="vl2-refine vl2-sample"><summary>Modelo diferente? Guardar foto para ampliar o catálogo</summary><p class="vl2-refine-hint">Registra a foto para estudo, sem aprovação nem criação automática de regras.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>':"";
+ root.innerHTML=retry+reading+reference+outcome+sampleOption+
  '<details class="vl2-details-root"><summary>Dados técnicos reconhecidos (somente consulta)</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
@@ -1120,11 +1124,12 @@ function showResult(){
  el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
  el("vl2-save")?.addEventListener("click",saveReview);
+ el("vl2-save-sample")?.addEventListener("click",saveSample);
 }
 function renderHistoryRows(rows,archive=false){
  return rows.map(x=>{
   const legacy=Number(x.fields?.verification?.workflowVersion||0)<5;
-  const status=x.review_status==="atencao"?"Divergência":x.review_status==="conferido"?(legacy?"Registro anterior":"Aprovado"):"Pendente";
+  const status=x.fields?.sampleRecord?"Amostra pendente":x.review_status==="atencao"?"Divergência":x.review_status==="conferido"?(legacy?"Registro anterior":"Aprovado"):"Pendente";
   return '<div class="vl2-history-line"><button class="vl2-history-entry" type="button" data-history-id="'+esc(x.id)+'">'+
    '<span class="vl2-history-dot vl2-history-'+esc(x.review_status)+'"></span>'+
    '<span class="vl2-history-main"><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(kinds,x.label_kind))+' · '+esc(nameOf(varieties,x.variety))+'</small><small>Responsável: '+esc(x.reviewer_name||"Não identificado")+'</small></span>'+
@@ -1246,6 +1251,32 @@ async function collectVisualEvidence(file,ocr){
   return {...base,aspect:Math.round(100*bmp.width/bmp.height)/100,colorSamples:chromatic,
     colorCounts:palette,dominantTone:chromatic>=30&&dominant[1]/chromatic>=.45?dominant[0]:"inconclusivo"};
  }catch{return base;}finally{bmp?.close?.();}
+}
+// Fotos desconhecidas viram amostras pendentes, sem criar modelos de aprovação.
+async function saveSample(){
+ if(!ctx?.canAccess?.()||!state.photo||state.sampleSaved||state.sampleSaving)return;
+ state.sampleSaving=true;
+ const btn=el("vl2-save-sample");if(btn)btn.disabled=true;
+ try{
+  const visualEvidence=await collectVisualEvidence(state.photo,state.text);
+  const findings=state.scanCompleted?diagnosticV4().checks.filter(x=>x.status!=="ok").slice(0,12):[];
+  const payload={
+   client:state.clientConfirmed?state.identity.client:"",
+   variety:state.identity.variety||"",label_kind:state.identity.kind||"",
+   label_class:state.identity.klass||"",packaging:state.identity.kind?nameOf(kinds,state.identity.kind):"",
+   review_status:"pendente",detected_text:state.text.slice(0,12000),
+   fields:{...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,
+    visualEvidence,sampleRecord:true,sources:state.sources},
+   checklist:findings.map(x=>["pendente",x.title,x.detail]),
+   notes:"Amostra fotográfica para estudo de modelos; conferência não aprovada."
+  };
+  const form=new FormData();form.append("action","sample");form.append("payload",JSON.stringify(payload));form.append("photo",state.photo,state.photo.name);
+  const result=await ctx.api("save",form);
+  if(!result?.sample_saved)throw Error("O servidor não confirmou o cadastro da amostra.");
+  state.sampleSaved=true;showResult();await fetchHistory();
+  notice("Amostra preservada no histórico para estudo, sem criar regra de aprovação.");
+ }catch(e){notice(e?.message||"Não foi possível registrar a amostra.",true);if(btn?.isConnected)btn.disabled=false;}
+ finally{state.sampleSaving=false;}
 }
 async function saveReview(){
  if(!ctx?.canAccess?.()||state.saved)return;
