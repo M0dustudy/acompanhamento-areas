@@ -84,7 +84,7 @@ function extract(raw,barcode){
  const foundClient=agreed.length===1?agreed[0]:words.length===1?words[0]:candidateClients.length===1?candidateClients[0]:"";
  const traceMatch=str(raw).match(/\bR[\s\-–—]*(\d{2})[\s\-–—]*([0-9A-Za-z_./]{2,40})[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z0-9]{2,5})\b/i);
  const trace=traceMatch?"R-"+traceMatch[1]+"-"+traceMatch[2].toUpperCase()+"-"+traceMatch[3]+"-"+traceMatch[4].toUpperCase()+"-"+traceMatch[5].toUpperCase():"";
- const track=parseTrace(trace),group=matches.filter(x=>!foundClient||x.client===foundClient);
+ const track=parseTrace(trace),group=matches.filter(x=>!foundClient||x.client===catalogClient(foundClient));
  const wordVar=varieties.filter(x=>x[3].some(alias=>n.includes(norm(alias))));
  const suffixVar=varieties.filter(x=>track&&x[2]===track.variety);
  const codeVar=distinct(group.map(x=>x.variety));
@@ -471,6 +471,7 @@ async function beginCamera(){
  if(setting.facingMode==="user"||/front|frontal|selfie/i.test(track?.label||"")){
   stopCamera();notice("O aparelho tentou abrir a câmera frontal. Use uma foto feita pela câmera traseira.",true);return;
  }
+ const stage=el("vl2-stage");if(stage){stage.style.width="";stage.style.height="";stage.style.aspectRatio="";stage.style.maxHeight="";}
  const video=el("vl2-video");if(!video){stopCamera();return;}
  video.srcObject=cameraStream;
  state.crop={cx:.5,cy:.5,scale:.85,ratio:1.5};positionMode("camera");
@@ -883,24 +884,24 @@ function showResult(){
   '<div class="vl2-reading-barcode"><small>Código de barras (EAN-13 completo)</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p></div>'+
   photoValue("Número impresso",state.barcodePrinted)+photoValue("Barras decodificadas",state.barcodeBars):
   '<div class="vl2-reading-barcode"><small>Identificadores</small><strong>Aguardando identificação do modelo</strong></div>';
- const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><span>01</span><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
+ const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
   photoValue("Modelo",kind?name:"A confirmar")+photoValue("Uva",initial)+evidence+
   '</div></section>';
- const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><span>02</span><div><strong>Dados da ordem de produção</strong><small>Informe os valores corretos, independentes da etiqueta impressa.</small></div></div>'+clientChooser()+traceBuilder()+
+ const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados da ordem de produção</strong><small>Informe os valores corretos, independentes da etiqueta impressa.</small></div></div>'+clientChooser()+traceBuilder()+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
  const issues=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
  const item=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
  let outcome="";
  if(!state.reviewRequested){
-  outcome='<section class="vl2-decision-prompt"><div class="vl2-reading-head"><span>03</span><div><strong>Conferência da etiqueta</strong><small>O parecer depende das confirmações acima.</small></div></div><p>'+esc(report.ready?"As referências estão preenchidas. Compare agora com a foto.":"Complete cliente, modelo e rastreabilidade da ordem de produção para habilitar a conferência.")+'</p><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?"disabled":"")+'>Conferir dados da etiqueta</button></section>';
+  outcome='<section class="vl2-decision-prompt"><div class="vl2-reading-head"><div><strong>Conferência da etiqueta</strong><small>O parecer depende das confirmações acima.</small></div></div><p>'+esc(report.ready?"As referências estão preenchidas. Compare agora com a foto.":"Complete cliente, modelo e rastreabilidade da ordem de produção para habilitar a conferência.")+'</p><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?"disabled":"")+'>Conferir dados da etiqueta</button></section>';
  }else{
   const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
-  outcome='<section class="vl2-outcome" id="vl2-outcome"><div class="vl2-status vl2-status-'+report.status+'"><div><small>03 · RESULTADO</small><strong>'+esc(title)+'</strong></div><p>'+esc(report.summary)+'</p></div>'+
+  outcome='<section class="vl2-outcome" id="vl2-outcome"><div class="vl2-status vl2-status-'+report.status+'"><div><small>RESULTADO DA CONFERÊNCIA</small><strong>'+esc(title)+'</strong></div><p>'+esc(report.summary)+'</p></div>'+
   '<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>'+esc(issues.length?"Itens para corrigir ou confirmar":"Itens conferidos")+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
   (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência encontrada nos dados que puderam ser verificados.</p>')+
   (passed.length?'<details class="vl2-passed"><summary>'+passed.length+' conferência(s) com a referência</summary><div class="vl2-check-list">'+passed.map(item).join("")+'</div></details>':"")+'</section></section>';
-  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><span>04</span><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a aplicação física e o modelo da etiqueta com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
+  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a aplicação física e o modelo da etiqueta com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
   else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
  }
  root.innerHTML=reading+reference+outcome+
@@ -1055,7 +1056,7 @@ async function saveReview(){
  }
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
- const fields={...state.fields,expectedRastreio:expectedCode(),clientConfirmed:state.clientConfirmed,
+ const fields={...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),clientConfirmed:state.clientConfirmed,
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:4},
