@@ -116,7 +116,7 @@ function extract(raw,barcode){
  else if(wG&&b&&!printedCnpj&&!printedGgn)kind="cumbuca"+wG;
  else if(!boxEvidence&&b&&state.photoAspect>0&&state.photoAspect<1.72)kind=wG?"cumbuca"+wG:"cumbuca";
  else if(boxEvidence&&state.photoAspect>1.25)kind="caixa";
- const shapeSuggestion=Boolean(kind&&!boxEvidence&&!explicitCumbuca&&!explicitCinta&&!catalogKind.some(Boolean)&&!/\bSELO\b/.test(n));
+ const shapeSuggestion=Boolean(kind&&!boxEvidence&&!explicitCumbuca&&!explicitCinta&&!catalogKind.some(Boolean)&&!wG&&!b&&!/\bSELO\b/.test(n));
  // Códigos 20/21 identificam a embalagem, mas não comprovam o tamanho físico da etiqueta.
  const dateMatch=str(raw).match(/\b([0-3]?\d)[.\/-]([01]?\d)[.\/-]((?:20)?\d{2})\b/);
  const date=dateMatch?dateMatch[1].padStart(2,"0")+"/"+dateMatch[2].padStart(2,"0")+"/"+(dateMatch[3].length===2?"20"+dateMatch[3]:dateMatch[3]):track?track.day+"/"+track.month+"/20"+track.year:"";
@@ -577,13 +577,12 @@ function ocrEvidenceScore(value){
 async function readPhoto(){
  if(!state.photo||!ctx?.canAccess?.())return;
  const seq=++state.sequence,progress=el("vl2-progress");
- if(progress){progress.hidden=false;progress.textContent="Lendo códigos e textos da etiqueta recortada…";}
+ if(progress){progress.hidden=false;progress.textContent="Lendo a etiqueta completa…";}
  let worker=null,recognized="",barcode="",failed=false;
  try{
-  barcode=await scanBarcode(state.photo);
   try{
    await ensureOCR();
-   if(progress)progress.textContent="Consultando as referências do manual e do catálogo…";
+   if(progress)progress.textContent="Reconhecendo os textos, siglas e números impressos…";
    worker=await window.Tesseract.createWorker("por+eng",1);
    recognized=str((await worker.recognize(state.photo,{rotateAuto:true})).data?.text).trim();
    if(ocrEvidenceScore(recognized)<32&&seq===state.sequence){
@@ -613,6 +612,9 @@ async function readPhoto(){
      }
    }
   }catch{failed=true;}
+  if(seq!==state.sequence||!ctx?.canAccess?.())return;
+  const likelyBox=/\b(?:PRODUZIDO POR|COMERCIALIZADO POR|CNPJ|GGN|GLN|CLASSE.*PESO)\b/.test(norm(recognized));
+  if(!likelyBox){if(progress)progress.textContent="Lendo as barras do código EAN-13…";barcode=await scanBarcode(state.photo);}
   if(seq!==state.sequence||!ctx?.canAccess?.())return;
   const data=extract(recognized,barcode);
   state.text=recognized;state.barcode=barcode||data.fields.barcode;state.barcodeBars=barcode;state.barcodePrinted=getEAN(recognized);state.detected=data;
