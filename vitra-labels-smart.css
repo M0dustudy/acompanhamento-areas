@@ -299,3 +299,14 @@
  .vl2-client-pop{max-height:300px}
  .vl2-crop-tools label{justify-content:flex-start}
 }
+
+/* Verificações positivas recolhidas: destaque para o que precisa de ação. */
+.vl2-passed{border-top:1px solid #e2eae2;background:#f8fbf8}
+.vl2-passed>summary{list-style:none;cursor:pointer;padding:12px 14px;color:#2b7950;font-size:11px;font-weight:750}
+.vl2-passed>summary::-webkit-details-marker{display:none}
+.vl2-passed>summary::after{content:"⌄";float:right;font-size:14px;line-height:1}
+.vl2-passed[open]>summary::after{content:"⌃"}
+.vl2-passed>.vl2-check-list{background:#fff;border-top:1px solid #e4eee6}
+.vl2-passed .vl2-check-item{padding:10px 14px}
+.vl2-history-entry:focus-visible{outline:3px solid #8cbba0!important;outline-offset:-2px}
+.vl2-correction-grid .vl2-lookup{margin-top:6px}
