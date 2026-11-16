@@ -1147,11 +1147,14 @@ function showResult(){
   unit?
   '<div class="vl2-reading-barcode"><small>Código de barras · EAN-13</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p><p>'+esc(state.barcodeBars&&state.barcodePrinted?(state.barcodeBars===state.barcodePrinted?"Barras e número impresso conferem.":"Divergência entre barras e número impresso."):"Comparação entre barras e número impresso pendente.")+'</p></div>':
   '<div class="vl2-reading-barcode"><small>Identificadores</small><strong>Aguardando identificação do modelo</strong></div>';
- const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
+ const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · '+state.ocrPasses+' passagem(ns) de OCR · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
   photoValue("Modelo",kind?name:"Não identificado")+photoValue("Uva",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
+ const urgent=report.checks.filter(x=>x.status==="error"&&/CNPJ|GGN|GLN|CEP|COORDENAD|ENDERE|CLASSE|MODELO E VARIEDADE/i.test(x.title)).slice(0,4);
+ const quickAlert=urgent.length?'<section class="vl2-quick-alerts" role="status"><strong>Possíveis divergências já detectadas</strong><small>Conferência preliminar da fotografia. Revise a imagem antes de decidir.</small>'+
+   urgent.map(x=>'<div><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p></div>').join("")+'</section>':"";
  const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados da ordem de produção</strong><small>Informe somente os dados que não constam no cadastro.</small></div></div>'+clientChooser()+traceBuilder()+
  (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>O código não possui uma classe única cadastrada. Informe a classificação correta da produção.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
@@ -1175,7 +1178,7 @@ function showResult(){
  '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
  const sampleOption=state.sampleSaved?'<p class="vl2-hint">Amostra registrada como pendente no histórico, sem aprovação.</p>':
   !state.saved&&report.status!=="aprovado"?'<details class="vl2-refine vl2-sample"><summary>Modelo diferente? Guardar foto para ampliar o catálogo</summary><p class="vl2-refine-hint">Registra a foto para estudo, sem aprovação nem criação automática de regras.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>':"";
- root.innerHTML=retry+reading+reference+outcome+deepRetry+sampleOption+
+ root.innerHTML=retry+reading+quickAlert+reference+outcome+deepRetry+sampleOption+
  '<details class="vl2-details-root"><summary>Dados técnicos reconhecidos (somente consulta)</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
@@ -1367,7 +1370,7 @@ async function saveSample(){
    label_class:state.identity.klass||"",packaging:state.identity.kind?nameOf(kinds,state.identity.kind):"",
    review_status:"pendente",detected_text:state.text.slice(0,12000),
    fields:{...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,
-    visualEvidence,sampleRecord:true,sources:state.sources},
+    visualEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},sampleRecord:true,sources:state.sources},
    checklist:findings.map(x=>["pendente",x.title,x.detail]),
    notes:"Amostra fotográfica para estudo de modelos; conferência não aprovada."
   };
@@ -1388,7 +1391,7 @@ async function saveReview(){
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
  const visualEvidence=await collectVisualEvidence(state.photo,state.text);
- const fields={...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,
+ const fields={...state.fields,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
