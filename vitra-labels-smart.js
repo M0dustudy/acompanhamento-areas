@@ -952,7 +952,7 @@ function mount(adapter){
  releasePhoto();resetScan();
  const p=el("panel");if(!p)return;
  p.innerHTML='<section class="vl2" aria-label="Conferência de etiquetas">'+
-  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE <i>TESTE ADMINISTRATIVO</i></span><h2>Conferência de etiquetas</h2><p>Fotografe uma etiqueta, confirme o cliente e compare a rastreabilidade.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
+  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2><p>Fotografe o rótulo, informe os dados da ordem de produção e confira o resultado antes de salvar.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
   '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Uma etiqueta por foto</h3><p>Centralize o rótulo no quadro. O restante será descartado.</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
   '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
@@ -961,10 +961,10 @@ function mount(adapter){
   '<button id="vl2-apply-crop" type="button" class="vl2-apply" hidden>Recortar e analisar etiqueta</button>'+
   '<div id="vl2-progress" class="vl2-progress" hidden>Reconhecendo dados…</div><div id="vl2-notice" class="vl2-notice" hidden></div>'+
   '<p class="vl2-photo-foot">A foto é analisada após o recorte. O reconhecimento pode falhar com reflexos, letras pequenas ou imagens desfocadas.</p></section>'+
-  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Dados e conferência</h3><p>Somente cliente e rastreabilidade precisam de confirmação habitual.</p></div></div><div id="vl2-results"></div></section></div>'+
+  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>As referências são solicitadas depois que a fotografia for analisada.</p></div></div><div id="vl2-results"></div></section></div>'+
   '<section class="vl2-recent"><div class="vl2-history-head"><h3>Histórico de conferências</h3><small>Fotografias, resultados e responsáveis</small></div><div id="vl2-history">Carregando histórico…</div>'+
   (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
-  '<p class="vl2-foot">Teste restrito ao administrador. Verificações dependem da qualidade da foto e das regras disponíveis para o cliente. Nenhum resultado é aprovado apenas por OCR.</p></section>';
+  '<p class="vl2-foot">A conferência digital compara informações reconhecidas com o manual e os padrões cadastrados. Um campo ilegível ou sem referência confiável permanece pendente. A liberação física continua sob responsabilidade da equipe autorizada.</p></section>';
  el("vl2-back")?.addEventListener("click",()=>{releasePhoto();ctx.back();});
  el("vl2-open-camera")?.addEventListener("click",beginCamera);
  el("vl2-gallery")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
