@@ -95,3 +95,13 @@ Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes
 - A classificação impressa na caixa deve coincidir com a classificação informada da ordem de produção. Essa condição é verificada tanto no frontend quanto pela Edge Function no momento do salvamento.
 - Manter a visualização de texto bruto apenas para auditoria, sem permitir que uma correção manual simule reconhecimento automático.
 - Antes de publicar, executar testes de unidade e integração simulada de cumbuca, caixa, rastreabilidade divergente, EAN divergente, GGN incorreto, classe divergente e falha por tempo esgotado. Teste móvel físico continua necessário para medir a confiabilidade real do OCR.
+
+
+## Ajuste da conferência por tipo — 16/11/2026
+
+- **Cumbuca:** não solicitar seleção de caixa nem identificação do tipo de caixa embalada. Na rastreabilidade de referência, o colaborador confirma ano, área, válvula, data e variedade. O método impresso na etiqueta segue o glossário documental (C, 5 ou 8), sem necessidade de entrada adicional para cumbuca. A verificação do servidor respeita essa distinção e não confunde campo dispensado com informação ausente.
+- **Caixa:** manter a identificação da caixa/pesagem na conferência quando o código impresso a exigir. Ler automaticamente o modelo e suas siglas: MEI (mercado interno), EX (externo), V (verde), P (preta), PA (parda), 50 (5 kg), 80 (8 kg), variedade e embalagem (10, 20, 21). Não solicitar cor manualmente. Uma sigla reconhecida pelo glossário não comprova, sozinha, a cor física da caixa; comparar o que estiver disponível na foto e no padrão aprovado.
+- **Produtor e comercializador são pessoas ou empresas distintas**, embora possam coincidir. Associar cada CNPJ, GGN, GLN, endereço, CEP e coordenada à seção correspondente da etiqueta.
+- **Dados opcionais:** vários produtores não possuem GGN, GLN ou coordenadas, e alguns modelos não imprimem todos os dados. Não tratar a simples ausência como divergência. Se o campo estiver efetivamente impresso, cruzar o valor lido com o registro da entidade identificada; informar número, campo e referência quando houver conflito. Campo impresso mas ilegível permanece pendente. Não atribuir o GGN comercial ao produtor.
+- **Identidade prevalece sobre identificador conflitante:** quando o nome reconhecido identifica inequivocamente um produtor/comerciante do cadastro, comparar o documento impresso com esse cadastro, em vez de aceitar outro titular apenas por coincidência do número.
+- A validação do cadastro de caixa continua exigindo produtor e comercializador identificados. Dados opcionais ausentes não devem impedir a conferência; incompatibilidades comprovadas devem impedir aprovação.
