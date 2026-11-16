@@ -877,6 +877,50 @@ function diagnosticV4(){
    }
   }
  }else if(box){
+  // Etiquetas de caixa não exigem código de barras.
+  if(f.barcode&&eanValid(f.barcode))add("ok","Código complementar","EAN encontrado na fotografia, mas não obrigatório para etiqueta de caixa.");
+ }
+ if(printed){
+  if(!trace)add("error","Formato de rastreabilidade","O código impresso "+printed+" não segue o formato R-ANO-ÁREA/VÁLVULA-DDMM-MÉTODO-SIGLA.");
+  else if(!varieties.some(v=>v[2]===trace.variety))add("pending","Sigla desconhecida","A sigla '"+trace.variety+"' não foi encontrada no glossário; confira a impressão e a referência atualizada do produtor.");
+  if(expected){
+   if(norm(expected).replace(/\s/g,"")!==norm(printed).replace(/\s/g,""))
+    add("error","Rastreabilidade divergente","Etiqueta: "+printed+" · ordem de produção: "+expected+".","DOC.CQ.056, pp. 2–3, 7");
+   else add("ok","Rastreabilidade","O código impresso confere integralmente com a ordem de produção: "+expected+".");
+  }
+ }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
+ const photoVar=state.detected?.identity?.variety||"",referenceVar=expectedVariety();
+ const printedVar=trace?varieties.find(v=>v[2]===trace.variety)?.[0]||"":"";
+ if(photoVar&&printedVar&&photoVar!==printedVar)
+   add("error","Variedade e sigla","O nome da uva identificado na etiqueta é "+nameOf(varieties,photoVar)+", mas a rastreabilidade termina em "+trace.variety+" ("+nameOf(varieties,printedVar)+").");
+ else if(photoVar&&printedVar)add("ok","Variedade e sigla",nameOf(varieties,photoVar)+" corresponde à sigla "+trace.variety+" no manual.","DOC.CQ.056, p. 5");
+ else if(photoVar)add("ok","Variedade identificada",nameOf(varieties,photoVar)+" reconhecida no texto da etiqueta.");
+ else if(printedVar)add("ok","Sigla reconhecida",trace.variety+" corresponde a "+nameOf(varieties,printedVar)+" no manual.");
+ else add("pending","Variedade","Não foi possível confirmar nome e sigla da uva na fotografia.");
+ if(referenceVar&&((photoVar&&photoVar!==referenceVar)||(printedVar&&printedVar!==referenceVar)))
+   add("error","Variedade da ordem de produção","A referência exige "+nameOf(varieties,referenceVar)+", mas a sigla impressa corresponde a "+nameOf(varieties,printedVar||photoVar)+".");
+ const validateDate=(d,m,y)=>{const dt=new Date(Number(y),Number(m)-1,Number(d));return dt.getFullYear()===Number(y)&&dt.getMonth()===Number(m)-1&&dt.getDate()===Number(d);};
+ if(trace){
+  const year=2000+Number(trace.year);
+  if(!validateDate(trace.day,trace.month,year))add("error","Data codificada","Dia e mês inválidos no código de rastreabilidade: "+trace.day+"/"+trace.month+"/"+year+".");
+ }
+ const datePhoto=state.detected?.printedDate||"";
+ if(datePhoto){
+  const dd=datePhoto.split("/");
+  if(dd.length===3&&!validateDate(dd[0],dd[1],dd[2]))add("error","Data de embalagem","A data impressa "+datePhoto+" não é válida.");
+  else if(trace&&datePhoto!==trace.day+"/"+trace.month+"/20"+trace.year)add("error","Data divergente","Data impressa: "+datePhoto+" · data na rastreabilidade: "+trace.day+"/"+trace.month+"/20"+trace.year+".");
+  else if(trace)add("ok","Data","A data "+datePhoto+" coincide com a data codificada na rastreabilidade.");
+ }else if(unit)add("pending","Data impressa","A data de embalagem não foi lida separadamente. O dia e o mês do código não comprovam, por si sós, que a data impressa está correta.");
+ if(unit){
+  const weights=distinct(matches.filter(x=>!selected||x.client===selected).map(x=>x.weight));
+  const expectation=kind.includes("250")?"250":kind.includes("500")?"500":weights.length===1?weights[0]:"";
+  if(expectation&&state.detected?.weightPhoto){
+    const observed=digits(state.detected.weightPhoto);
+    if(observed!==expectation)add("error","Peso da cumbuca","Etiqueta: "+state.detected.weightPhoto+" · modelo: "+expectation+" g.");
+    else add("ok","Peso da unidade","Peso impresso confere com "+expectation+" g.");
+  }else if(!expectation)add("pending","Peso / modelo da cumbuca","Peso da cumbuca não pôde ser confirmado. Confira 250 g ou 500 g conforme o modelo aprovado.");
+ }
+ if(box){
   const chosenClass=state.expected.klass||"",readClass=state.identity.klass||"";
   if(!chosenClass)add("pending","Classificação da ordem","Informe a classificação real da ordem de produção para compará-la com a classe impressa na caixa.");
   if(!readClass)add("pending","Classificação impressa","O sistema não conseguiu ler a classe impressa na caixa. Uma nova fotografia poderá permitir a comparação.");
