@@ -17,7 +17,7 @@ const state={
  expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -47,7 +47,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
- state.notes="";state.mode="empty";state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;
+ state.notes="";state.mode="empty";state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -651,49 +651,64 @@ function diagnosticV4(){
 }
 function showResult(){
  const root=el("vl2-results");if(!root)return;
- const report=diagnose();state.diag=report;
- const title=report.status==="aprovado"?"Aprovado na leitura":report.status==="reprovado"?"Reprovado: divergências detectadas":report.status==="pendente"?"Conferência pendente":"Aguardando fotografia";
- const count=state.photo?'<span>'+report.errors+' divergência(s) · '+report.pending+' pendência(s) · '+report.ok+' conferência(s)</span>':"";
- const status='<div class="vl2-status vl2-status-'+report.status+'"><div><small>DIAGNÓSTICO DA ETIQUETA</small><strong>'+title+'</strong></div>'+count+'<p>'+esc(report.summary)+'</p></div>';
+ if(!state.photo||!state.scanCompleted){
+  root.innerHTML='<div class="vl2-welcome"><strong>Comece pela fotografia</strong><p>Fotografe uma única etiqueta. Depois da leitura, confirme o cliente e a rastreabilidade correta da ordem de produção. O diagnóstico aparece após essa comparação.</p></div>';
+  return;
+ }
+ const report=diagnosticV4();state.diag=report;
+ const kind=state.identity.kind,name=nameOf(kinds,kind);
+ const initial=state.detected?.identity?.variety?nameOf(varieties,state.detected.identity.variety):"Não identificada";
+ const code=state.fields.barcode||"Não identificado";
+ const owners=distinct(catalog.filter(x=>x.barcode===code).map(x=>x.client));
+ const ownerNames=owners.map(x=>nameOf(clients,x)).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+ const codeContext=owners.length>1?"O mesmo EAN-13 consta para "+ownerNames.join(" e ")+". Isso não significa erro por si só.":owners.length===1?"EAN-13 associado a "+ownerNames[0]+".":"O EAN-13 ainda não foi localizado no catálogo consultado.";
+ const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><span>01</span><div><strong>Leitura da fotografia</strong><small>Identificação preliminar</small></div></div><div class="vl2-reading-facts"><div><small>Modelo</small><strong>'+esc(kind?name:"A confirmar")+'</strong></div><div><small>Uva</small><strong>'+esc(initial)+'</strong></div><div class="vl2-reading-barcode"><small>Código de barras (EAN-13 completo)</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p></div></div></section>';
+ const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><span>02</span><div><strong>Dados da ordem de produção</strong><small>Informe os valores corretos, independentes da etiqueta impressa.</small></div></div>'+clientChooser()+traceBuilder()+
+ (kind?"":'<div class="vl2-type-choice"><strong>Tipo da etiqueta</strong>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+'</div>')+'</section>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
- const flagged=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
- const formatCheck=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
- const checks=state.photo?'<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Diagnóstico por item</strong><small>'+report.checks.length+' verificações</small></div>'+
- (flagged.length?'<div class="vl2-check-list">'+flagged.map(formatCheck).join("")+'</div>':"")+
- (passed.length?'<details class="vl2-passed"><summary>✓ '+passed.length+' item(ns) conferido(s) com a referência</summary><div class="vl2-check-list">'+passed.map(formatCheck).join("")+'</div></details>':"")+
- '</section>':"";
- const verification=state.photo?'<details class="vl2-read-panel"><summary>Consultar todos os dados lidos</summary>'+detailsView()+'</details>':detailsView();
- const canSave=state.photo&&state.identity.client&&state.clientConfirmed&&(state.identity.variety||expectedVariety())&&state.identity.kind&&expectedCode();
- root.innerHTML=status+clientChooser()+traceBuilder()+checks+verification+
- correctionPanel()+'<section class="vl2-closeout"><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a fotografia, o modelo aprovado e a ordem de produção. Este registro não substitui a liberação física.</span></label>'+
- '<textarea id="vl2-notes" rows="2" placeholder="Observação da conferência (opcional)">'+esc(state.notes)+'</textarea>'+
- '<button type="button" class="vl2-save" id="vl2-save" '+(!canSave||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Salvar diagnóstico no histórico")+'</button></section>';
- el("vl2-client-search")?.addEventListener("input",e=>{
-  const search=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(search));
- });
- root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;showResult();}));
- root.querySelectorAll("[data-vl2-trace]").forEach(input=>input.addEventListener("change",e=>{
-  const key=e.target.dataset.vl2Trace;
-  let value=e.target.value;
-  if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
-  state.expected[key]=value;
-  if(key==="area"||key==="valve")e.target.value=value;
-  if(!state.identity.variety&&key==="variety"&&state.detected?.identity?.variety)state.identity.variety=state.detected.identity.variety;
-  showResult();
+ const issues=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
+ const item=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
+ let outcome="";
+ if(!state.reviewRequested){
+  outcome='<section class="vl2-decision-prompt"><div class="vl2-reading-head"><span>03</span><div><strong>Conferência da etiqueta</strong><small>O parecer depende das confirmações acima.</small></div></div><p>'+esc(report.ready?"As referências estão preenchidas. Compare agora com a foto.":"Complete cliente, modelo e rastreabilidade da ordem de produção para habilitar a conferência.")+'</p><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?"disabled":"")+'>Conferir dados da etiqueta</button></section>';
+ }else{
+  const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
+  outcome='<section class="vl2-outcome" id="vl2-outcome"><div class="vl2-status vl2-status-'+report.status+'"><div><small>03 · RESULTADO</small><strong>'+esc(title)+'</strong></div><p>'+esc(report.summary)+'</p></div>'+
+  '<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>'+esc(issues.length?"Itens para corrigir ou confirmar":"Itens conferidos")+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
+  (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência encontrada nos dados que puderam ser verificados.</p>')+
+  (passed.length?'<details class="vl2-passed"><summary>'+passed.length+' conferência(s) com a referência</summary><div class="vl2-check-list">'+passed.map(item).join("")+'</div></details>':"")+'</section></section>';
+  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><span>04</span><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a aplicação física e o modelo da etiqueta com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
+  else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
+ }
+ root.innerHTML=reading+reference+outcome+
+ '<details class="vl2-details-root"><summary>Ver dados reconhecidos e corrigir leitura</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
+ root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
+  if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
  }));
- root.querySelectorAll("[data-vl2-identity]").forEach(inp=>inp.addEventListener("change",e=>{state.identity[e.target.dataset.vl2Identity]=e.target.value;showResult();}));
+ root.querySelectorAll("[data-vl2-close-lookup]").forEach(b=>b.addEventListener("click",()=>{b.closest("details").open=false;}));
+ el("vl2-client-search")?.addEventListener("input",e=>{const q=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(q));});
+ root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.reviewRequested=false;showResult();}));
+ root.querySelectorAll("[data-vl2-trace]").forEach(inp=>{
+  const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
+   if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
+   state.expected[key]=value;state.reviewRequested=false;
+  };
+  inp.addEventListener("input",update);inp.addEventListener("change",update);
+ });
  root.querySelectorAll("[data-vl2-search-choice]").forEach(inp=>inp.addEventListener("input",e=>{
-  const search=norm(e.target.value);e.target.closest(".vl2-lookup-pop").querySelectorAll("[data-pick-label]").forEach(b=>b.hidden=!b.dataset.pickLabel.includes(search));
+  const q=norm(e.target.value);e.target.closest(".vl2-lookup-pop").querySelectorAll("[data-pick-label]").forEach(b=>b.hidden=!b.dataset.pickLabel.includes(q));
  }));
  root.querySelectorAll("[data-vl2-option-trace]").forEach(b=>b.addEventListener("click",()=>{
-  const key=b.dataset.vl2OptionTrace;state.expected[key]=b.dataset.pickValue;
-  if(key==="variety"&&!state.identity.variety&&state.detected?.identity?.variety)state.identity.variety=state.detected.identity.variety;showResult();
+  state.expected[b.dataset.vl2OptionTrace]=b.dataset.pickValue;state.reviewRequested=false;showResult();
  }));
- root.querySelectorAll("[data-vl2-option-identity]").forEach(b=>b.addEventListener("click",()=>{state.identity[b.dataset.vl2OptionIdentity]=b.dataset.pickValue;showResult();}));
+ root.querySelectorAll("[data-vl2-option-identity]").forEach(b=>b.addEventListener("click",()=>{
+  state.identity[b.dataset.vl2OptionIdentity]=b.dataset.pickValue;state.reviewRequested=false;showResult();
+ }));
  root.querySelectorAll("[data-vl2-field]").forEach(inp=>inp.addEventListener("change",e=>{
-  state.fields[e.target.dataset.vl2Field]=e.target.value.trim();state.sources[e.target.dataset.vl2Field]="Corrigido manualmente";showResult();
+  state.fields[e.target.dataset.vl2Field]=e.target.value.trim();state.sources[e.target.dataset.vl2Field]="Corrigido manualmente";state.reviewRequested=false;showResult();
  }));
- el("vl2-verified")?.addEventListener("change",e=>state.reviewed=e.target.checked);
+ el("vl2-evaluate")?.addEventListener("click",()=>{state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
+ el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
  el("vl2-save")?.addEventListener("click",saveReview);
 }
