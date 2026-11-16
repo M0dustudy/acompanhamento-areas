@@ -409,6 +409,15 @@
   }
   function labelRender(){
     const p=q("#panel");if(!p||me?.role!=="master")return;
+    if(typeof window.VITRA_LABEL_SMART?.mount!=="function"){
+      p.innerHTML='<section class="va-error" role="alert">O leitor de etiquetas não foi carregado. Atualize a página para tentar novamente.</section>';return;
+    }
+    window.VITRA_LABEL_SMART.mount({
+      canAccess:()=>me?.role==="master"&&!!session?.access_token,
+      api:labelApi,stamp,
+      back:()=>{if(typeof window.showHome==="function")window.showHome();}
+    });
+    return;
     p.innerHTML='<section class="vl-module" aria-label="Verificação de etiquetas">' +
       '<div class="vl-header"><div><span class="vl-kicker">CONTROLE DE QUALIDADE <span>TESTE ADMIN</span></span><h2>Verificação de etiquetas</h2><p>Fotografe a etiqueta, confira a leitura e complete os dados que faltam.</p></div><button class="vl-back" type="button" id="vl-back">Voltar ao painel</button></div>'+
       '<div class="vl-layout"><div class="vl-column">' +
