@@ -541,7 +541,7 @@ function prepareOCRImage(file,maxSide=2300){
   }finally{bitmap.close?.();}
  });
 }
-async function scanBarcode(file){
+async function scanBarcode(file,token=state.sequence){
  let bmp=null;
  try{
   bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
@@ -558,7 +558,7 @@ async function scanBarcode(file){
      const value=digits(x.rawValue),ean=value.length===12?"0"+value:value;
      if(!eanValid(ean))continue;
      const bounds=x.boundingBox;
-     if(bounds?.width&&bounds?.height)state.barcodeRegion={x:bounds.x,y:bounds.y,w:bounds.width,h:bounds.height,iw:canvas.width,ih:canvas.height};
+     if(state.sequence===token&&bounds?.width&&bounds?.height)state.barcodeRegion={x:bounds.x,y:bounds.y,w:bounds.width,h:bounds.height,iw:canvas.width,ih:canvas.height};
      return ean;
     }
    }catch{}
@@ -672,7 +672,7 @@ async function readPhoto(){
   const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
   if(!likelyBox){
    update("Conferindo o código de barras…");
-   barcode=await limitWork(scanBarcode(photo),9600,"Tempo de leitura das barras esgotado.").catch(()=>"");
+   barcode=await limitWork(scanBarcode(photo,seq),9600,"Tempo de leitura das barras esgotado.").catch(()=>"");
   }
   if(seq!==state.sequence)return;
   printedNumber=getEAN(recognized);
@@ -682,9 +682,9 @@ async function readPhoto(){
   }
  };
  try{await limitWork(run(),54000,"A análise excedeu o tempo máximo. Tente novamente com a etiqueta centralizada.");}
- catch(e){failure=e?.message||"A leitura foi interrompida.";if(worker)discardOCRWorker(worker);state.sequence++; }
+ catch(e){failure=e?.message||"A leitura foi interrompida.";if(worker)discardOCRWorker(worker); }
  finally{
-  const stillCurrent=seq===state.sequence||!!failure&&seq+1===state.sequence;
+  const stillCurrent=seq===state.sequence;
   if(stillCurrent&&ctx?.canAccess?.()){
    try{
     const data=extract(recognized,barcode);
@@ -776,14 +776,10 @@ function detailsView(){
  return '<div class="vl2-facts">'+facts+'</div>';
 }
 function correctionPanel(){
- return '<details class="vl2-refine"><summary>Corrigir leitura ou tipo de etiqueta</summary>'+
-  '<div class="vl2-correction-grid"><div class="vl2-option-field"><span>Tipo reconhecido</span>'+lookupPicker(kinds,"kind",state.identity.kind,"Não identificado","identity")+'</div>'+
-  '<div class="vl2-option-field"><span>Variedade reconhecida</span>'+lookupPicker(varieties,"variety",state.identity.variety,"Não identificada","identity")+'</div>'+
-  '<div class="vl2-option-field"><span>Classificação reconhecida</span>'+lookupPicker(classes.map(x=>[x,x]),"klass",state.identity.klass,"Não identificada","identity")+'</div></div>'+
-  '<p class="vl2-refine-hint">Os dados abaixo são extraídos da foto. Corrija apenas erros de leitura; não é necessário preenchê-los para realizar a conferência.</p>'+
-  '<div class="vl2-correction-grid">'+[["rastreio","Rastreabilidade lida"],["peso","Peso"],["barcode","EAN"],["data","Data"],["lote","Lote"],["produtor","Produtor"],["cnpj","CNPJ do produtor"],["cnpjComercial","CNPJ comercial"],["ggn","GGN"],["produto","Produto"]].map(x=>
-    '<label>'+esc(x[1])+'<input data-vl2-field="'+x[0]+'" value="'+esc(state.fields[x[0]]||"")+'"></label>').join("")+'</div>'+
-  '<details class="vl2-raw"><summary>Texto bruto extraído</summary><pre>'+esc(state.text||"Sem leitura")+'</pre></details></details>';
+ return '<details class="vl2-refine"><summary>Modelo identificado incorretamente?</summary>'+
+  '<p class="vl2-refine-hint">Somente o tipo de etiqueta pode ser ajustado aqui. Os números e identificadores serão conferidos a partir da fotografia, sem transcrição manual.</p>'+
+  '<div class="vl2-option-field"><span>Modelo da etiqueta</span>'+lookupPicker(kinds,"kind",state.identity.kind,"Selecionar modelo","identity")+'</div></details>'+
+  '<details class="vl2-raw"><summary>Consultar texto extraído da foto</summary><pre>'+esc(state.text||"Nenhum texto foi reconhecido.")+'</pre></details>';
 }
 function diagnose(){
  const issues=computeIssues(),additional=[],f=state.fields,client=state.identity.client,expected=expectedCode(),model=state.identity.kind;
@@ -841,7 +837,7 @@ function diagnosticV4(){
   if(!ean)add("pending","EAN-13","O código numérico da cumbuca não foi identificado; refaça a leitura da etiqueta.");
   else if(!eanValid(ean))add("error","EAN-13","O número "+ean+" não passa na validação do dígito verificador.");
   if(!bars)add("pending","Leitura das barras","Não foi possível decodificar as barras da imagem. Sem essa leitura, não é seguro afirmar que o código corresponde à numeração impressa.");
-  if(!printedNumber)add("pending","Número impresso","Os 13 dígitos impressos abaixo das barras não puderam ser lidos independentemente.");
+  if(!printedNumber)add("pending","Dígitos abaixo das barras","O leitor decodificou "+(bars||"as barras parcialmente")+", mas não conseguiu reconhecer separadamente os 13 algarismos que aparecem impressos sob elas. Sem essa segunda leitura, não há comparação entre barras e texto.");
   if(bars&&printedNumber){
    if(bars!==printedNumber)add("error","Barras e números diferentes","Código decodificado das barras: "+bars+" · número impresso na etiqueta: "+printedNumber+".");
    else add("ok","Barras e números","O leitor identificou "+bars+" nas barras e os mesmos 13 dígitos foram reconhecidos no texto impresso.");
@@ -867,7 +863,7 @@ function diagnosticV4(){
     add("error","Rastreabilidade divergente","Etiqueta: "+printed+" · ordem de produção: "+expected+".","DOC.CQ.056, pp. 2–3, 7");
    else add("ok","Rastreabilidade","O código impresso confere integralmente com a ordem de produção: "+expected+".");
   }
- }else add("pending","Rastreabilidade não reconhecida","O código não foi lido na etiqueta; não é possível conferir a sequência da produção.");
+ }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
  const photoVar=state.detected?.identity?.variety||"",referenceVar=expectedVariety();
  const printedVar=trace?varieties.find(v=>v[2]===trace.variety)?.[0]||"":"";
  if(photoVar&&printedVar&&photoVar!==printedVar)
@@ -981,8 +977,10 @@ function showResult(){
   if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a aplicação física e o modelo da etiqueta com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
   else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
  }
- root.innerHTML=reading+reference+outcome+
- '<details class="vl2-details-root"><summary>Ver dados reconhecidos e corrigir leitura</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
+ const retry=state.analysisError?
+ '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
+ root.innerHTML=retry+reading+reference+outcome+
+ '<details class="vl2-details-root"><summary>Dados técnicos reconhecidos (somente consulta)</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
  }));
@@ -1019,6 +1017,7 @@ function showResult(){
   state.fields[e.target.dataset.vl2Field]=e.target.value.trim();state.sources[e.target.dataset.vl2Field]="Corrigido manualmente";state.reviewRequested=false;showResult();
  }));
  el("vl2-confirm-kind")?.addEventListener("click",()=>{state.kindConfirmed=true;showResult();});
+ el("vl2-retry-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto().finally(()=>{state.processing=false;});});
  el("vl2-evaluate")?.addEventListener("click",()=>{state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
  el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
