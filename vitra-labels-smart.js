@@ -682,22 +682,63 @@ async function saveReview(){
   notice(out.pattern_learned?"Conferência registrada. Padrão validado incluído no catálogo.":"Conferência registrada. Nenhum dado do estoque foi alterado.");
  }catch(e){notice(e?.message||"Falha ao salvar conferência.",true);if(btn?.isConnected)btn.disabled=false;}
 }
+function setCropShape(active){
+ for(const name of ["vl2-square","vl2-rectangle","vl2-portrait"])el(name)?.classList.toggle("active",name===active);
+}
+function adjustCrop(delta){
+ state.crop.scale=Math.max(.35,Math.min(.98,state.crop.scale+delta));
+ if(el("vl2-zoom"))el("vl2-zoom").value=Math.round(state.crop.scale*100);
+ drawCrop();
+}
 function bindFrame(){
  const frame=el("vl2-frame"),stage=el("vl2-stage");if(!frame||!stage)return;
- let drag=null;
+ const active=new Map();let gesture=null;
+ function clamp(value,lo,hi){return Math.max(lo,Math.min(hi,value));}
+ function spacing(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+ function center(a,b){return {x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
  frame.addEventListener("pointerdown",e=>{
-  if(state.mode!=="camera"&&state.mode!=="crop")return;
-  drag={x:e.clientX,y:e.clientY,cx:state.crop.cx,cy:state.crop.cy};
-  frame.setPointerCapture(e.pointerId);e.preventDefault();
+  if(!["camera","crop"].includes(state.mode))return;
+  const p={x:e.clientX,y:e.clientY};active.set(e.pointerId,p);
+  try{frame.setPointerCapture(e.pointerId);}catch{}
+  if(active.size>=2){
+   const two=[...active.values()];gesture={kind:"pinch",startDistance:Math.max(20,spacing(two[0],two[1])),startScale:state.crop.scale,startCenter:center(two[0],two[1]),startCx:state.crop.cx,startCy:state.crop.cy};
+  }else{
+   gesture={kind:e.target.closest(".vl2-resize-grip")?"resize":"move",x:e.clientX,y:e.clientY,cx:state.crop.cx,cy:state.crop.cy,scale:state.crop.scale,ratio:state.crop.ratio,rect:frameBounds()};
+  }
+  e.preventDefault();
  });
  frame.addEventListener("pointermove",e=>{
-  if(!drag)return;
-  state.crop.cx=Math.max(0,Math.min(1,drag.cx+(e.clientX-drag.x)/stage.clientWidth));
-  state.crop.cy=Math.max(0,Math.min(1,drag.cy+(e.clientY-drag.y)/stage.clientHeight));
-  drawCrop();
+  if(!active.has(e.pointerId)||!gesture)return;
+  active.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(active.size>=2&&gesture.kind==="pinch"){
+   const points=[...active.values()],dist=spacing(points[0],points[1]),mid=center(points[0],points[1]);
+   state.crop.scale=clamp(gesture.startScale*dist/gesture.startDistance,.35,.98);
+   state.crop.cx=clamp(gesture.startCx+(mid.x-gesture.startCenter.x)/stage.clientWidth,0,1);
+   state.crop.cy=clamp(gesture.startCy+(mid.y-gesture.startCenter.y)/stage.clientHeight,0,1);
+  }else if(active.size===1){
+   const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;
+   if(gesture.kind==="resize"){
+    const width=clamp(gesture.rect.w+dx,stage.clientWidth*.25,stage.clientWidth*.98);
+    const height=clamp(gesture.rect.h+dy,stage.clientHeight*.25,stage.clientHeight*.98);
+    state.crop.ratio=clamp(width/height,.45,3.25);
+    state.crop.scale=clamp(Math.max(width/stage.clientWidth,height/stage.clientHeight),.35,.98);
+    state.crop.cx=clamp(gesture.cx+dx/(2*stage.clientWidth),0,1);
+    state.crop.cy=clamp(gesture.cy+dy/(2*stage.clientHeight),0,1);
+   }else{
+    state.crop.cx=clamp(gesture.cx+dx/stage.clientWidth,0,1);
+    state.crop.cy=clamp(gesture.cy+dy/stage.clientHeight,0,1);
+   }
+  }
+  if(el("vl2-zoom"))el("vl2-zoom").value=Math.round(state.crop.scale*100);
+  drawCrop();e.preventDefault();
  });
- frame.addEventListener("pointerup",()=>drag=null);
- frame.addEventListener("pointercancel",()=>drag=null);
+ function finish(e){
+  active.delete(e.pointerId);if(!active.size)gesture=null;
+  else{const remain=[...active.values()][0];gesture={kind:"move",x:remain.x,y:remain.y,cx:state.crop.cx,cy:state.crop.cy};}
+ }
+ frame.addEventListener("pointerup",finish);
+ frame.addEventListener("pointercancel",finish);
+ frame.addEventListener("lostpointercapture",finish);
  window.removeEventListener("resize",drawCrop);
  window.addEventListener("resize",drawCrop,{passive:true});
 }
@@ -708,8 +749,8 @@ function mount(adapter){
  p.innerHTML='<section class="vl2" aria-label="Conferência de etiquetas">'+
   '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE <i>TESTE ADMINISTRATIVO</i></span><h2>Conferência de etiquetas</h2><p>Fotografe uma etiqueta, confirme o cliente e compare a rastreabilidade.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
   '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Uma etiqueta por foto</h3><p>Centralize o rótulo no quadro. O restante será descartado.</p></div></div>'+
-  '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>ÁREA DE LEITURA</span></div></div>'+
-  '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Retangular</button></div><label>Área do recorte<input id="vl2-zoom" type="range" min="55" max="97" value="85"></label></div>'+
+  '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
+  '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><div class="vl2-crop-stepper"><button id="vl2-zoom-out" type="button" aria-label="Diminuir quadro">−</button><button id="vl2-zoom-in" type="button" aria-label="Aumentar quadro">+</button><button id="vl2-center" type="button">Centralizar</button></div><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
   '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Abrir câmera traseira</button><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
   '<button id="vl2-capture" type="button" class="vl2-apply" hidden>Capturar somente a área marcada</button>'+
   '<button id="vl2-apply-crop" type="button" class="vl2-apply" hidden>Recortar e analisar etiqueta</button>'+
@@ -723,8 +764,12 @@ function mount(adapter){
  el("vl2-gallery")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
  el("vl2-capture")?.addEventListener("click",captureCamera);
  el("vl2-apply-crop")?.addEventListener("click",finishCrop);
- el("vl2-square")?.addEventListener("click",()=>{state.crop.ratio=1;el("vl2-square").classList.add("active");el("vl2-rectangle").classList.remove("active");drawCrop();});
- el("vl2-rectangle")?.addEventListener("click",()=>{state.crop.ratio=1.5;el("vl2-rectangle").classList.add("active");el("vl2-square").classList.remove("active");drawCrop();});
+ el("vl2-square")?.addEventListener("click",()=>{state.crop.ratio=1;setCropShape("vl2-square");drawCrop();});
+ el("vl2-rectangle")?.addEventListener("click",()=>{state.crop.ratio=1.5;setCropShape("vl2-rectangle");drawCrop();});
+ el("vl2-portrait")?.addEventListener("click",()=>{state.crop.ratio=.68;setCropShape("vl2-portrait");drawCrop();});
+ el("vl2-center")?.addEventListener("click",()=>{state.crop.cx=.5;state.crop.cy=.5;drawCrop();});
+ el("vl2-zoom-in")?.addEventListener("click",()=>adjustCrop(.07));
+ el("vl2-zoom-out")?.addEventListener("click",()=>adjustCrop(-.07));
  el("vl2-zoom")?.addEventListener("input",e=>{state.crop.scale=Number(e.target.value)/100;drawCrop();});
  bindFrame();showResult();loadPatterns();loadEntities();fetchHistory();
 }
