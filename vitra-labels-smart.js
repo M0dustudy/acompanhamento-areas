@@ -949,7 +949,8 @@ function showResult(){
 }
 function renderHistoryRows(rows,archive=false){
  return rows.map(x=>{
-  const status=x.review_status==="atencao"?"Divergência":x.review_status==="conferido"?"Aprovado":"Pendente";
+  const legacy=Number(x.fields?.verification?.workflowVersion||0)<5;
+  const status=x.review_status==="atencao"?"Divergência":x.review_status==="conferido"?(legacy?"Registro anterior":"Aprovado"):"Pendente";
   return '<div class="vl2-history-line"><button class="vl2-history-entry" type="button" data-history-id="'+esc(x.id)+'">'+
    '<span class="vl2-history-dot vl2-history-'+esc(x.review_status)+'"></span>'+
    '<span class="vl2-history-main"><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(kinds,x.label_kind))+' · '+esc(nameOf(varieties,x.variety))+'</small><small>Responsável: '+esc(x.reviewer_name||"Não identificado")+'</small></span>'+
@@ -1033,7 +1034,7 @@ async function openHistory(id){
   const names={aprovado:record.review_status==="conferido"?"Aprovado na conferência":"Leitura sem divergências · inspeção pendente",reprovado:"Reprovado / divergência",pendente:"Pendente de confirmação"};
   const summaries=saved.summary||"Registro histórico. Consulte os itens encontrados e o texto reconhecido.";
   const items=checks.length?checks.map(x=>'<div class="vl2-check-item vl2-check-'+esc(x.status||"pending")+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>').join(""):Array.isArray(record.checklist)?record.checklist.map(x=>'<div class="vl2-check-item vl2-check-'+(x[0]==="atencao"?"error":"pending")+'"><span aria-hidden="true">?</span><div><strong>'+esc(x[1])+'</strong><p>'+esc(x[2])+'</p></div></div>').join(""):"";
-  const vals=[["Cliente",nameOf(clients,record.client)],["Tipo de etiqueta",nameOf(kinds,record.label_kind)],["Variedade",nameOf(varieties,record.variety)],["Classificação",record.label_class],["Rastreabilidade lida",f.rastreio],["Rastreabilidade de referência",f.expectedRastreio],["GGN",f.ggn],["CNPJ do produtor",f.cnpj],["CNPJ comercial",f.cnpjComercial],["Produtor",f.produtor],["Lote",f.lote],["Data",f.data],["Peso",f.peso],["Código de barras",f.barcode]];
+  const vals=[["Cliente",nameOf(clients,record.client)],["Tipo de etiqueta",nameOf(kinds,record.label_kind)],["Variedade",nameOf(varieties,record.variety)],["Classificação",record.label_class],["Rastreabilidade lida",f.rastreio],["Rastreabilidade de referência",f.expectedRastreio],["GGN",f.ggn],["CNPJ do produtor",f.cnpj],["CNPJ comercial",f.cnpjComercial],["GGN comercial",f.ggnComercial],["GLN do produtor",f.gln],["GLN do comercializador",f.glnComercial],["EAN nas barras",f.barcodeBarras],["EAN impresso",f.barcodeImpresso],["Produtor",f.producerReference||f.produtor],["Comercializado por",f.merchantReference||f.comercializado],["Lote",f.lote],["Data",f.data],["Peso",f.peso],["Código de barras",f.barcode]];
   host.innerHTML='<div class="vl2-overlay" role="dialog" aria-modal="true" aria-label="Diagnóstico registrado"><div class="vl2-dialog"><header><div><small>CONFERÊNCIA REGISTRADA · '+esc(ctx.stamp(record.created_at))+'</small><h3>Diagnóstico da etiqueta</h3></div><button id="vl2-close-detail" type="button" aria-label="Fechar">×</button></header>'+
    '<div class="vl2-detail-status vl2-status-'+esc(status)+'"><strong>'+esc(names[status]||"Registro de conferência")+'</strong><p>'+esc(summaries)+'</p><small>Responsável: '+esc(record.reviewer_name||"Não identificado")+'</small></div>'+
    (image||"")+'<div class="vl2-detail-facts">'+vals.filter(x=>x[1]).map(x=>'<div><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>').join("")+'</div>'+
@@ -1058,9 +1059,9 @@ async function saveReview(){
  const btn=el("vl2-save");if(btn)btn.disabled=true;
  const fields={...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),clientConfirmed:state.clientConfirmed,
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
-  producerReference:state.referenceProducer?.name||"",
-  diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:4},
-  verification:{workflowVersion:4,validated:true,referenceComplete:true,barcodeOrigin:"photo",reviewedByHuman:true}};
+  producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
+  diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
+  verification:{workflowVersion:5,validated:true,referenceComplete:true,barcodeOrigin:"photo",reviewedByHuman:true}};
  const payload={client:state.identity.client,variety:state.identity.variety||state.detected?.identity?.variety||expectedVariety(),
   label_kind:state.identity.kind,label_class:category()==="box"?(state.identity.klass||""):"",
   packaging:nameOf(kinds,state.identity.kind),review_status:"conferido",
