@@ -310,3 +310,11 @@
 .vl2-passed .vl2-check-item{padding:10px 14px}
 .vl2-history-entry:focus-visible{outline:3px solid #8cbba0!important;outline-offset:-2px}
 .vl2-correction-grid .vl2-lookup{margin-top:6px}
+
+/* Campos de busca com estrutura HTML válida e alinhamento consistente. */
+.vl2-trace-grid .vl2-trace-field,.vl2-correction-grid .vl2-option-field{display:block;min-width:0}
+.vl2-trace-grid .vl2-trace-field>span,.vl2-correction-grid .vl2-option-field>span{
+ display:block;font-size:10px;line-height:1.4;font-weight:740;color:#476952
+}
+.vl2-correction-grid .vl2-option-field .vl2-lookup{margin-top:7px}
+.vl2-trace-grid .vl2-lookup{margin-top:5px}
