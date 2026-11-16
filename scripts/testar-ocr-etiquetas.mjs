@@ -67,10 +67,10 @@ assert(source.includes('class="vl2-trace-grid"'));
 assert(source.includes("vl2-concise-result"));
 assert(source.includes('readPass(canvas,12000)'));
 assert(source.includes('await limitWork(run(),33000'));
-assert.equal(t.extract("UVA VITORIA\\nR-26-109A5-1611-5-VI","7898366001754").identity.variety,"vitoria");
+assert.equal(t.extract("UVA VITORIA\nR-26-109A5-1611-5-VI","7898366001754").identity.variety,"vitoria");
 assert.equal(t.extract("MEI-V50VI10","").identity.kind,"sacola");
 assert.equal(t.extract("MEI-V50VI20","").identity.variety,"vitoria");
-assert.equal(t.extract("VITORIA\\n7898366001754","7898366001754").identity.kind,"cumbuca");
+assert.equal(t.extract("VITORIA\n7898366001754","7898366001754").identity.kind,"cumbuca");
 
 // Simulações não fotográficas do fluxo de alto volume:
 // uma passagem no caso completo; somente uma passagem complementar no caso incompleto.
@@ -79,13 +79,13 @@ context.window.Tesseract={createWorker:async()=>({
  recognize:async()=>{calls++;return {data:{text:readings.shift()||""}};},
  terminate:async()=>{}
 })};
-const fullRead="PRODUZIDO POR FAZENDA TESTE\\nCOMERCIALIZADO POR EXPOFRUT\\nCNPJ: 12345678000190\\nGGN: 1234567890123\\nR-26-109A5-1611-5-VI\\nUVA VITORIA\\nEXTRA";
+const fullRead="PRODUZIDO POR FAZENDA TESTE\nCOMERCIALIZADO POR EXPOFRUT\nCNPJ: 12345678000190\nGGN: 1234567890123\nR-26-109A5-1611-5-VI\nUVA VITORIA\nEXTRA";
 t.state.photo={type:"image/jpeg"};t.state.barcodeBars="";t.state.ocrRawPassages=[];
 readings=[fullRead];calls=0;await t.readPhoto();
 assert.equal(calls,1,"A leitura completa não deve executar regiões extras");
 assert.equal(t.state.fields.rastreio,"R-26-109A5-1611-5-VI");
 t.state.photo={type:"image/jpeg"};t.state.ocrRawPassages=[];t.state.barcodeBars="";
-readings=["PRODUZIDO POR FAZENDA TESTE\\nCNPJ: 12345678000190","R-26-109A5-1611-5-VI\\nUVA VITORIA"];calls=0;
+readings=["PRODUZIDO POR FAZENDA TESTE\nCNPJ: 12345678000190","R-26-109A5-1611-5-VI\nUVA VITORIA"];calls=0;
 await t.readPhoto();
 assert.equal(calls,2,"A leitura parcial deve tentar uma única região complementar");
 assert.equal(t.state.fields.rastreio,"R-26-109A5-1611-5-VI");
