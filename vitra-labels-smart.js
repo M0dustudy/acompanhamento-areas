@@ -17,7 +17,7 @@ const state={
  expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -48,7 +48,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
- state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;state.kindConfirmed=false;
+ state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;state.kindConfirmed=false;
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -489,15 +489,57 @@ async function captureCamera(){
  }catch{notice("A captura falhou. Confira o enquadramento e tente novamente.",true);}
  finally{state.processing=false;}
 }
+function limitWork(promise,ms,message){
+ let timer=null;
+ const timed=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message||"O processamento excedeu o tempo permitido.")),ms);});
+ return Promise.race([Promise.resolve(promise),timed]).finally(()=>clearTimeout(timer));
+}
+let cachedOCRWorker=null,pendingOCRWorker=null;
 async function ensureOCR(){
  if(window.Tesseract?.createWorker)return;
- await new Promise((resolve,reject)=>{
-  const old=document.querySelector("script[data-vl2-ocr]");
-  if(old){if(window.Tesseract?.createWorker)return resolve();old.addEventListener("load",resolve,{once:true});old.addEventListener("error",reject,{once:true});return;}
-  const tag=document.createElement("script");tag.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
-  tag.async=true;tag.dataset.vl2Ocr="true";tag.onload=resolve;tag.onerror=reject;document.head.appendChild(tag);
+ const load=async()=>{
+  let tag=document.querySelector('script[data-vl2-ocr]');
+  if(tag&&tag.dataset.failed==="true"){tag.remove();tag=null;}
+  return new Promise((resolve,reject)=>{
+   const onLoad=()=>window.Tesseract?.createWorker?resolve():reject(new Error("O leitor de texto não inicializou."));
+   const onError=()=>reject(new Error("Não foi possível carregar o motor de leitura."));
+   if(tag){tag.addEventListener("load",onLoad,{once:true});tag.addEventListener("error",onError,{once:true});return;}
+   tag=document.createElement("script");
+   tag.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+   tag.async=true;tag.dataset.vl2Ocr="true";tag.onload=onLoad;tag.onerror=onError;
+   document.head.appendChild(tag);
+  });
+ };
+ try{await limitWork(load(),12000,"A conexão não conseguiu carregar o leitor de texto.");}
+ catch(e){const tag=document.querySelector('script[data-vl2-ocr]');if(tag){tag.dataset.failed="true";tag.remove();}throw e;}
+ if(!window.Tesseract?.createWorker)throw new Error("Reconhecimento de texto indisponível.");
+}
+async function getOCRWorker(){
+ if(cachedOCRWorker)return cachedOCRWorker;
+ if(!pendingOCRWorker){
+  pendingOCRWorker=window.Tesseract.createWorker("por",1).then(w=>{
+   cachedOCRWorker=w;return w;
+  }).finally(()=>{pendingOCRWorker=null;});
+ }
+ return limitWork(pendingOCRWorker,25000,"O leitor de texto demorou demais para iniciar.");
+}
+function discardOCRWorker(worker){
+ if(cachedOCRWorker===worker)cachedOCRWorker=null;
+ try{worker?.terminate()?.catch?.(()=>{});}catch{}
+}
+function prepareOCRImage(file,maxSide=2300){
+ return createImageBitmap(file,{imageOrientation:"from-image"}).then(bitmap=>{
+  try{
+   const scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));
+   const canvas=document.createElement("canvas");
+   canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+   canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+   const g=canvas.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,canvas.width,canvas.height);
+   g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";
+   g.drawImage(bitmap,0,0,canvas.width,canvas.height);
+   return canvas;
+  }finally{bitmap.close?.();}
  });
- if(!window.Tesseract?.createWorker)throw Error("OCR indisponível");
 }
 async function scanBarcode(file){
  let bmp=null;let canvas=null;
