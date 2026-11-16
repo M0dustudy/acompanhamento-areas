@@ -619,7 +619,8 @@ function discardOCRWorker(worker){
 function prepareOCRImage(file,maxSide=2300){
  return createImageBitmap(file,{imageOrientation:"from-image"}).then(bitmap=>{
   try{
-   const scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));
+   // Etiquetas pequenas precisam de caracteres maiores no OCR; imagens grandes são reduzidas.
+   const scale=Math.min(2.3,maxSide/Math.max(bitmap.width,bitmap.height));
    const canvas=document.createElement("canvas");
    canvas.width=Math.max(1,Math.round(bitmap.width*scale));
    canvas.height=Math.max(1,Math.round(bitmap.height*scale));
