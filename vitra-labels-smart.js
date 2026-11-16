@@ -586,8 +586,12 @@ function showResult(){
  const count=state.photo?'<span>'+report.errors+' divergência(s) · '+report.pending+' pendência(s) · '+report.ok+' conferência(s)</span>':"";
  const status='<div class="vl2-status vl2-status-'+report.status+'"><div><small>DIAGNÓSTICO DA ETIQUETA</small><strong>'+title+'</strong></div>'+count+'<p>'+esc(report.summary)+'</p></div>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
- const checks=state.photo?'<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Verificações</strong><small>'+report.checks.length+' itens analisados</small></div>'+
-   '<div class="vl2-check-list">'+visual.map(x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>').join("")+'</div></section>':"";
+ const flagged=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
+ const formatCheck=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
+ const checks=state.photo?'<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Diagnóstico por item</strong><small>'+report.checks.length+' verificações</small></div>'+
+ (flagged.length?'<div class="vl2-check-list">'+flagged.map(formatCheck).join("")+'</div>':"")+
+ (passed.length?'<details class="vl2-passed"><summary>✓ '+passed.length+' item(ns) conferido(s) com a referência</summary><div class="vl2-check-list">'+passed.map(formatCheck).join("")+'</div></details>':"")+
+ '</section>':"";
  const verification=state.photo?'<details class="vl2-read-panel"><summary>Consultar todos os dados lidos</summary>'+detailsView()+'</details>':detailsView();
  const canSave=state.photo&&state.identity.client&&state.clientConfirmed&&(state.identity.variety||expectedVariety())&&state.identity.kind&&expectedCode();
  root.innerHTML=status+clientChooser()+traceBuilder()+checks+verification+
@@ -653,7 +657,7 @@ async function openHistory(id){
   }
   const f=record.fields||{},saved=f.diagnostic||{},checks=Array.isArray(saved.checks)?saved.checks:[];
   const status=saved.status|| (record.review_status==="conferido"?"aprovado":record.review_status==="atencao"?"reprovado":"pendente");
-  const names={aprovado:"Aprovado na conferência",reprovado:"Reprovado / divergência",pendente:"Pendente de confirmação"};
+  const names={aprovado:record.review_status==="conferido"?"Aprovado na conferência":"Leitura sem divergências · inspeção pendente",reprovado:"Reprovado / divergência",pendente:"Pendente de confirmação"};
   const summaries=saved.summary||"Registro histórico. Consulte os itens encontrados e o texto reconhecido.";
   const items=checks.length?checks.map(x=>'<div class="vl2-check-item vl2-check-'+esc(x.status||"pending")+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>').join(""):Array.isArray(record.checklist)?record.checklist.map(x=>'<div class="vl2-check-item vl2-check-'+(x[0]==="atencao"?"error":"pending")+'"><span aria-hidden="true">?</span><div><strong>'+esc(x[1])+'</strong><p>'+esc(x[2])+'</p></div></div>').join(""):"";
   const vals=[["Cliente",nameOf(clients,record.client)],["Tipo de etiqueta",nameOf(kinds,record.label_kind)],["Variedade",nameOf(varieties,record.variety)],["Classificação",record.label_class],["Rastreabilidade lida",f.rastreio],["Rastreabilidade de referência",f.expectedRastreio],["GGN",f.ggn],["CNPJ do produtor",f.cnpj],["CNPJ comercial",f.cnpjComercial],["Produtor",f.produtor],["Lote",f.lote],["Data",f.data],["Peso",f.peso],["Código de barras",f.barcode]];
