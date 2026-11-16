@@ -395,15 +395,19 @@ function clientChooser(){
   sortedClients.map(c=>'<button type="button" data-vl2-client="'+esc(c[0])+'" data-label="'+esc(norm(c[1]))+'">'+esc(c[1])+'</button>').join("")+
   '</div></div></details><p class="vl2-help">'+(state.clientConfirmed?"Cliente confirmado. Você pode alterá-lo a qualquer momento.":active?"Identificação sugerida pela foto; toque para confirmar.":"Escolha o cliente para cruzar com a etiqueta.")+'</p></div>';
 }
-function traceOptions(items,key,placeholder){
- return '<select data-vl2-trace="'+key+'" aria-label="'+key+'">'+opts(items,state.expected[key],placeholder)+'</select>';
+function lookupPicker(items,key,value,placeholder,attribute){
+ const ordered=items.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{numeric:true,sensitivity:"base"}));
+ const selected=ordered.find(x=>x[0]===value),attr=attribute==="trace"?"data-vl2-option-trace":"data-vl2-option-identity";
+ const list=ordered.map(x=>'<button type="button" '+attr+'="'+esc(key)+'" data-pick-value="'+esc(x[0])+'" data-pick-label="'+esc(norm(x[1]))+'"'+(x[0]===value?' aria-current="true"':'')+'>'+esc(x[1])+'</button>').join("");
+ return '<details class="vl2-lookup"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><span>'+esc(selected?selected[1]:placeholder)+'</span><b aria-hidden="true">⌄</b></summary><div class="vl2-lookup-pop"><input type="search" data-vl2-search-choice autocomplete="off" placeholder="Pesquisar opção…"><div class="vl2-lookup-list">'+list+'</div></div></details>';
 }
+function traceOptions(items,key,placeholder){return lookupPicker(items,key,state.expected[key],placeholder,"trace");}
 function traceBuilder(){
  const year=Number(new Date().getFullYear());
  const years=Array.from({length:11},(_,i)=>{const y=String(year-5+i).slice(-2);return [y,String(year-5+i)];});
  const day=Array.from({length:31},(_,i)=>[String(i+1).padStart(2,"0"),String(i+1).padStart(2,"0")]);
  const month=Array.from({length:12},(_,i)=>[String(i+1).padStart(2,"0"),String(i+1).padStart(2,"0")]);
- const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(x=>[x,x]);
+ const letters=["A","B","C","D","1","2","3","4"].map(x=>[x,x]);
  const varietiesCodes=varieties.filter(x=>x[2]).slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(x=>[x[2],x[1]]);
  const siteAreas=(()=>{try{return typeof A==="object"&&A?Object.keys(A).map(digits).filter(x=>x.length>=3&&x.length<=5):[];}catch{return [];}})();
  const expected=expectedCode(),observed=state.fields.rastreio||"";
@@ -414,8 +418,8 @@ function traceBuilder(){
   '<div class="vl2-trace-grid">'+
   '<label>Prefixo<input readonly value="R" aria-label="Prefixo R"></label>'+
   '<label>Ano'+traceOptions(years,"year","Ano")+'</label>'+
-  '<label class="vl2-trace-area">Área<input data-vl2-trace="area" inputmode="numeric" maxlength="5" list="vl2-areas" value="'+esc(state.expected.area)+'" placeholder="Ex.: 0210"><datalist id="vl2-areas">'+distinct([...siteAreas,state.detected?.track?.area,...(state.history||[]).map(x=>parseTrace(x?.fields?.rastreio||"")?.area)]).filter(Boolean).map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist></label>'+
-  '<label>Válvula'+traceOptions(letters,"valve","Válvula")+'</label>'+
+  '<label class="vl2-trace-area">Área<input data-vl2-trace="area" maxlength="20" list="vl2-areas" value="'+esc(state.expected.area)+'" placeholder="Código do produtor"><datalist id="vl2-areas">'+distinct([...siteAreas,state.detected?.track?.area,...(state.history||[]).map(x=>parseTrace(x?.fields?.rastreio||"")?.area)]).filter(Boolean).map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist></label>'+
+  '<label>Válvula'+'<input data-vl2-trace="valve" maxlength="16" list="vl2-valves" value="'+esc(state.expected.valve)+'" placeholder="Letra ou número"><datalist id="vl2-valves">'+letters.map(x=>'<option value="'+x[0]+'"></option>').join("")+'</datalist>'+'</label>'+
   '<label>Dia'+traceOptions(day,"day","Dia")+'</label>'+
   '<label>Mês'+traceOptions(month,"month","Mês")+'</label>'+
   '<label>Pesagem'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Método")+'</label>'+
@@ -452,8 +456,8 @@ function detailsView(){
 function correctionPanel(){
  return '<details class="vl2-refine"><summary>Corrigir leitura ou tipo de etiqueta</summary>'+
   '<div class="vl2-correction-grid"><label>Tipo reconhecido<select data-vl2-identity="kind">'+opts(kinds,state.identity.kind,"Não identificado")+'</select></label>'+
-  '<label>Variedade reconhecida<select data-vl2-identity="variety">'+opts(varieties,state.identity.variety,"Não identificada")+'</select></label>'+
-  '<label>Classificação reconhecida<select data-vl2-identity="klass">'+opts(classes.map(x=>[x,x]),state.identity.klass,"Não identificada")+'</select></label></div>'+
+  '<label>Variedade reconhecida'+lookupPicker(varieties,"variety",state.identity.variety,"Não identificada","identity")+'</label>'+
+  '<label>Classificação reconhecida'+lookupPicker(classes.map(x=>[x,x]),"klass",state.identity.klass,"Não identificada","identity")+'</label></div>'+
   '<p class="vl2-refine-hint">Os dados abaixo são extraídos da foto. Corrija apenas erros de leitura; não é necessário preenchê-los para realizar a conferência.</p>'+
   '<div class="vl2-correction-grid">'+[["rastreio","Rastreabilidade lida"],["peso","Peso"],["barcode","EAN"],["data","Data"],["lote","Lote"],["produtor","Produtor"],["cnpj","CNPJ do produtor"],["cnpjComercial","CNPJ comercial"],["ggn","GGN"],["produto","Produto"]].map(x=>
     '<label>'+esc(x[1])+'<input data-vl2-field="'+x[0]+'" value="'+esc(state.fields[x[0]]||"")+'"></label>').join("")+'</div>'+
@@ -481,14 +485,25 @@ function showResult(){
  root.querySelectorAll("[data-vl2-trace]").forEach(inp=>inp.addEventListener("change",e=>{
   const key=e.target.dataset.vl2Trace;
   let value=e.target.value;
-  if(key==="area")value=digits(value).slice(0,5);
+  if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9]/g,"").slice(0,key==="area"?20:16);
   state.expected[key]=value;
-  if(key==="area")e.target.value=value;
+  if(key==="area"||key==="valve")e.target.value=value;
   if(!state.identity.variety&&key==="variety")state.identity.variety=expectedVariety();
   showResult();
  }));
  root.querySelectorAll("[data-vl2-identity]").forEach(input=>input.addEventListener("change",e=>{
   state.identity[e.target.dataset.vl2Identity]=e.target.value;showResult();
+ }));
+ root.querySelectorAll("[data-vl2-search-choice]").forEach(inp=>inp.addEventListener("input",e=>{
+ const query=norm(e.target.value);
+ e.target.closest(".vl2-lookup-pop").querySelectorAll("[data-pick-label]").forEach(b=>b.hidden=!b.dataset.pickLabel.includes(query));
+ }));
+ root.querySelectorAll("[data-vl2-option-trace]").forEach(btn=>btn.addEventListener("click",()=>{
+ const key=btn.dataset.vl2OptionTrace;state.expected[key]=btn.dataset.pickValue;
+ if(key==="variety"&&!state.identity.variety)state.identity.variety=expectedVariety();showResult();
+ }));
+ root.querySelectorAll("[data-vl2-option-identity]").forEach(btn=>btn.addEventListener("click",()=>{
+ state.identity[btn.dataset.vl2OptionIdentity]=btn.dataset.pickValue;showResult();
  }));
  root.querySelectorAll("[data-vl2-field]").forEach(input=>input.addEventListener("change",e=>{
   state.fields[e.target.dataset.vl2Field]=e.target.value.trim();state.sources[e.target.dataset.vl2Field]="Corrigido manualmente";showResult();
