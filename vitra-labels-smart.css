@@ -464,3 +464,20 @@
  .vl2-history-action{padding:5px 7px!important}
  .vl2-details-body .vl2-facts{grid-template-columns:1fr}
 }
+
+/* v5: fotografia inteira, orientação e recorte opcional sem perda de área */
+.vl2-photo{margin-inline:auto;min-width:0;max-width:100%;overflow:hidden}
+.vl2-photo>img{object-fit:contain!important}
+.vl2-gallery-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.vl2-gallery-tools[hidden]{display:none!important}
+.vl2-gallery-tools button{font:700 12px/1.35 inherit!important;color:#295b3b!important;-webkit-text-fill-color:#295b3b!important;
+border:1px solid #d6e5d9!important;background:#f6faf6!important;border-radius:10px!important;
+min-height:45px;padding:9px 6px!important;white-space:normal}
+.vl2-gallery-tools button:hover{background:#e7f2e9!important}
+.vl2-photo-foot{line-height:1.55}
+.vl2-photo:not(:has(video:not([hidden]))) .vl2-frame{box-shadow:0 0 0 999px #07170b73}
+@media(max-width:520px){
+ .vl2-gallery-tools{gap:5px}
+ .vl2-gallery-tools button{font-size:11px!important;padding:7px 3px!important}
+ .vl2-photo{max-width:100%}
+}
