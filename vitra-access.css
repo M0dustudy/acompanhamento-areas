@@ -890,3 +890,10 @@ html.va-locked .vitra-shell{visibility:hidden!important;pointer-events:none!impo
 @media(max-width:1000px){.vl-layout{grid-template-columns:1fr}}
 @media(max-width:720px){.vl-module{padding:4px 0 25px}.vl-card{padding:15px;border-radius:14px}.vl-header{align-items:flex-start}.vl-header h2{font-size:27px}.vl-photo-actions>*{flex:1 1 40%;text-align:center}.vl-viewbox{min-height:230px}.vl-form-grid{grid-template-columns:1fr 1fr;gap:11px}}
 @media(max-width:410px){.vl-form-grid{grid-template-columns:1fr}.vl-photo-actions>*{flex-basis:100%}.vl-card{padding:13px}.vl-viewbox{min-height:195px}}
+
+/* Controle de módulos por colaborador, disponível somente ao administrador. */
+#cards>[hidden],#cards .card[hidden]{display:none!important}
+.va-module-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.va-module-choice{display:flex!important;flex-direction:row!important;align-items:center;gap:9px;border:1px solid #d8e6da;border-radius:10px;padding:10px 12px;background:#f7faf7;color:#315a3c;font-size:12px!important;line-height:1.4!important;font-weight:700}
+.va-module-choice input[type="checkbox"]{flex:0 0 18px;width:18px!important;height:18px!important;accent-color:#246d47;min-height:0!important;margin:0!important}
+@media(max-width:420px){.va-module-choices{grid-template-columns:1fr}}
