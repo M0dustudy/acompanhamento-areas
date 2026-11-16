@@ -492,13 +492,13 @@ function traceBuilder(){
   '<p>Informe a rastreabilidade real da produção. O código lido na foto será comparado separadamente.</p>'+
   '<div class="vl2-trace-grid">'+
   '<label>Prefixo<input readonly value="R" aria-label="Prefixo R"></label>'+
-  '<label>Ano'+traceOptions(years,"year","Ano")+'</label>'+
+  '<div class="vl2-trace-field"><span>Ano</span>'+traceOptions(years,"year","Ano")+'</div>'+
   '<label class="vl2-trace-area">Área<input data-vl2-trace="area" maxlength="20" list="vl2-areas" value="'+esc(state.expected.area)+'" placeholder="Código do produtor"><datalist id="vl2-areas">'+distinct([...siteAreas,state.detected?.track?.area,...(state.history||[]).map(x=>parseTrace(x?.fields?.rastreio||"")?.area)]).filter(Boolean).map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist></label>'+
   '<label>Válvula'+'<input data-vl2-trace="valve" maxlength="16" list="vl2-valves" value="'+esc(state.expected.valve)+'" placeholder="Letra ou número"><datalist id="vl2-valves">'+letters.map(x=>'<option value="'+x[0]+'"></option>').join("")+'</datalist>'+'</label>'+
-  '<label>Dia'+traceOptions(day,"day","Dia")+'</label>'+
-  '<label>Mês'+traceOptions(month,"month","Mês")+'</label>'+
-  '<label>Pesagem'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Método")+'</label>'+
-  '<label>Variedade'+traceOptions(varietiesCodes,"variety","Sigla")+'</label></div>'+
+  '<div class="vl2-trace-field"><span>Dia</span>'+traceOptions(day,"day","Dia")+'</div>'+
+  '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
+  '<div class="vl2-trace-field"><span>Pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Método")+'</div>'+
+  '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected||"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-trace-status '+(same?"vl2-matched":expected&&observed?"vl2-different":"")+'">'+esc(status)+'</div></section>';
 }
@@ -534,9 +534,9 @@ function detailsView(){
 }
 function correctionPanel(){
  return '<details class="vl2-refine"><summary>Corrigir leitura ou tipo de etiqueta</summary>'+
-  '<div class="vl2-correction-grid"><label>Tipo reconhecido'+lookupPicker(kinds,"kind",state.identity.kind,"Não identificado","identity")+'</label>'+
-  '<label>Variedade reconhecida'+lookupPicker(varieties,"variety",state.identity.variety,"Não identificada","identity")+'</label>'+
-  '<label>Classificação reconhecida'+lookupPicker(classes.map(x=>[x,x]),"klass",state.identity.klass,"Não identificada","identity")+'</label></div>'+
+  '<div class="vl2-correction-grid"><div class="vl2-option-field"><span>Tipo reconhecido</span>'+lookupPicker(kinds,"kind",state.identity.kind,"Não identificado","identity")+'</div>'+
+  '<div class="vl2-option-field"><span>Variedade reconhecida</span>'+lookupPicker(varieties,"variety",state.identity.variety,"Não identificada","identity")+'</div>'+
+  '<div class="vl2-option-field"><span>Classificação reconhecida</span>'+lookupPicker(classes.map(x=>[x,x]),"klass",state.identity.klass,"Não identificada","identity")+'</div></div>'+
   '<p class="vl2-refine-hint">Os dados abaixo são extraídos da foto. Corrija apenas erros de leitura; não é necessário preenchê-los para realizar a conferência.</p>'+
   '<div class="vl2-correction-grid">'+[["rastreio","Rastreabilidade lida"],["peso","Peso"],["barcode","EAN"],["data","Data"],["lote","Lote"],["produtor","Produtor"],["cnpj","CNPJ do produtor"],["cnpjComercial","CNPJ comercial"],["ggn","GGN"],["produto","Produto"]].map(x=>
     '<label>'+esc(x[1])+'<input data-vl2-field="'+x[0]+'" value="'+esc(state.fields[x[0]]||"")+'"></label>').join("")+'</div>'+
