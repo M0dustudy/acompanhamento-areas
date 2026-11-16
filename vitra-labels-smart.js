@@ -17,7 +17,7 @@ const state={
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -48,7 +48,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
- state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;state.kindConfirmed=false;
+ state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.reviewRequested=false;state.kindConfirmed=false;
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -711,10 +711,57 @@ async function enhanceForOCR(file){
   return canvas;
  }catch{return null;}finally{bitmap?.close?.();}
 }
+
+async function prepareOCRBand(file,from,to,contrast=false){
+ let bmp=null;
+ try{
+  bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
+  const top=Math.floor(bmp.height*from),height=Math.max(1,Math.floor(bmp.height*to)-top);
+  const scale=Math.min(2,2700/bmp.width,3500/height);
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.max(1,Math.round(bmp.width*scale));
+  canvas.height=Math.max(1,Math.round(height*scale));
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+  if(contrast)ctx.filter="grayscale(1) contrast(1.45) brightness(1.05)";
+  ctx.drawImage(bmp,0,top,bmp.width,height,0,0,canvas.width,canvas.height);
+  return canvas;
+ }finally{bmp?.close?.();}
+}
+function ocrTraceCandidates(raw){
+ const re=/\bR[\s\-–—]*(\d{2})[\s\-–—]*([0-9A-Za-z_./]{2,40})[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z0-9]{2,5})\b/gi;
+ return distinct([...str(raw).matchAll(re)].map(m=>"R-"+m[1]+"-"+m[2].toUpperCase()+"-"+m[3]+"-"+m[4].toUpperCase()+"-"+m[5].toUpperCase()));
+}
+function ocrConflictKeys(passages){
+ const values={rastreio:ocrTraceCandidates(passages.join("\n"))};
+ for(const key of ["cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial"]){
+  values[key]=distinct(passages.filter(Boolean).map(p=>extract(p,"").fields[key]).filter(Boolean));
+ }
+ return Object.entries(values).filter(([key,list])=>list.length>1).map(([key])=>key);
+}
+function mergeOCRPassages(passages){
+ const seen=new Set(),out=[];
+ const ranked=passages.filter(Boolean).slice().sort((a,b)=>ocrEvidenceScore(b)-ocrEvidenceScore(a));
+ for(const passage of ranked)for(const raw of passage.split(/\r?\n/)){
+  const line=raw.trim(),key=norm(line).replace(/\s+/g,"");
+  if(!line||key.length<2||seen.has(key))continue;
+  seen.add(key);out.push(line);
+ }
+ return out.join("\n").slice(0,16000);
+}
+function shouldScanOCRBands(raw,deep=false){
+ const text=norm(raw);
+ return deep||!ocrTraceCandidates(raw).length||/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CAIXA)\b/.test(text);
+}
 function ocrEvidenceScore(value){
  const text=norm(value);let score=Math.min(200,text.length)/20;
  if(/\bR-\d{2}-[A-Z0-9./_]+-\d{4}-[C58]-[A-Z0-9]{2,5}\b/.test(text))score+=30;
  if(/\bCNPJ\b/.test(text))score+=7;
+ if(/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR)\b/.test(text))score+=9;
+ if(/\bGLN\b/.test(text))score+=7;
+ if(/LOCALIZACAO\s+GEOGRAFICA/.test(text))score+=9;
+ if(/\bCEP\b/.test(text))score+=4;
  if(/\bGGN\b/.test(text))score+=7;
  if(/\b(?:EMBALADO|EMBALAGEM|DATA)\b/.test(text))score+=4;
  if(varieties.some(v=>v[3].some(a=>text.includes(norm(a)))))score+=12;
