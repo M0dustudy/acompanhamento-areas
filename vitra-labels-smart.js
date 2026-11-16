@@ -316,8 +316,9 @@ async function beginCamera(){
  }
  const video=el("vl2-video");if(!video){stopCamera();return;}
  video.srcObject=cameraStream;
- try{await video.play();}catch{stopCamera();notice("Não foi possível iniciar a câmera traseira.",true);return;}
- state.crop={cx:.5,cy:.5,scale:.85,ratio:1.5};positionMode("camera");showResult();
+ state.crop={cx:.5,cy:.5,scale:.85,ratio:1.5};positionMode("camera");
+ try{await video.play();}catch{stopCamera();positionMode("empty");notice("Não foi possível iniciar a câmera traseira.",true);return;}
+ showResult();
  notice("Centralize uma única etiqueta dentro do quadro. Apenas essa área será fotografada.");
 }
 async function captureCamera(){
@@ -535,6 +536,7 @@ function bindFrame(){
  });
  frame.addEventListener("pointerup",()=>drag=null);
  frame.addEventListener("pointercancel",()=>drag=null);
+ window.removeEventListener("resize",drawCrop);
  window.addEventListener("resize",drawCrop,{passive:true});
 }
 function mount(adapter){
