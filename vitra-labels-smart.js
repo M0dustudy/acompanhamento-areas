@@ -12,7 +12,7 @@ const classes=["Campesita","Happy Tree / Extra A","Extra","Sacola","Selecionada"
 const producers=[];
 const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{sensitivity:"base"}));
 const state={
- photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",detected:null,
+ photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,
  identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
  expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
@@ -43,7 +43,7 @@ function releasePhoto(){
  state.photo=null;state.sourceFile=null;
 }
 function resetScan(){
- state.sequence++;state.photo=null;state.text="";state.barcode="";state.detected=null;
+ state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
@@ -67,7 +67,7 @@ function expectedVariety(){
  return varieties.find(x=>x[2]===state.expected.variety)?.[0]||"";
 }
 function getEAN(raw){
- const plain=str(raw).replace(/(?:GGN|GLOBALGAP|GLOBAL G A P)\s*:?\s*(\d[\d\s-]{11,20})/gi," ");
+ const plain=str(raw).replace(/(?:GGN|GLN|GLOBALGAP|GLOBAL G A P)\s*:?\s*(\d[\d\s-]{11,20})/gi," ");
  const codes=(plain.match(/(?<!\d)(?:\d[\s-]*){13}(?!\d)/g)||[]).map(digits);
  const matches=codes.filter(x=>catalog.some(p=>p.barcode===x));
  return matches.find(eanValid)||codes.find(eanValid)||matches[0]||"";
@@ -523,7 +523,7 @@ async function readPhoto(){
   }catch{failed=true;}
   if(seq!==state.sequence||!ctx?.canAccess?.())return;
   const data=extract(recognized,barcode);
-  state.text=recognized;state.barcode=barcode||data.fields.barcode;state.detected=data;
+  state.text=recognized;state.barcode=barcode||data.fields.barcode;state.barcodeBars=barcode;state.barcodePrinted=getEAN(recognized);state.detected=data;
   state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
   // Uma escolha explícita feita antes da foto nunca é substituída pelo OCR.
   if(!state.clientConfirmed)state.identity.client=data.detectedClient;
@@ -662,19 +662,33 @@ function diagnosticV4(){
  const expected=expectedCode(),printed=f.rastreio||"",trace=parseTrace(printed);
  const scanned=Boolean(state.scanCompleted&&state.photo);
  if(!scanned)return {status:"inicial",ready:false,checks:[],errors:0,pending:0,ok:0,summary:""};
- if(!state.clientConfirmed||!selected)add("pending","Cliente","Confirme o cliente da ordem de produção para comparar o EAN da fotografia.");
+ if(!state.clientConfirmed||!selected)add("pending","Cliente","Confirme o cliente da ordem de produção para cruzar os campos impressos com o modelo aprovado.");
  if(!expected)add("pending","Rastreabilidade de referência","Informe o código correto da ordem de produção. O VITRA vai comparar com o código impresso, sem copiar um para o outro.");
  if(!kind)add("pending","Tipo de etiqueta","Não foi possível identificar o modelo com segurança. Selecione o tipo em Ajustar leitura.");
  if(kind&&state.detected?.kindConfidence==="low"&&!state.kindConfirmed)add("pending","Modelo sugerido pela forma","O formato da imagem sugere "+nameOf(kinds,kind)+", mas não há dados suficientes para diferenciar cumbuca e caixa com segurança. Confirme o modelo antes de aprovar.");
  if(category()==="other")add("pending","Modelo da etiqueta","O modelo informado não é identificado como etiqueta de caixa ou de cumbuca; exige uma regra específica de validação.");
- if(f.barcode){
-  if(!eanValid(f.barcode))add("error","Código de barras","EAN lido: "+f.barcode+". Dígito verificador inválido; confira os 13 números.");
-  else if(!matches.length)add("pending","EAN não catalogado","EAN-13 "+f.barcode+" válido, mas ausente das referências cadastradas. É necessária a confirmação do padrão autorizado.");
-  else if(selected&&state.clientConfirmed&&!owners.includes(selected))add("error","EAN de outro cliente","EAN-13 "+f.barcode+" está cadastrado para: "+ownerNames.join(", ")+". Não há vínculo desse código com "+display+" na base consultada. Confira o cliente e eventual autorização de uso do código da fazenda.");
-  else if(selected&&state.clientConfirmed){
-   add("ok","EAN e cliente","EAN-13 "+f.barcode+" corresponde ao cadastro de "+display+(owners.length>1?". Este mesmo número também consta para "+ownerNames.join(" e ")+".":"."),"DOC.CQ.056 · códigos por cliente");
+ if(unit){
+  const bars=state.barcodeBars||"",printedNumber=state.barcodePrinted||"",ean=f.barcode||"";
+  if(!ean)add("pending","EAN-13","O código numérico da cumbuca não foi identificado; refaça a leitura da etiqueta.");
+  else if(!eanValid(ean))add("error","EAN-13","O número "+ean+" não passa na validação do dígito verificador.");
+  if(!bars)add("pending","Leitura das barras","Não foi possível decodificar as barras da imagem. Sem essa leitura, não é seguro afirmar que o código corresponde à numeração impressa.");
+  if(!printedNumber)add("pending","Número impresso","Os 13 dígitos impressos abaixo das barras não puderam ser lidos independentemente.");
+  if(bars&&printedNumber){
+   if(bars!==printedNumber)add("error","Barras e números diferentes","Código decodificado das barras: "+bars+" · número impresso na etiqueta: "+printedNumber+".");
+   else add("ok","Barras e números","O leitor identificou "+bars+" nas barras e os mesmos 13 dígitos foram reconhecidos no texto impresso.");
   }
- }else add("pending","Código de barras","Os 13 dígitos não foram reconhecidos. Refaça a fotografia ou revise o campo lido.");
+  if(ean&&eanValid(ean)){
+   if(!matches.length)add("pending","EAN sem padrão aprovado","EAN-13 "+ean+" válido, mas não localizado no catálogo de clientes ou produtores autorizados.");
+   else if(selected&&state.clientConfirmed&&!owners.includes(selected)){
+    add("error","EAN incompatível com o cliente","EAN-13 "+ean+" consta para "+ownerNames.join(", ")+", não para "+display+". Verifique se existe autorização expressa para uso do EAN da fazenda.");
+   }else if(selected&&state.clientConfirmed){
+    add("ok","EAN e cliente","EAN-13 "+ean+" cadastrado para "+display+(owners.length>1?". Também consta para "+ownerNames.join(" e ")+".":"."),"DOC.CQ.056 · códigos por cliente");
+   }
+  }
+ }else if(box){
+  // Etiquetas de caixa não exigem código de barras.
+  if(f.barcode&&eanValid(f.barcode))add("ok","Código complementar","EAN encontrado na fotografia, mas não obrigatório para etiqueta de caixa.");
+ }
  if(printed){
   if(!trace)add("error","Formato de rastreabilidade","O código impresso "+printed+" não segue o formato R-ANO-ÁREA/VÁLVULA-DDMM-MÉTODO-SIGLA.");
   else if(!varieties.some(v=>v[2]===trace.variety))add("pending","Sigla desconhecida","A sigla '"+trace.variety+"' não foi encontrada no glossário; confira a impressão e a referência atualizada do produtor.");
@@ -731,7 +745,8 @@ function diagnosticV4(){
     else if(row.type==="confirmar")add("pending",row.title,row.body,row.reference);
     else if(row.type==="ok")add("ok",row.title,row.body,row.reference);
    }
-   if(!ref.producer)add("pending","Produtor da caixa","Não foi possível vincular com segurança o produtor impresso a uma referência documental.");
+   if(!ref.producer)add("pending","Produtor da caixa","Não foi possível identificar e validar o produtor com uma referência documental.");
+   if(!ref.merchant)add("pending","Comercializador da caixa","Não foi possível identificar e validar a empresa responsável pela comercialização.");
   }
   if(f.cnpj&&!validCnpj(f.cnpj))add("error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
   if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
