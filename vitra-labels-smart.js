@@ -452,7 +452,7 @@ async function useFile(file){
  if(!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>10*1024*1024){notice("Escolha imagem JPG, PNG ou WebP de até 10 MB.",true);return;}
  releasePhoto();resetScan();state.crop={cx:.5,cy:.5,scale:.92,ratio:1};state.cropActive=false;
  setGalleryPreview(file);showResult();
- notice("Foto completa carregada. Gire se necessário; escolha «Analisar foto inteira» ou ajuste o recorte.");
+ notice("Foto pronta para análise. Use Girar se a etiqueta estiver de lado.");
 }
 async function beginCamera(){
  if(!navigator.mediaDevices?.getUserMedia){notice("Câmera integrada indisponível. Use «Escolher foto».",true);return;}
@@ -730,7 +730,7 @@ function traceBuilder(){
  const siteAreas=(()=>{try{return typeof A==="object"&&A?Object.keys(A).map(digits).filter(x=>x.length>=3&&x.length<=5):[];}catch{return [];}})();
  const expected=expectedCode(),observed=state.fields.rastreio||"";
  const same=expected&&observed&&norm(expected)===norm(observed);
- const status=expected?(observed?(same?"Conferida: códigos correspondem":"Divergência com a foto"):"Referência completa; aguardando leitura da foto"):"Selecione os campos da produção";
+ const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
  return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
   '<p>Informe a rastreabilidade real da produção. O código lido na foto será comparado separadamente.</p>'+
   '<div class="vl2-trace-grid">'+
@@ -935,6 +935,11 @@ function showResult(){
  const root=el("vl2-results");if(!root)return;
  if(!state.photo||!state.scanCompleted){
   root.innerHTML='<div class="vl2-welcome"><strong>Comece pela fotografia</strong><p>Escolha uma fotografia ou abra a câmera traseira. O VITRA lê as informações impressas; você informa apenas o cliente e a rastreabilidade correta da produção.</p></div>';
+  return;
+ }
+ if(state.analysisError&&!state.text&&!state.barcodeBars){
+  root.innerHTML='<section class="vl2-reading-failure" role="status"><strong>Não foi possível ler esta etiqueta</strong><p>'+esc(state.analysisError)+'</p><p>A foto continua disponível. Confira a orientação, aproxime a etiqueta ou tente novamente.</p><button type="button" id="vl2-retry-read">Tentar leitura novamente</button></section>';
+  el("vl2-retry-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto().finally(()=>{state.processing=false;});});
   return;
  }
  const report=diagnosticV4();state.diag=report;
