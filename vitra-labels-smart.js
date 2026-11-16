@@ -17,7 +17,7 @@ const state={
  expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -47,7 +47,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
- state.notes="";state.mode="empty";state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;
+ state.notes="";state.mode="empty";state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;state.kindConfirmed=false;
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -115,6 +115,7 @@ function extract(raw,barcode){
  else if(wG&&b&&!printedCnpj&&!printedGgn)kind="cumbuca"+wG;
  else if(!boxEvidence&&b&&state.photoAspect>0&&state.photoAspect<1.72)kind=wG?"cumbuca"+wG:"cumbuca";
  else if(boxEvidence&&state.photoAspect>1.25)kind="caixa";
+ const shapeSuggestion=Boolean(kind&&!boxEvidence&&!explicitCumbuca&&!explicitCinta&&!catalogKind.some(Boolean)&&!/\\bSELO\\b/.test(n));
  // Códigos 20/21 identificam a embalagem, mas não comprovam o tamanho físico da etiqueta.
  const dateMatch=str(raw).match(/\b([0-3]?\d)[.\/-]([01]?\d)[.\/-]((?:20)?\d{2})\b/);
  const date=dateMatch?dateMatch[1].padStart(2,"0")+"/"+dateMatch[2].padStart(2,"0")+"/"+(dateMatch[3].length===2?"20"+dateMatch[3]:dateMatch[3]):track?track.day+"/"+track.month+"/20"+track.year:"";
@@ -135,7 +136,7 @@ function extract(raw,barcode){
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
   fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnNumber,produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
-  producer,commer,weightPhoto,weightCatalog,refWeight,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1
+  producer,commer,weightPhoto,weightCatalog,refWeight,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high"
  };
 }
 function registryAudit(){
@@ -602,6 +603,7 @@ function diagnosticV4(){
  if(!state.clientConfirmed||!selected)add("pending","Cliente","Confirme o cliente da ordem de produção para comparar o EAN da fotografia.");
  if(!expected)add("pending","Rastreabilidade de referência","Informe o código correto da ordem de produção. O VITRA vai comparar com o código impresso, sem copiar um para o outro.");
  if(!kind)add("pending","Tipo de etiqueta","Não foi possível identificar o modelo com segurança. Selecione o tipo em Ajustar leitura.");
+ if(kind&&state.detected?.kindConfidence==="low"&&!state.kindConfirmed)add("pending","Modelo sugerido pela forma","O formato da imagem sugere "+nameOf(kinds,kind)+", mas não há dados suficientes para diferenciar cumbuca e caixa com segurança. Confirme o modelo antes de aprovar.");
  if(category()==="other")add("pending","Modelo da etiqueta","O modelo informado não é identificado como etiqueta de caixa ou de cumbuca; exige uma regra específica de validação.");
  if(f.barcode){
   if(!eanValid(f.barcode))add("error","Código de barras","EAN lido: "+f.barcode+". Dígito verificador inválido; confira os 13 números.");
@@ -672,7 +674,7 @@ function diagnosticV4(){
   if(f.cnpj&&!validCnpj(f.cnpj))add("error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
   if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
   if(f.ggn&&digits(f.ggn).length!==13)add("error","GGN","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
-  if(/\bGLN\b/i.test(state.text)&&!/\bGLN\s*[:#-]?\s*\d{13}/i.test(state.text))add("pending","GLN","O GLN aparece na etiqueta, mas o número não pôde ser lido para conferência.");
+  if(/\bGLN\b/i.test(state.text))add("pending","GLN sem base de comparação","O manual consultado não fornece GLN de referência para essa empresa. Não é seguro aprovar esse identificador apenas por possuir 13 dígitos.");
  }
  if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
@@ -701,7 +703,7 @@ function showResult(){
  const codeContext=owners.length>1?"O mesmo EAN-13 consta para "+ownerNames.join(" e ")+". Isso não significa erro por si só.":owners.length===1?"EAN-13 associado a "+ownerNames[0]+".":"O EAN-13 ainda não foi localizado no catálogo consultado.";
  const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><span>01</span><div><strong>Leitura da fotografia</strong><small>Identificação preliminar</small></div></div><div class="vl2-reading-facts"><div><small>Modelo</small><strong>'+esc(kind?name:"A confirmar")+'</strong></div><div><small>Uva</small><strong>'+esc(initial)+'</strong></div><div class="vl2-reading-barcode"><small>Código de barras (EAN-13 completo)</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p></div></div></section>';
  const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><span>02</span><div><strong>Dados da ordem de produção</strong><small>Informe os valores corretos, independentes da etiqueta impressa.</small></div></div>'+clientChooser()+traceBuilder()+
- (kind?"":'<div class="vl2-type-choice"><strong>Tipo da etiqueta</strong>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+'</div>')+'</section>';
+ ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
  const issues=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
  const item=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
@@ -740,11 +742,12 @@ function showResult(){
   state.expected[b.dataset.vl2OptionTrace]=b.dataset.pickValue;state.reviewRequested=false;showResult();
  }));
  root.querySelectorAll("[data-vl2-option-identity]").forEach(b=>b.addEventListener("click",()=>{
-  state.identity[b.dataset.vl2OptionIdentity]=b.dataset.pickValue;state.reviewRequested=false;showResult();
+  state.identity[b.dataset.vl2OptionIdentity]=b.dataset.pickValue;if(b.dataset.vl2OptionIdentity==="kind")state.kindConfirmed=true;state.reviewRequested=false;showResult();
  }));
  root.querySelectorAll("[data-vl2-field]").forEach(inp=>inp.addEventListener("change",e=>{
   state.fields[e.target.dataset.vl2Field]=e.target.value.trim();state.sources[e.target.dataset.vl2Field]="Corrigido manualmente";state.reviewRequested=false;showResult();
  }));
+ el("vl2-confirm-kind")?.addEventListener("click",()=>{state.kindConfirmed=true;showResult();});
  el("vl2-evaluate")?.addEventListener("click",()=>{state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
  el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
