@@ -148,6 +148,8 @@
       nav.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openManagement(); }});
       nav.classList.toggle("active", !!q(".vitra-shell.va-admin-view"));
       q("#cards")?.appendChild(nav);
+    }
+    if (me?.role==="master"||me?.module_access?.labels===true) {
       const navLabels = document.createElement("div");
       navLabels.className = "card vl-nav";
       navLabels.dataset.main = "labels";
@@ -169,7 +171,8 @@
       '<span class="va-account-name">' + safe(firstName) + '</span>' +
       '<svg class="va-account-chevron" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>' +
       '<div class="va-account-options" role="group" aria-label="Ações da conta">' +
-      (me?.role === "master" ? '<button type="button" class="va-account-mobile-access" id="va-mobile-access">Gestão de acessos</button><button type="button" class="va-account-mobile-access" id="va-mobile-labels">Verificação de etiquetas · teste</button>' : '') +
+      (me?.role === "master" ? '<button type="button" class="va-account-mobile-access" id="va-mobile-access">Gestão de acessos</button>' : '') +
+      (me?.role==="master"||me?.module_access?.labels===true?'<button type="button" class="va-account-mobile-access" id="va-mobile-labels">Verificação de etiquetas</button>':"") +
       '<button type="button" id="va-signout">Sair do VITRA</button></div>';
     sidebar.appendChild(account);
     q("#va-signout", account).addEventListener("click", logout);
@@ -182,6 +185,16 @@
       openLabelReview();
     });
     if (me?.role !== "master" && q("#panel .vl-module") && typeof window.showHome === "function") window.showHome();
+    applyModuleVisibility();
+  }
+  const moduleKeys={acomp:"field",colh:"harvest",pausa:"paused",fim:"finished",recep:"reception",titul:"titulation",estoque:"stock"};
+  function applyModuleVisibility(){
+    const allowed=me?.role==="master"?null:me?.module_access||{};
+    q("#cards")?.querySelectorAll("[data-main]").forEach(node=>{
+      const raw=node.dataset.main||"";
+      const id=moduleKeys[raw]||(/recept|recep/i.test(raw)?"reception":/titula|titul/i.test(raw)?"titulation":/stock|estoque/i.test(raw)?"stock":null);
+      if(id&&allowed&&allowed[id]===false)node.hidden=true;
+    });
   }
   async function logout() {
     managementRequestId++;
@@ -413,7 +426,7 @@
       p.innerHTML='<section class="va-error" role="alert">O leitor de etiquetas não foi carregado. Atualize a página para tentar novamente.</section>';return;
     }
     window.VITRA_LABEL_SMART.mount({
-      canAccess:()=>me?.role==="master"&&!!session?.access_token,
+      canAccess:()=>(me?.role==="master"||me?.module_access?.labels===true)&&!!session?.access_token,
       api:labelApi,stamp,
       back:()=>{if(typeof window.showHome==="function")window.showHome();}
     });
@@ -450,7 +463,7 @@
     labelCheck();labelHistory();
   }
   async function labelApi(action,payload={}){
-    if(me?.role!=="master")throw Error("Acesso restrito");
+    if(me?.role!=="master"&&me?.module_access?.labels!==true)throw Error("Acesso restrito");
     await freshSession();
     const isUpload=action==="save";
     const response=await fetch(settings.url+"/functions/v1/vitra-etiquetas",{
@@ -488,16 +501,16 @@
     finally{if(btn.isConnected)btn.disabled=false;}
   }
   async function openLabelReview(){
-    if(me?.role!=="master")return;
+    if(me?.role!=="master"&&me?.module_access?.labels!==true)return;
     const requestId=++labelRequestId;
     q(".va-account")?.removeAttribute("open");
     if(typeof window.markMain==="function")window.markMain("labels");
     q("#panel").innerHTML='<div class="vl-loading">Verificando acesso ao módulo de etiquetas…</div>';
     try{
       const info=await call("me");
-      if(info.profile?.role!=="master"||info.profile?.enabled!==true)throw Error("Acesso reservado ao administrador.");
+      if(info.profile?.enabled!==true||(info.profile.role!=="master"&&info.profile.module_access?.labels!==true))throw Error("Sem permissão para verificar etiquetas.");
       await labelApi("history");
-      if(requestId!==labelRequestId||me?.role!=="master")return;
+      if(requestId!==labelRequestId||(me?.role!=="master"&&me?.module_access?.labels!==true))return;
       labelRender();
       if(window.innerWidth<=900)q(".vitra-main")?.scrollIntoView({block:"start"});
     }catch(e){if(requestId===labelRequestId)q("#panel").innerHTML='<div class="va-error" role="alert">'+safe(e.message||"Acesso não autorizado")+'</div>';}
@@ -533,7 +546,8 @@
       (u.enabled ? '<span class="va-status-on">Ativo</span>' : '<span class="va-status-off">Bloqueado</span>')) +
       '</td><td>' + safe(stamp(u.last_login_at)) + '</td><td>' +
       (u.role === "master" ? '<span class="va-subtle">Conta principal</span>' :
-      '<button type="button" class="va-action" data-va-action="edit" data-id="' + safe(u.id) + '">Editar</button>' +
+      '<button type="button" class="va-action" data-va-action="modules" data-id="' + safe(u.id) + '">Módulos</button>' +
+       '<button type="button" class="va-action" data-va-action="edit" data-id="' + safe(u.id) + '">Editar</button>' +
       '<button type="button" class="va-action" data-va-action="password" data-id="' + safe(u.id) + '">Senha</button>' +
       '<button type="button" class="va-action" data-va-action="toggle" data-id="' + safe(u.id) + '">' + (u.enabled ? "Bloquear" : "Ativar") + '</button>' +
       '<button type="button" class="va-action va-action-danger" data-va-action="remove" data-id="' + safe(u.id) + '">Excluir</button>') +
@@ -686,7 +700,13 @@
     const btn = ev.currentTarget, action = btn.dataset.vaAction;
     const u = userRows.find(x => String(x.id) === btn.dataset.id);
     if (!u || u.role === "master") return;
-    if (action === "edit") {
+    if (action === "modules") {
+      const fields=[["field","Campo"],["harvest","Colheita"],["paused","Áreas pausadas"],["finished","Áreas finalizadas"],["reception","Recepção"],["titulation","Titulação"],["stock","Estoque"],["labels","Conferência de etiquetas"]];
+      const current=u.module_access||{};
+      modal("Permissões dos módulos","Escolha os módulos que @"+u.username+" poderá abrir. O acesso às etiquetas também é validado no servidor.",
+        '<div class="va-module-choices">'+fields.map(([key,label])=>'<label class="va-module-choice"><input type="checkbox" name="'+key+'" '+(current[key]===true?"checked":"")+'>'+label+'</label>').join("")+'</div>',
+        f=>call("modules",{id:u.id,modules:Object.fromEntries(fields.map(([key])=>[key,f.has(key)]))}));
+    } else if (action === "edit") {
       modal("Editar acesso", "Altere o nome e o usuário deste colaborador.",
         '<label>Nome completo<input name="display_name" maxlength="80" required value="' + safe(u.display_name || "") + '"></label>' +
         '<label>Usuário<input name="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+" required value="' + safe(u.username) + '"></label>',
