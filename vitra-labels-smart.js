@@ -240,7 +240,7 @@ function registryAudit(){
  return {rows:out,producer,merchant};
 }
 function computeIssues(){
- const out=[],add=(type,title,body)=>out.push({type,title,body});
+ const out=[],add=(type,title,body)=>out.push([type,title,body]);
  const detected=state.detected,f=state.fields,x=state.expected,chosen=state.identity.client,real=detected?.detectedClient||"";
  if(!state.photo)return out;
  if(!chosen||!state.clientConfirmed)add("confirmar","Cliente","Selecione ou confirme o cliente que receberá a etiqueta.");
