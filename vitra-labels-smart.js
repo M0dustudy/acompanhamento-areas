@@ -184,7 +184,7 @@ function registryAudit(){
   if(digits(read)===digits(expected))add("ok",label,entity.name+" · "+digits(read)+" confere com a referência.",ref(entity));
   else add("atencao",label,"Lido: "+digits(read)+" · cadastrado para "+entity.name+": "+digits(expected)+". Confira o número impresso.",ref(entity));
  };
- if(!f.ggn&&/\bGGN\b/i.test(full))add("confirmar","GGN","O identificador aparece na etiqueta, mas os 13 dígitos não foram reconhecidos.");
+ if(!f.ggn&&/\bGGN\b/i.test(produced))add("confirmar","GGN do produtor","Há indicação de GGN do produtor, mas os 13 dígitos não foram reconhecidos.");
  if(f.ggn){
   if(sameGGN.length>1&&!choose(named)&&!choose(sameCNPJ))add("confirmar","GGN compartilhado","O mesmo GGN está associado a "+sameGGN.map(x=>x.name).join(" / ")+". A numeração sozinha não identifica um produtor exclusivo.");
   else if(!sameGGN.length&&!producer)add("confirmar","GGN sem referência","O número "+digits(f.ggn)+" não consta nos registros atualmente disponíveis; não foi considerado incorreto por ausência de cadastro.");
@@ -989,7 +989,8 @@ function diagnosticV4(){
   }
   if(f.cnpj&&!validCnpj(f.cnpj))add("error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
   if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
-  if(f.ggn&&digits(f.ggn).length!==13)add("error","GGN","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
+  if(f.ggn&&digits(f.ggn).length!==13)add("error","GGN do produtor","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
+  if(f.ggnComercial&&digits(f.ggnComercial).length!==13)add("error","GGN do comerciante","Lidos "+digits(f.ggnComercial).length+" dígitos no campo comercial; confira os 13 dígitos.");
   if(/\bGLN\b/i.test(state.text)&&!f.gln&&!f.glnComercial)add("pending","GLN ilegível","Há indicação de GLN na etiqueta, mas os dígitos não foram reconhecidos com segurança.");
  }
  if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
