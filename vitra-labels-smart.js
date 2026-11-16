@@ -166,6 +166,67 @@ function extract(raw,barcode){
   producer,commer,weightPhoto,weightCatalog,refWeight,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1
  };
 }
+function registryAudit(){
+ const out=[],f=state.fields,rows=state.entities;
+ const add=(type,title,body,reference="DOC.CQ.056")=>out.push({type,title,body,reference});
+ if(!state.photo)return {rows:out,producer:null,merchant:null};
+ if(!state.refsLoaded){add("confirmar","Base de produtores","Consulta privada indisponível; não foi possível comparar GGN, CNPJ e endereços.");return {rows:out,producer:null,merchant:null};}
+ const full=state.text||"";
+ const part=(pattern,stop)=>full.match(pattern)?.[1]?.split(stop)[0]||"";
+ const produced=part(/(?:PRODUZIDO\s+POR|PRODUTOR)\s*[:\-]?\s*([\s\S]*)/i,/COMERCIALIZADO\s+POR|RASTREABILIDADE|C[ÓO]DIGO\s+DE\s+BARRAS/i);
+ const marketed=part(/COMERCIALIZADO\s+POR\s*[:\-]?\s*([\s\S]*)/i,/PRODUZIDO\s+POR|RASTREABILIDADE/i);
+ const entityName=(fragment,e)=>{
+  if(!fragment)return false;
+  const clean=v=>norm(v).replace(/[^A-Z0-9]/g,"");
+  const needle=clean(e.name),hay=clean(fragment);
+  return needle.length>=10&&hay.includes(needle);
+ };
+ const producers=rows.filter(x=>x.kind==="producer");
+ const merchants=rows.filter(x=>x.kind==="commercial"||x.kind==="producer");
+ const sameGGN=digits(f.ggn)?producers.filter(p=>p.ggn===digits(f.ggn)):[];
+ const sameCNPJ=digits(f.cnpj)?producers.filter(p=>p.cnpj===digits(f.cnpj)):[];
+ const named=produced?producers.filter(e=>entityName(produced,e)):[];
+ const choose=(set)=>set.length===1?set[0]:null;
+ const producer=choose(sameCNPJ)||choose(named)||choose(sameGGN)||null;
+ const ref=e=>"DOC.CQ.056, p. "+e.source_page;
+ const compare=(key,label,read,expected,entity)=>{
+  if(!expected)return;
+  if(!read){add("confirmar",label,"Referência de "+entity.name+" conhecida, mas o número não foi lido para comparar.",ref(entity));return;}
+  if(digits(read)===digits(expected))add("ok",label,entity.name+" · "+digits(read)+" confere com a referência.",ref(entity));
+  else add("atencao",label,"Lido: "+digits(read)+" · cadastrado para "+entity.name+": "+digits(expected)+". Confira o número impresso.",ref(entity));
+ };
+ if(!f.ggn&&/\bGGN\b/i.test(full))add("confirmar","GGN","O identificador aparece na etiqueta, mas os 13 dígitos não foram reconhecidos.");
+ if(f.ggn){
+  if(sameGGN.length>1&&!choose(named)&&!choose(sameCNPJ))add("confirmar","GGN compartilhado","O mesmo GGN está associado a "+sameGGN.map(x=>x.name).join(" / ")+". A numeração sozinha não identifica um produtor exclusivo.");
+  else if(!sameGGN.length&&!producer)add("confirmar","GGN sem referência","O número "+digits(f.ggn)+" não consta nos registros atualmente disponíveis; não foi considerado incorreto por ausência de cadastro.");
+  else if(producer?.ggn)compare("ggn","GGN do produtor",f.ggn,producer.ggn,producer);
+ }
+ if(!f.cnpj&&/\bCNPJ\b/i.test(produced))add("confirmar","CNPJ do produtor","O documento menciona CNPJ, mas não foi possível ler o número completo.");
+ if(f.cnpj){
+  if(producer?.cnpj)compare("cnpj","CNPJ do produtor",f.cnpj,producer.cnpj,producer);
+  else if(sameCNPJ.length===1)add("ok","CNPJ do produtor","Número reconhecido para "+sameCNPJ[0].name+".",ref(sameCNPJ[0]));
+  else if(!sameCNPJ.length)add("confirmar","CNPJ do produtor","Número lido, mas o cadastro consultado não permite confirmar o titular.");
+ }
+ if(producer){
+  add("ok","Produtor identificado",producer.name+" (referência documental).",ref(producer));
+  if(f.ggn&&producer.ggn&&producer.ggn!==digits(f.ggn)&&sameGGN.length>0)add("atencao","Produtor e GGN","O GGN encontrado pertence a outra referência, diferente do produtor identificado pelo CNPJ ou nome.",ref(producer));
+ }
+ const merchantByCnpj=digits(f.cnpjComercial)?merchants.filter(e=>e.cnpj===digits(f.cnpjComercial)):[];
+ const namedMerchant=marketed?merchants.filter(e=>entityName(marketed,e)):[];
+ const merchant=choose(merchantByCnpj)||choose(namedMerchant)||null;
+ if(f.cnpjComercial){
+  if(merchant?.cnpj)compare("cnpjComercial","CNPJ do comerciante",f.cnpjComercial,merchant.cnpj,merchant);
+  else add("confirmar","CNPJ do comerciante","Número lido, mas não foi possível confirmar a empresa responsável na base.");
+ }
+ if(merchant)add("ok","Comercializado por",merchant.name+" · endereço cadastrado: "+(merchant.address||"sem endereço"),ref(merchant));
+ const cep=v=>digits((str(v).match(/(?:CEP)\s*[:\-]?\s*(\d{5}[-\s]?\d{3})/i)||[])[1]||"");
+ for(const [label,partText,entity] of [["CEP do produtor",produced,producer],["CEP do comerciante",marketed,merchant]]){
+  const read=cep(partText),reference=entity?cep(entity.address):"";
+  if(!reference||!read)continue;
+  add(read===reference?"ok":"atencao",label,read===reference?"CEP "+read+" confere com o endereço de "+entity.name+".":"Lido: "+read+" · referência de "+entity.name+": "+reference+".",ref(entity));
+ }
+ return {rows:out,producer,merchant};
+}
 function computeIssues(){
  const out=[],add=(type,title,body)=>out.push({type,title,body});
  const detected=state.detected,f=state.fields,x=state.expected,chosen=state.identity.client,real=detected?.detectedClient||"";
@@ -206,15 +267,17 @@ function computeIssues(){
  if(f.cnpj&&!validCnpj(f.cnpj))add("atencao","CNPJ","Os dígitos do CNPJ reconhecido não passaram na validação. Confira a impressão.");
  if(/\bCNPJ\b/i.test(state.text)&&!f.cnpj&&!f.cnpjComercial)add("confirmar","CNPJ ilegível","Há referência a CNPJ na etiqueta, mas nenhum número foi identificado com segurança.");
  if(/\bGGN\b/i.test(state.text)&&!f.ggn)add("confirmar","GGN ilegível","Há referência a GGN, mas o número não foi recuperado com segurança.");
- if(detected?.producer?.[1]&&f.cnpj&&f.cnpj!==detected.producer[1])add("atencao","CNPJ do produtor","O CNPJ reconhecido difere do cadastro de "+detected.producer[0]+" no DOC.CQ.056.");
+ if(!state.refsLoaded&&detected?.producer?.[1]&&f.cnpj&&f.cnpj!==detected.producer[1])add("atencao","CNPJ do produtor","O CNPJ reconhecido difere do cadastro de "+detected.producer[0]+" no DOC.CQ.056.");
  if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add("atencao","CNPJ do comerciante","O dígito verificador do CNPJ comercial não confere.");
- if(detected?.commer?.[1]&&f.cnpjComercial&&f.cnpjComercial!==detected.commer[1])add("atencao","CNPJ do comerciante","CNPJ impresso diferente da referência para "+detected.commer[0]+".");
- if(detected?.producer?.[2]&&f.ggn&&f.ggn!==detected.producer[2])add("atencao","GGN do produtor","O GGN reconhecido difere da referência de "+detected.producer[0]+" no DOC.CQ.056.");
- if((f.cnpj||f.ggn)&&!detected?.producer)add("confirmar","Cadastro do produtor","Identificação numérica detectada, mas não foi possível associá-la com segurança a um produtor do manual.");
+ if(!state.refsLoaded&&detected?.commer?.[1]&&f.cnpjComercial&&f.cnpjComercial!==detected.commer[1])add("atencao","CNPJ do comerciante","CNPJ impresso diferente da referência para "+detected.commer[0]+".");
+ if(!state.refsLoaded&&detected?.producer?.[2]&&f.ggn&&f.ggn!==detected.producer[2])add("atencao","GGN do produtor","O GGN reconhecido difere da referência de "+detected.producer[0]+" no DOC.CQ.056.");
+ if(!state.refsLoaded&&(f.cnpj||f.ggn)&&!detected?.producer)add("confirmar","Cadastro do produtor","Identificação numérica detectada, mas não foi possível associá-la com segurança a um produtor do manual.");
  const relevantMatches=state.matches.filter(m=>m.client===chosen);
  const uniqueClass=distinct(relevantMatches.map(m=>m.klass));
  if(state.identity.klass&&uniqueClass.length===1&&uniqueClass[0]!==state.identity.klass)add("atencao","Classificação","A classe impressa difere do padrão cadastrado para o código e cliente selecionados.");
  if(!state.text&&!state.barcode)add("confirmar","Imagem","Nenhuma informação legível foi reconhecida. Fotografe novamente com melhor iluminação.");
+ const registry=registryAudit();state.referenceChecks=registry.rows;state.referenceProducer=registry.producer;state.referenceMerchant=registry.merchant;
+ for(const item of registry.rows)if(item.type!=="ok")out.push([item.type,item.title,item.body]); 
  return out;
 }
 async function loadPatterns(){
