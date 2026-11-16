@@ -458,7 +458,7 @@ function traceBuilder(){
  const day=Array.from({length:31},(_,i)=>[String(i+1).padStart(2,"0"),String(i+1).padStart(2,"0")]);
  const month=Array.from({length:12},(_,i)=>[String(i+1).padStart(2,"0"),String(i+1).padStart(2,"0")]);
  const letters=["A","B","C","D","1","2","3","4"].map(x=>[x,x]);
- const varietiesCodes=varieties.filter(x=>x[2]).slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(x=>[x[2],x[1]]);
+ const varietiesCodes=varieties.filter(x=>x[2]).slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(x=>[x[2],x[2]+" · "+x[1]]);
  const siteAreas=(()=>{try{return typeof A==="object"&&A?Object.keys(A).map(digits).filter(x=>x.length>=3&&x.length<=5):[];}catch{return [];}})();
  const expected=expectedCode(),observed=state.fields.rastreio||"";
  const same=expected&&observed&&norm(expected)===norm(observed);
@@ -475,7 +475,7 @@ function traceBuilder(){
   '<div class="vl2-trace-field"><span>Pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Método")+'</div>'+
   '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected||"Preenchimento incompleto")+'</strong></div></div>'+
-  '<div class="vl2-trace-status '+(same?"vl2-matched":expected&&observed?"vl2-different":"")+'">'+esc(status)+'</div></section>';
+  '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
 }
 function fact(label,value,source){
  return '<div class="vl2-fact"><small>'+esc(label)+'</small><strong>'+esc(value||"Não identificado")+'</strong>'+(source?'<span>'+esc(source)+'</span>':"")+'</div>';
@@ -692,6 +692,7 @@ function showResult(){
   const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
    if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
    state.expected[key]=value;state.reviewRequested=false;
+   const action=el("vl2-evaluate");if(action)action.disabled=!diagnosticV4().ready;
   };
   inp.addEventListener("input",update);inp.addEventListener("change",update);
  });
@@ -762,30 +763,29 @@ async function openHistory(id){
 }
 async function saveReview(){
  if(!ctx?.canAccess?.()||state.saved)return;
- if(!state.photo||!state.identity.client||!state.clientConfirmed||!state.identity.kind||!(state.identity.variety||expectedVariety())||!expectedCode()){
-  notice("Confirme o cliente e complete a rastreabilidade. Se a foto estiver ilegível, corrija o tipo de etiqueta ou a variedade em ajustes.",true);return;
+ const report=diagnosticV4();
+ if(!state.reviewRequested||report.status!=="aprovado"||!report.referenceComplete||!state.reviewed){
+  notice("Somente etiquetas aprovadas na conferência e confirmadas pelo responsável podem ser salvas.",true);return;
  }
+ if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
- const report=diagnose();
- const status=report.status==="reprovado"?"atencao":report.status==="aprovado"&&state.reviewed?"conferido":"pendente";
  const fields={...state.fields,expectedRastreio:expectedCode(),clientConfirmed:state.clientConfirmed,
-  sources:state.sources,barcodeMatched:state.matches.some(x=>x.client===state.identity.client),
+  sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",
-  diagnostic:{status:report.status,summary:report.summary,checks:report.checks},
-  verification:{validated:status==="conferido",referenceComplete:report.referenceComplete,
-  barcodeOrigin:state.sources.barcode==="Corrigido manualmente"?"manual":"photo"}};
- const payload={client:state.identity.client,variety:state.identity.variety||expectedVariety(),
-  label_kind:state.identity.kind,label_class:state.identity.klass||"",packaging:nameOf(kinds,state.identity.kind),
-  review_status:status,detected_text:state.text.slice(0,12000),fields,
+  diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:4},
+  verification:{workflowVersion:4,validated:true,referenceComplete:true,barcodeOrigin:"photo",reviewedByHuman:true}};
+ const payload={client:state.identity.client,variety:state.identity.variety||state.detected?.identity?.variety||expectedVariety(),
+  label_kind:state.identity.kind,label_class:category()==="box"?(state.identity.klass||""):"",
+  packaging:nameOf(kinds,state.identity.kind),review_status:"conferido",
+  detected_text:state.text.slice(0,12000),fields,
   checklist:report.checks.filter(x=>x.status!=="ok").map(x=>[x.status==="error"?"atencao":"pendente",x.title,x.detail]),
   notes:state.notes||""};
  const form=new FormData();form.append("action","save");form.append("payload",JSON.stringify(payload));form.append("photo",state.photo,state.photo.name);
  try{
-  notice("Salvando a foto recortada e a conferência no histórico…");
-  const out=await ctx.api("save",form);
-  state.saved=true;showResult();await fetchHistory();
-  notice(out.pattern_learned?"Conferência registrada. Padrão validado incluído no catálogo.":"Conferência registrada. Nenhum dado do estoque foi alterado.");
- }catch(e){notice(e?.message||"Falha ao salvar conferência.",true);if(btn?.isConnected)btn.disabled=false;}
+  notice("Registrando o diagnóstico aprovado e sua fotografia…");
+  const outcome=await ctx.api("save",form);state.saved=true;showResult();await fetchHistory();
+  notice(outcome.pattern_learned?"Conferência aprovada e salva. Referência adicionada ao catálogo.":"Conferência aprovada e salva no histórico.");
+ }catch(e){notice(e?.message||"Não foi possível salvar o diagnóstico.",true);if(btn?.isConnected)btn.disabled=false;}
 }
 function setCropShape(active){
  for(const name of ["vl2-square","vl2-rectangle","vl2-portrait"])el(name)?.classList.toggle("active",name===active);
