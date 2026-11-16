@@ -33,3 +33,26 @@ A conferência por fotografia deve produzir um diagnóstico rápido e rastreáve
 
 ## Pendências de validação em uso
 Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes de layout e números com caracteres parecidos. Regras de clientes ou destinos que não constem da documentação vigente devem permanecer como pendências, nunca ser aprovadas por suposição.
+
+
+## Fluxo operacional (16/11/2026 — v4)
+1. A fotografia deve vir primeiro; não solicitar cliente ou código da produção antes da leitura.
+2. Identificar preliminarmente o modelo. Cumbucas e cintas usam leitura de variedade, data, rastreabilidade, peso quando informado e EAN completo. Caixas podem incluir razão social, produtor, GGN, GLN, CNPJ e endereço.
+3. Não identificar cumbuca ou caixa somente pela proporção do **recorte** da câmera: esse enquadramento não prova a dimensão física. Quando a identificação depender apenas da forma, exigir confirmação do tipo.
+4. Solicitar cliente da ordem de produção mesmo quando o nome não estiver impresso na cumbuca. O cliente não deve ser inferido definitivamente por um EAN compartilhado.
+5. Solicitar rastreabilidade independente: o colaborador lê no computador o código correto, e o VITRA compara **sem copiá-lo automaticamente** da etiqueta.
+6. O diagnóstico só é apresentado após a confirmação do cliente, do modelo e da rastreabilidade. Cada divergência deve mostrar exatamente o valor impresso e o esperado.
+7. Estados do resultado: **reprovado** quando há conflito comprovado; **pendente** quando a leitura ou a base não permitem confirmação; **aprovado na conferência digital** apenas quando as verificações exigidas estão completas e não há pendências.
+8. O sistema só oferece o salvamento depois de parecer favorável e confirmação final do colaborador. Qualquer alteração posterior na referência invalida o parecer anterior.
+
+## Observações documentais essenciais
+- O código EAN-13 **7898366001754** aparece no manual para **Doce Mel e Trielo**, associado à uva Vitória (DOC.CQ.056, p. 13). Informar ambos os clientes quando esse EAN for lido não representa irregularidade. A associação com um terceiro cliente precisa ser verificada e justificada.
+- Para a uva BRS Vitória, a sigla de rastreabilidade é **VI** (DOC.CQ.056, p. 5). O nome comercial impresso e a sigla devem ser comparados como campos diferentes do mesmo produto.
+- A simples existência de 13 dígitos no GLN não permite aprovar o código sem uma referência de GLN atribuída à empresa. Manter pendente quando não houver cadastro.
+- O reconhecimento de caracteres da foto pode falhar. Melhorias de contraste e nova leitura elevam a chance de identificação, sem garantia de precisão absoluta.
+
+## Autorização e preservação do histórico
+- O administrador mestre decide quais contas poderão entrar no módulo de etiquetas. A API valida essa autorização a cada solicitação.
+- Os registros mostram usuário responsável, diagnóstico e fotografia. A conta mestre pode **ocultar e restaurar** registros; colaboradores não podem ocultar.
+- O recurso é uma ocultação reversível com auditoria, **não** exclusão física dos documentos originais. Nunca apagar evidências sem autorização expressa.
+- Controles visuais dos demais módulos devem respeitar as preferências atribuídas, mas uma eventual restrição de confidencialidade de dados publicados no HTML exige migração dos dados protegidos para uma API autenticada.
