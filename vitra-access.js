@@ -186,6 +186,8 @@
     });
     if (me?.role !== "master" && q("#panel .vl-module") && typeof window.showHome === "function") window.showHome();
     window.VITRA_MODULE_ALLOWED = key => me?.role==="master"||me?.module_access?.[key]!==false;
+    document.documentElement.classList.toggle("va-no-titulation",!window.VITRA_MODULE_ALLOWED("titulation"));
+    document.documentElement.classList.toggle("va-no-reception",!window.VITRA_MODULE_ALLOWED("reception"));
     applyModuleVisibility();
   }
   const moduleKeys={acomp:"field",colh:"harvest",pausa:"paused",fim:"finished","external-reception":"reception",stock:"stock",recep:"reception",titul:"titulation",estoque:"stock"};
