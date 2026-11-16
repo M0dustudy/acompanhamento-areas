@@ -74,7 +74,7 @@ function releasePhoto(){
 }
 function resetScan(){
  state.sequence++;state.photo=null;state.text="";state.barcode="";state.detected=null;
- state.fields={};state.sources={};state.issues=[];state.matches=[];state.reviewed=false;state.saved=false;
+ state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:""};
  state.notes="";state.mode="empty";
@@ -224,6 +224,18 @@ function registryAudit(){
   const read=cep(partText),reference=entity?cep(entity.address):"";
   if(!reference||!read)continue;
   add(read===reference?"ok":"atencao",label,read===reference?"CEP "+read+" confere com o endereço de "+entity.name+".":"Lido: "+read+" · referência de "+entity.name+": "+reference+".",ref(entity));
+ }
+ const cities=["CASA NOVA","PETROLINA","JUAZEIRO","IBIAPINA","SANTA MARIA DA BOA VISTA"];
+ for(const [label,block,entity] of [["Endereço do produtor",produced,producer],["Endereço do comerciante",marketed,merchant]]){
+  if(!entity?.address||!block)continue;
+  const expectedCity=cities.find(x=>norm(entity.address).includes(x));
+  const readCities=cities.filter(x=>norm(block).includes(x));
+  if(expectedCity&&readCities.length===1){
+   add(readCities[0]===expectedCity?"ok":"atencao",label,
+   readCities[0]===expectedCity?"Município impresso coincide com "+entity.name+".":"Município lido: "+readCities[0]+"; cadastro de "+entity.name+": "+expectedCity+".",ref(entity));
+  }else if(/(?:ENDERECO|ENDEREÇO|END:|CEP:)/i.test(block)&&!cep(block)){
+   add("confirmar",label,"Endereço presente, mas sem leitura confiável para comparação.",ref(entity));
+  }
  }
  return {rows:out,producer,merchant};
 }
@@ -505,8 +517,12 @@ function detailsView(){
   fact("Classificação",state.identity.klass,"Identificada quando disponível");
  if(category()==="box"){
   facts+=fact("Peso da caixa",f.peso,src.peso)+fact("Lote",f.lote,src.lote)+
-    fact("Produtor",f.produtor,src.produtor)+fact("CNPJ do produtor",f.cnpj,src.cnpj)+fact("GGN",f.ggn,src.ggn)+
-    fact("Comercializado por",f.comercializado,src.comercializado)+fact("CNPJ comercial",f.cnpjComercial,src.cnpjComercial)+
+    fact("Produtor",state.referenceProducer?.name||f.produtor,state.referenceProducer?"Identificação na base privada":"Foto / referência")+
+    fact("Endereço do produtor",state.referenceProducer?.address||"","DOC.CQ.056, conforme cadastro")+
+    fact("CNPJ do produtor",f.cnpj,src.cnpj)+fact("GGN",f.ggn,src.ggn)+
+    fact("Comercializado por",state.referenceMerchant?.name||f.comercializado,src.comercializado)+
+    fact("Endereço comercial",state.referenceMerchant?.address||"","DOC.CQ.056, conforme cadastro")+
+    fact("CNPJ comercial",f.cnpjComercial,src.cnpjComercial)+
     fact("Data de embalagem",f.data,src.data)+fact("Código de barras",f.barcode,src.barcode);
  }else if(category()==="unit"){
   facts+=fact("Peso da unidade",f.peso,src.peso)+fact("Código de barras",f.barcode,src.barcode)+
@@ -518,7 +534,7 @@ function detailsView(){
 }
 function correctionPanel(){
  return '<details class="vl2-refine"><summary>Corrigir leitura ou tipo de etiqueta</summary>'+
-  '<div class="vl2-correction-grid"><label>Tipo reconhecido<select data-vl2-identity="kind">'+opts(kinds,state.identity.kind,"Não identificado")+'</select></label>'+
+  '<div class="vl2-correction-grid"><label>Tipo reconhecido'+lookupPicker(kinds,"kind",state.identity.kind,"Não identificado","identity")+'</label>'+
   '<label>Variedade reconhecida'+lookupPicker(varieties,"variety",state.identity.variety,"Não identificada","identity")+'</label>'+
   '<label>Classificação reconhecida'+lookupPicker(classes.map(x=>[x,x]),"klass",state.identity.klass,"Não identificada","identity")+'</label></div>'+
   '<p class="vl2-refine-hint">Os dados abaixo são extraídos da foto. Corrija apenas erros de leitura; não é necessário preenchê-los para realizar a conferência.</p>'+
