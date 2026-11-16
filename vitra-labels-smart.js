@@ -410,6 +410,33 @@ async function scanBarcode(file){
   return found.find(x=>eanValid(x.rawValue))?.rawValue||"";
  }catch{return "";}finally{bitmap?.close?.();}
 }
+async function enhanceForOCR(file){
+ let bitmap=null;
+ try{
+  bitmap=await createImageBitmap(file);
+  const width=Math.min(2800,Math.max(1500,bitmap.width));
+  const height=Math.round(bitmap.height*width/bitmap.width);
+  if(height>3800)throw Error("Imagem excessivamente alta");
+  const canvas=document.createElement("canvas");
+  canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext("2d",{willReadFrequently:true});
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,width,height);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+  ctx.filter="contrast(1.4) brightness(1.11) saturate(0)";
+  ctx.drawImage(bitmap,0,0,width,height);
+  return canvas;
+ }catch{return null;}finally{bitmap?.close?.();}
+}
+function ocrEvidenceScore(value){
+ const text=norm(value);let score=Math.min(200,text.length)/20;
+ if(/\bR-\d{2}-[A-Z0-9./_]+-\d{4}-[C58]-[A-Z0-9]{2,5}\b/.test(text))score+=30;
+ if(/\bCNPJ\b/.test(text))score+=7;
+ if(/\bGGN\b/.test(text))score+=7;
+ if(/\b(?:EMBALADO|EMBALAGEM|DATA)\b/.test(text))score+=4;
+ if(varieties.some(v=>v[3].some(a=>text.includes(norm(a)))))score+=12;
+ if(getEAN(text))score+=20;
+ return score;
+}
 async function readPhoto(){
  if(!state.photo||!ctx?.canAccess?.())return;
  const seq=++state.sequence,progress=el("vl2-progress");
@@ -422,6 +449,14 @@ async function readPhoto(){
    if(progress)progress.textContent="Consultando as referências do manual e do catálogo…";
    worker=await window.Tesseract.createWorker("por+eng",1);
    recognized=str((await worker.recognize(state.photo)).data?.text).trim();
+   if(ocrEvidenceScore(recognized)<30&&seq===state.sequence){
+     if(progress)progress.textContent="Aprimorando a leitura de caracteres e números pequenos…";
+     const sharpened=await enhanceForOCR(state.photo);
+     if(sharpened){
+       const alternative=str((await worker.recognize(sharpened)).data?.text).trim();
+       if(ocrEvidenceScore(alternative)>ocrEvidenceScore(recognized))recognized=alternative;
+     }
+   }
   }catch{failed=true;}
   if(seq!==state.sequence||!ctx?.canAccess?.())return;
   const data=extract(recognized,barcode);
@@ -431,6 +466,7 @@ async function readPhoto(){
   if(!state.clientConfirmed)state.identity.client=data.detectedClient;
   state.identity.kind=data.identity.kind;state.identity.variety=data.identity.variety;state.identity.klass=data.identity.klass;
   state.ocrFailed=failed;state.scanCompleted=true;state.issues=[];showResult();
+  if(el("vl2-results")&&window.innerWidth<1000)el("vl2-results").scrollIntoView({behavior:"smooth",block:"start"});
   notice(failed?"Leitura parcial. Confira a imagem e corrija os campos que não foram identificados.":"Etiqueta analisada. Informe as referências de produção para concluir a comparação.",failed);
  }finally{
   try{await worker?.terminate();}catch{}
@@ -441,7 +477,7 @@ function clientChooser(){
  const active=state.identity.client;
  return '<div class="vl2-client-wrap"><div class="vl2-control-label">Cliente <small>seleção obrigatória</small></div>'+
   '<details name="vl2-choice" class="vl2-client-combo" id="vl2-client-combo"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><strong>'+esc(active?nameOf(clients,active):"Pesquisar ou selecionar cliente")+'</strong><em>'+esc(state.clientConfirmed?"Alterar":"Confirmar")+'</em></summary>'+
-  '<div class="vl2-client-pop"><input id="vl2-client-search" type="search" autocomplete="off" aria-label="Pesquisar cliente" placeholder="Digite o nome do cliente…"><div class="vl2-client-options">'+
+  '<div class="vl2-client-pop"><div class="vl2-popup-header"><strong>Selecionar cliente</strong><button type="button" data-vl2-close-lookup aria-label="Fechar seleção">✕</button></div><input id="vl2-client-search" type="search" autocomplete="off" aria-label="Pesquisar cliente" placeholder="Digite o nome do cliente…"><div class="vl2-client-options">'+
   sortedClients.map(c=>'<button type="button" data-vl2-client="'+esc(c[0])+'" data-label="'+esc(norm(c[1]))+'">'+esc(c[1])+'</button>').join("")+
   '</div></div></details><p class="vl2-help">'+(state.clientConfirmed?"Cliente confirmado. Você pode alterá-lo a qualquer momento.":active?"Identificação sugerida pela foto; toque para confirmar.":"Escolha o cliente para cruzar com a etiqueta.")+'</p></div>';
 }
