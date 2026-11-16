@@ -149,11 +149,12 @@ function extract(raw,barcode){
  if(explicitCinta&&wG)kind="cinta"+wG;
  else if(explicitCumbuca&&wG)kind="cumbuca"+wG;
  else if(classCode)kind=classCode[5]==="10"?"sacola":"caixa";
+ else if(/\bSACOLA\b/.test(n)&&!explicitCumbuca)kind="sacola";
  else if(boxEvidence)kind="caixa";
  else if(/\bSELO\b/.test(n))kind="selo";
  else if(catalogKind.length===1&&catalogKind[0])kind=catalogKind[0];
  else if(wG&&b&&!printedCnpj&&!printedGgn)kind="cumbuca"+wG;
- else if(!boxEvidence&&b&&state.photoAspect>0&&state.photoAspect<1.72)kind=wG?"cumbuca"+wG:"cumbuca";
+ else if(!boxEvidence&&b)kind=wG?"cumbuca"+wG:"cumbuca";
  else if(boxEvidence&&state.photoAspect>1.25)kind="caixa";
  const shapeSuggestion=Boolean(kind&&!boxEvidence&&!explicitCumbuca&&!explicitCinta&&!catalogKind.some(Boolean)&&!wG&&!b&&!/\bSELO\b/.test(n));
  // Códigos 20/21 identificam a embalagem, mas não comprovam o tamanho físico da etiqueta.
@@ -1108,6 +1109,8 @@ function diagnosticV4(){
  }
  if(box){
   const model=state.detected?.boxModel;
+  if(model&&/\bSACOLA\b/.test(norm(state.text))&&model.package!=="10")
+   add("error","Embalagem incompatível","A etiqueta menciona sacola, mas o código de modelo indica outra embalagem.");
   if(model){
    const colors={V:"verde",P:"preta",PA:"parda"};
    const title="Código da cor da caixa";
