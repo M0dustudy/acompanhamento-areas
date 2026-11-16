@@ -59,10 +59,27 @@ function parseTrace(value){
  const m=norm(value).replace(/[–—]/g,"-").replace(/\s/g,"").match(/^R-(\d{2})-([0-9A-Z_./]{1,40})-(\d{2})(\d{2})-([C58])-([A-Z0-9]{2,5})$/);
  return m?{year:m[1],areaValve:m[2],area:"",valve:"",day:m[3],month:m[4],method:m[5],variety:m[6]}:null;
 }
+// Somente referências inequívocas para o EAN e o cliente autorizam preenchimento automático.
+function classFromCatalog(){
+ const ean=digits(state.barcodeBars||state.fields?.barcode||"");
+ if(!eanValid(ean)||!state.clientConfirmed||!state.identity.client)return "";
+ const rows=catalog.filter(x=>x.barcode===ean&&catalogClient(x.client)===catalogClient(state.identity.client));
+ const values=distinct(rows.map(x=>x.klass));
+ return rows.length&&rows.every(x=>!!x.klass)&&values.length===1?values[0]:"";
+}
+function effectiveClass(){return classFromCatalog()||state.expected.klass||"";}
+// O modelo de caixa e o código de rastreabilidade devem concordar antes de dispensar a pesagem.
+function modelMethod(){
+ if(category()!=="box")return "";
+ const model=state.detected?.boxModel,track=parseTrace(state.fields?.rastreio||"");
+ const expected=model?.weight==="50"?"5":model?.weight==="80"?"8":"";
+ return expected&&track?.method===expected?expected:"";
+}
+function effectiveMethod(){return state.expected.method||modelMethod();}
 function expectedCode(){
- const x=state.expected,unit=category()==="unit",box=category()==="box";
- if(!(unit||box)||!x.year||!x.area||!x.valve||!x.day||!x.month||!x.variety||(box&&!x.method))return "";
- return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+(unit?"*":x.method)+"-"+x.variety;
+ const x=state.expected,unit=category()==="unit",box=category()==="box",method=effectiveMethod();
+ if(!(unit||box)||!x.year||!x.area||!x.valve||!x.day||!x.month||!x.variety||(box&&!method))return "";
+ return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+(unit?"*":method)+"-"+x.variety;
 }
 function codeMatchesReference(reference,printed){
  const expected=norm(reference).replace(/\s/g,""),actual=norm(printed).replace(/\s/g,"");
@@ -103,7 +120,7 @@ function extract(raw,barcode){
  else if(/\bSELECIONADA\b/.test(n))klass="Selecionada";
  else if(/\bSABOR\b/.test(n))klass="Sabor";
  else if(/\bEXTRA\b/.test(n))klass="Extra";
- else {const classesFromCode=distinct(group.map(x=>x.klass));if(classesFromCode.length===1)klass=classesFromCode[0];}
+ // Classe não lida na foto permanece ausente, mesmo quando o catálogo possui uma referência.
  const printedWeight=str(raw).match(/\b(?:PESO\s*[:=]?\s*)?(\d{1,2}(?:[,.]\d{1,2})?)\s*(KG|G)\b/i);
  const codeWeights=distinct(group.map(x=>x.weight));
  const weightPhoto=printedWeight?printedWeight[1].replace(".",",")+" "+printedWeight[2].toLowerCase():"";
@@ -776,7 +793,7 @@ function traceBuilder(){
  const letters=["A","B","C","D","1","2","3","4"].map(x=>[x,x]);
  const varietiesCodes=varieties.filter(x=>x[2]).slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(x=>[x[2],x[2]+" · "+x[1]]);
  const siteAreas=(()=>{try{return typeof A==="object"&&A?Object.keys(A).map(digits).filter(x=>x.length>=3&&x.length<=5):[];}catch{return [];}})();
- const expected=expectedCode(),observed=state.fields.rastreio||"",box=category()==="box";
+ const expected=expectedCode(),observed=state.fields.rastreio||"",box=category()==="box",autoMethod=!state.expected.method&&box?modelMethod():"";
  const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
  return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
@@ -788,7 +805,7 @@ function traceBuilder(){
   '<label>Válvula'+'<input data-vl2-trace="valve" maxlength="16" list="vl2-valves" value="'+esc(state.expected.valve)+'" placeholder="Letra ou número"><datalist id="vl2-valves">'+letters.map(x=>'<option value="'+x[0]+'"></option>').join("")+'</datalist>'+'</label>'+
   '<div class="vl2-trace-field"><span>Dia</span>'+traceOptions(day,"day","Dia")+'</div>'+
   '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
-  (box?'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>':"")+
+  (box?(autoMethod?'<div class="vl2-trace-field vl2-trace-inferred"><span>Pesagem identificada</span><strong>'+(autoMethod==="5"?"5 kg":"8 kg")+' · dois códigos da etiqueta conferem</strong></div>':'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>'):"")+
   '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
@@ -966,8 +983,8 @@ function diagnosticV4(){
    add("ok","Modelo da embalagem",model.market+" · "+model.weight+" · "+model.variety+" · "+model.package+" identifica "+pack+" pelo glossário, sem exigir preenchimento manual.","DOC.CQ.056, p. 3, 5");
   }else if(/\b(?:MEI|EX)\s*[-]?\s*[A-Z]{1,3}\d{2}[A-Z]{2,3}\d{2}\b/.test(norm(state.text)))
    add("pending","Código do modelo da caixa","Há um código de modelo, mas o texto não corresponde ao glossário. Confira a impressão ou refaça a leitura.");
-  const chosenClass=state.expected.klass||"",readClass=state.identity.klass||"";
-  if(!chosenClass)add("pending","Classificação da ordem","Informe a classificação real da ordem de produção para compará-la com a classe impressa na caixa.");
+  const chosenClass=effectiveClass(),readClass=state.identity.klass||"";
+  if(!chosenClass)add("pending","Classificação da ordem","Não há classe única comprovada no catálogo para este EAN e cliente. Informe a classificação da produção.");
   if(!readClass)add("pending","Classificação impressa","O sistema não conseguiu ler a classe impressa na caixa. Uma nova fotografia poderá permitir a comparação.");
   else if(chosenClass&&readClass!==chosenClass)
    add("error","Classificação divergente","Caixa impressa: "+readClass+" · ordem de produção: "+chosenClass+".");
@@ -997,9 +1014,9 @@ function diagnosticV4(){
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
   if(state.sources[k]==="Corrigido manualmente")add("pending","Identificador ajustado","O campo "+k+" foi alterado manualmente. Uma nova leitura da foto é necessária para aprovação automática.");
  const critical=checks.filter(x=>x.status==="error"),pending=checks.filter(x=>x.status==="pending");
- const ready=Boolean(state.photo&&state.scanCompleted&&state.clientConfirmed&&expected&&kind&&(!box||state.expected.klass));
+ const ready=Boolean(state.photo&&state.scanCompleted&&state.clientConfirmed&&expected&&kind&&(!box||effectiveClass()));
  const status=!ready?"coleta":critical.length?"reprovado":pending.length?"pendente":"aprovado";
- const summary=status==="coleta"?"Confirme as referências da ordem de produção"+(box?", incluindo a classificação da caixa.":".")+" Só então será possível concluir a análise.":
+ const summary=status==="coleta"?"Confirme as referências necessárias da ordem de produção"+(box&&!classFromCatalog()?", incluindo a classificação da caixa.":".")+" Só então será possível concluir a análise.":
  status==="reprovado"?"Foram identificadas "+critical.length+" divergência(s) entre a etiqueta e as referências consultadas.":
  status==="pendente"?"A imagem ou o cadastro não permitem concluir a conferência com segurança. Revise os itens pendentes.":
  "Os identificadores lidos coincidem com as referências disponíveis. O resultado digital está apto para confirmação e registro.";
@@ -1033,9 +1050,7 @@ function showResult(){
   (f.gln?photoValue("GLN do produtor",f.gln):"")+
   (f.glnComercial?photoValue("GLN do comerciante",f.glnComercial):""):
   unit?
-  '<div class="vl2-reading-barcode"><small>Código de barras (EAN-13 completo)</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p></div>'+
-  photoValue("13 números abaixo das barras",state.barcodePrinted||"Leitura não concluída")+
-  photoValue("Número decodificado das barras",state.barcodeBars||"Leitura não concluída"):
+  '<div class="vl2-reading-barcode"><small>Código de barras · EAN-13</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p><p>'+esc(state.barcodeBars&&state.barcodePrinted?(state.barcodeBars===state.barcodePrinted?"Barras e número impresso conferem.":"Divergência entre barras e número impresso."):"Comparação entre barras e número impresso pendente.")+'</p></div>':
   '<div class="vl2-reading-barcode"><small>Identificadores</small><strong>Aguardando identificação do modelo</strong></div>';
  const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
   photoValue("Modelo",kind?name:"Não identificado")+photoValue("Uva",initial)+
@@ -1043,7 +1058,7 @@ function showResult(){
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
  const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados da ordem de produção</strong><small>Informe somente os dados que não constam no cadastro.</small></div></div>'+clientChooser()+traceBuilder()+
- (box?'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>Confirme a classe que deveria constar na etiqueta da caixa.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>':"")+
+ (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>O código não possui uma classe única cadastrada. Informe a classificação correta da produção.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
  const issues=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
@@ -1208,6 +1223,30 @@ async function openHistory(id){
   host.querySelector("#vl2-close-detail")?.addEventListener("click",close);
  }
 }
+// Perfil observacional de novos layouts e cores, sem transformar uma amostra em regra de conformidade.
+async function collectVisualEvidence(file,ocr){
+ const base={version:1,source:"amostra_fotografica_sem_validacao_de_cor",lines:String(ocr||"").split(/\r?\n/).filter(v=>v.trim()).length};
+ if(!file)return base;
+ let bmp=null;
+ try{
+  bmp=await createImageBitmap(file);
+  const width=Math.max(1,Math.min(160,bmp.width));
+  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=Math.max(1,Math.min(320,Math.round(width*bmp.height/bmp.width)));
+  const context=canvas.getContext("2d",{willReadFrequently:true});context.drawImage(bmp,0,0,canvas.width,canvas.height);
+  const pixel=context.getImageData(0,0,canvas.width,canvas.height).data;
+  const palette={vermelho:0,laranja:0,amarelo:0,verde:0,azul:0,roxo:0};let chromatic=0;
+  for(let i=0;i<pixel.length;i+=24){
+   const r=pixel[i]/255,g=pixel[i+1]/255,b=pixel[i+2]/255,hi=Math.max(r,g,b),lo=Math.min(r,g,b),d=hi-lo;
+   if(hi<.2||hi>.97||d/Math.max(hi,.01)<.24)continue;
+   let hue=hi===r?((g-b)/d)%6:hi===g?(b-r)/d+2:(r-g)/d+4;hue=(hue*60+360)%360;chromatic++;
+   const group=hue<18||hue>=345?"vermelho":hue<48?"laranja":hue<75?"amarelo":hue<170?"verde":hue<260?"azul":"roxo";
+   palette[group]++;
+  }
+  const dominant=Object.entries(palette).sort((a,b)=>b[1]-a[1])[0];
+  return {...base,aspect:Math.round(100*bmp.width/bmp.height)/100,colorSamples:chromatic,
+    colorCounts:palette,dominantTone:chromatic>=30&&dominant[1]/chromatic>=.45?dominant[0]:"inconclusivo"};
+ }catch{return base;}finally{bmp?.close?.();}
+}
 async function saveReview(){
  if(!ctx?.canAccess?.()||state.saved)return;
  const report=diagnosticV4();
@@ -1216,7 +1255,8 @@ async function saveReview(){
  }
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
- const fields={...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:state.expected.klass||"",clientConfirmed:state.clientConfirmed,
+ const visualEvidence=await collectVisualEvidence(state.photo,state.text);
+ const fields={...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
