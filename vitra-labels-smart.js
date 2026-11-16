@@ -116,10 +116,16 @@ function extract(raw,barcode){
  const traceMatch=str(raw).match(/\bR[\s\-–—]*(\d{2})[\s\-–—]*([0-9A-Za-z_./]{2,40})[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z0-9]{2,5})\b/i);
  const trace=traceMatch?"R-"+traceMatch[1]+"-"+traceMatch[2].toUpperCase()+"-"+traceMatch[3]+"-"+traceMatch[4].toUpperCase()+"-"+traceMatch[5].toUpperCase():"";
  const track=parseTrace(trace),group=matches.filter(x=>!foundClient||x.client===catalogClient(foundClient));
- const wordVar=varieties.filter(x=>x[3].some(alias=>n.includes(norm(alias))));
+ const wordVar=varieties.filter(v=>v[3].some(alias=>n.includes(norm(alias)))||
+   (v[0]==="vitoria"&&/\bVITORIA\b/.test(n))||
+   (v[0]==="isis"&&/\bISIS\b/.test(n)));
  const suffixVar=varieties.filter(x=>track&&x[2]===track.variety);
- const codeVar=distinct(group.map(x=>x.variety));
- const variety=wordVar.length===1?wordVar[0][0]:suffixVar.length===1?suffixVar[0][0]:codeVar.length===1?codeVar[0]:"";
+ const modelVarMatch=n.match(/\b(?:MEI|EX)\s*[-]?\s*(?:PA|V|P)(?:50|80)([A-Z]{2,3})(?:10|20|21)\b/);
+ const modelVar=varieties.filter(v=>modelVarMatch&&v[2]===modelVarMatch[1]);
+ const catalogVar=distinct(group.map(x=>x.variety));
+ const observedVars=distinct([...wordVar,...suffixVar,...modelVar].map(x=>x[0]));
+ const variety=observedVars.length===1?observedVars[0]:observedVars.length===0&&catalogVar.length===1?catalogVar[0]:"";
+ const varietySource=observedVars.length===1?"Texto ou código impresso":variety?"Código de barras cadastrado":"";
  let klass="";
  if(/\bEXTRA\s*A\b|\bHAPPY\s*TREE\b/.test(n))klass="Happy Tree / Extra A";
  else if(/\bCAMPESITA\b/.test(n))klass="Campesita";
@@ -175,7 +181,7 @@ function extract(raw,barcode){
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
   fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||(!companySection?ggnNumber:""),ggnComercial,gln:glnProdutor,glnComercial,produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
-  producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high"
+  producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high",varietySource
  };
 }
 function canonicalCoordinates(value){
@@ -908,9 +914,8 @@ function traceBuilder(){
  const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
  return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
-  '<p>Informe o código correto da ordem de produção. Ele não será copiado da foto.</p>'+
-  '<label class="vl2-quick-trace">Código da ordem de produção<input id="vl2-trace-full" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="R-26-ÁREAVÁLVULA-DDMM-5-SIGLA" value="'+esc(state.expected.raw||"")+'" aria-label="Rastreabilidade da ordem de produção"></label>'+
-  '<details class="vl2-trace-manual"><summary>Ou preencher a rastreabilidade por partes</summary><div class="vl2-trace-grid">'+
+  '<p>Selecione os dados corretos da ordem de produção para comparar com a etiqueta.</p>'+
+  '<div class="vl2-trace-grid">'+
   '<label>Prefixo<input readonly value="R" aria-label="Prefixo R"></label>'+
   '<div class="vl2-trace-field"><span>Ano</span>'+traceOptions(years,"year","Ano")+'</div>'+
   '<label class="vl2-trace-area">Área<input data-vl2-trace="area" maxlength="20" list="vl2-areas" value="'+esc(state.expected.area)+'" placeholder="Código do produtor"><datalist id="vl2-areas">'+distinct([...siteAreas,state.detected?.track?.area,...(state.history||[]).map(x=>parseTrace(x?.fields?.rastreio||"")?.area)]).filter(Boolean).map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist></label>'+
@@ -918,7 +923,7 @@ function traceBuilder(){
   '<div class="vl2-trace-field"><span>Dia</span>'+traceOptions(day,"day","Dia")+'</div>'+
   '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
   (box?(autoMethod?'<div class="vl2-trace-field vl2-trace-inferred"><span>Pesagem identificada</span><strong>'+(autoMethod==="5"?"5 kg":"8 kg")+' · dois códigos da etiqueta conferem</strong></div>':'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>'):"")+
-  '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div></details>'+
+  '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
 }
@@ -1161,25 +1166,24 @@ function showResult(){
  }
  const report=diagnosticV4();state.diag=report;
  const kind=state.identity.kind,name=nameOf(kinds,kind);
- const initial=state.detected?.identity?.variety?nameOf(varieties,state.detected.identity.variety):"Não identificada";
+ const initial=state.identity.variety?nameOf(varieties,state.identity.variety):(state.fields.produto||"Variedade não determinada");
  const f=state.fields,code=f.barcode||"Não identificado",box=category()==="box",unit=category()==="unit";
  const owners=distinct(catalog.filter(x=>x.barcode===code).map(x=>x.client));
  const ownerNames=owners.map(x=>nameOf(clients,x)).sort((a,b)=>a.localeCompare(b,"pt-BR"));
  const codeContext=owners.length>1?"Código EAN-13 cadastrado para "+ownerNames.join(" e ")+". Não é necessariamente uma irregularidade.":owners.length===1?"EAN-13 associado a "+ownerNames[0]+".":"Código não cadastrado ou ainda não identificado.";
  const photoValue=(label,value)=>!value?"":'<div><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong></div>';
  const evidence=box?
-  photoValue("Produzido por",state.referenceProducer?.name||f.produtor)+
-  photoValue("Comercializado por",state.referenceMerchant?.name||f.comercializado)+
-  photoValue("CNPJ do produtor",f.cnpj)+photoValue("CNPJ do comerciante",f.cnpjComercial)+
-  photoValue("GGN do produtor",f.ggn)+
-  (f.ggnComercial?photoValue("GGN do comerciante",f.ggnComercial):"")+
-  (f.gln?photoValue("GLN do produtor",f.gln):"")+
-  (f.glnComercial?photoValue("GLN do comerciante",f.glnComercial):""):
+  photoValue("Origem",state.referenceProducer?.name||f.produtor)+
+  photoValue("Comercialização",state.referenceMerchant?.name||f.comercializado)+
+  photoValue("Documentos identificados",[
+   f.cnpj?"CNPJ de origem":"",f.cnpjComercial?"CNPJ comercial":"",
+   f.ggn?"GGN de origem":"",f.ggnComercial?"GGN comercial":"",
+   f.gln?"GLN de origem":"",f.glnComercial?"GLN comercial":""].filter(Boolean).join(" · ")):
   unit?
   '<div class="vl2-reading-barcode"><small>Código de barras · EAN-13</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p><p>'+esc(state.barcodeBars&&state.barcodePrinted?(state.barcodeBars===state.barcodePrinted?"Barras e número impresso conferem.":"Divergência entre barras e número impresso."):"Comparação entre barras e número impresso pendente.")+'</p></div>':
   '<div class="vl2-reading-barcode"><small>Identificadores</small><strong>Aguardando identificação do modelo</strong></div>';
  const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · '+state.ocrPasses+' passagem(ns) de OCR · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
-  photoValue("Modelo",kind?name:"Não identificado")+photoValue("Uva",initial)+
+  photoValue("Modelo",kind?name:"Não identificado")+photoValue("Variedade / produto",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
@@ -1217,12 +1221,6 @@ function showResult(){
  root.querySelectorAll("[data-vl2-close-lookup]").forEach(b=>b.addEventListener("click",()=>{b.closest("details").open=false;}));
  el("vl2-client-search")?.addEventListener("input",e=>{const q=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(q));});
  root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.reviewRequested=false;showResult();}));
- el("vl2-trace-full")?.addEventListener("input",e=>{
-  state.expected.raw=e.target.value.toUpperCase().trim();
-  state.reviewRequested=false;state.reviewed=false;
-  const action=el("vl2-evaluate");if(action)action.disabled=!diagnosticV4().ready;
- });
- el("vl2-trace-full")?.addEventListener("change",()=>showResult());
  root.querySelectorAll("[data-vl2-trace]").forEach(inp=>{
   const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
    if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
