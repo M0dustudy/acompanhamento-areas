@@ -666,6 +666,7 @@ async function readPhoto(){
  if(!state.photo||!ctx?.canAccess?.())return;
  const seq=++state.sequence,photo=state.photo,progress=el("vl2-progress");
  state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
+ showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia para leitura…";}
  let worker=null,recognized="",barcode="",printedNumber="",failure="";
  const update=message=>{if(seq===state.sequence&&progress)progress.textContent=message;};
@@ -953,7 +954,7 @@ function diagnosticV4(){
  const critical=checks.filter(x=>x.status==="error"),pending=checks.filter(x=>x.status==="pending");
  const ready=Boolean(state.photo&&state.scanCompleted&&state.clientConfirmed&&expected&&kind&&(!box||state.expected.klass));
  const status=!ready?"coleta":critical.length?"reprovado":pending.length?"pendente":"aprovado";
- const summary=status==="coleta"?"Complete o cliente e a rastreabilidade da ordem de produção. Só depois o VITRA emitirá o resultado.":
+ const summary=status==="coleta"?"Confirme as referências da ordem de produção"+(box?", incluindo a classificação da caixa.":".")+" Só então será possível concluir a análise.":
  status==="reprovado"?"Foram identificadas "+critical.length+" divergência(s) entre a etiqueta e as referências consultadas.":
  status==="pendente"?"A imagem ou o cadastro não permitem concluir a conferência com segurança. Revise os itens pendentes.":
  "Os identificadores lidos coincidem com as referências disponíveis. O resultado digital está apto para confirmação e registro.";
@@ -1004,7 +1005,7 @@ function showResult(){
  const item=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
  let outcome="";
  if(!state.reviewRequested){
-  outcome='<section class="vl2-decision-prompt"><div class="vl2-reading-head"><div><strong>Conferência da etiqueta</strong><small>O parecer depende das confirmações acima.</small></div></div><p>'+esc(report.ready?"As referências estão preenchidas. Compare agora com a foto.":"Complete cliente, modelo e rastreabilidade da ordem de produção para habilitar a conferência.")+'</p><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?"disabled":"")+'>Conferir dados da etiqueta</button></section>';
+  outcome='<section class="vl2-decision-prompt"><div class="vl2-reading-head"><div><strong>Conferência da etiqueta</strong><small>O parecer depende das confirmações acima.</small></div></div><p>'+esc(report.ready?"As referências estão preenchidas. Compare agora com a foto.":"Complete as referências da ordem de produção para habilitar a conferência.")+'</p><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?"disabled":"")+'>Conferir dados da etiqueta</button></section>';
  }else{
   const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
   outcome='<section class="vl2-outcome" id="vl2-outcome"><div class="vl2-status vl2-status-'+report.status+'"><div><small>RESULTADO DA CONFERÊNCIA</small><strong>'+esc(title)+'</strong></div><p>'+esc(report.summary)+'</p></div>'+
