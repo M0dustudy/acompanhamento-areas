@@ -133,12 +133,12 @@ function extract(raw,barcode){
  let kind="";
  const explicitCinta=/\bCINTA\b/.test(n),explicitCumbuca=/\bCUMBUCA\b/.test(n);
  const printedCnpj=/\bCNPJ\b/.test(n),printedGgn=/\bGGN\b/.test(n);
- const boxEvidence=/\bPRODUZIDO POR\b|\bCOMERCIALIZADO POR\b|\bCAIXA\b|\b(?:5|8)\s*KG\b/.test(n);
+ const boxEvidence=!!classCode||/\bCAIXA\b|\b(?:5|8)\s*KG\b/.test(n);
  const wG=/\b250\s*G\b/.test(n)?"250":/\b500\s*G\b/.test(n)?"500":/^\d{3} G$/i.test(peso)?digits(peso):"";
  const catalogKind=distinct(group.map(x=>x.kind));
  if(explicitCinta&&wG)kind="cinta"+wG;
  else if(explicitCumbuca&&wG)kind="cumbuca"+wG;
- else if(boxEvidence&&/PRODUZIDO POR|COMERCIALIZADO POR|CAIXA|KG/.test(n))kind="caixa";
+ else if(boxEvidence)kind="caixa";
  else if(/\bSELO\b/.test(n))kind="selo";
  else if(catalogKind.length===1&&catalogKind[0])kind=catalogKind[0];
  else if(wG&&b&&!printedCnpj&&!printedGgn)kind="cumbuca"+wG;
@@ -152,10 +152,10 @@ function extract(raw,barcode){
  const companySection=str(raw).split(/COMERCIALIZADO POR/i)[1]?.split(/PRODUZIDO POR|RASTREABILIDADE/i)[0]||"";
  const producerCnpj=digits(producedSection.match(cnpjPattern)?.[0]||"");
  const companyCnpj=digits(companySection.match(cnpjPattern)?.[0]||"");
- const cnpj=producerCnpj||candidates.length===1&&!companySection?candidates[0]:"";
+ const cnpj=producerCnpj||(candidates.length===1&&!companySection?candidates[0]:"");
  const ggn=str(raw).match(/\b(?:GGN|GLOBALGAP|GLOBAL\s*G\.?A\.?P\.?)\s*[:#-]?\s*(\d[\d\s-]{11,18})/i)?.[1]||"";
  const ggnNumber=digits(ggn).slice(0,13);
- const producer=producers.find(p=>n.includes(norm(p[0])))||producers.find(p=>p[1]&&digits(cnpj)===p[1])||null;
+ const producer=producers.find(p=>producedSection&&norm(producedSection).includes(norm(p[0])))||producers.find(p=>p[1]&&digits(cnpj)===p[1])||producers.find(p=>p[2]&&ggnNumber===p[2])||(!companySection?producers.find(p=>n.includes(norm(p[0]))):null)||null;
  const commer=producers.find(p=>companySection&&norm(companySection).includes(norm(p[0])))||null;
  const refWeight=classCode?classCode[3]==="50"?"5 kg":classCode[3]==="80"?"8 kg":"":"";
  return {
