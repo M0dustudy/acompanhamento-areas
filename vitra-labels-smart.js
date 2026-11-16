@@ -55,7 +55,7 @@ function extract(raw,barcode){
  else if(/\bEXTRA\b/.test(n))ocrClass.push("Extra");
  const deduped=distinct(ocrClass);
  if(deduped.length===1)assign("klass",deduped[0],"Classe na foto");
- else if(codeClass.length===1)assign("klass",codeClass[0],"Código cadastrado");
+ else if(identified.client&&codeClass.length===1)assign("klass",codeClass[0],"Código cadastrado");
  const listedWeights=distinct(group.map(m=>m.weight));
  const measured=original.match(/\b(?:PESO\s*[:=]?\s*)?(\d{1,2}(?:[,.]\d{1,2})?)\s*(KG|G)\b/i);
  const weightPhoto=measured?measured[1].replace(".",",")+" "+measured[2].toLowerCase():"";
@@ -78,13 +78,13 @@ function extract(raw,barcode){
  else if(containsBox)proposedKind="caixa";
  else if(/\bEXPORTACAO\b/.test(n)&&/\bEX\b/.test(n))proposedKind="exportacao";
  const catalogKind=distinct(group.map(m=>m.kind));
- if(!proposedKind&&catalogKind.length===1)proposedKind=catalogKind[0];
+ if(!proposedKind&&identified.client&&catalogKind.length===1)proposedKind=catalogKind[0];
  if(proposedKind)assign("kind",proposedKind,traceClass.length?"Código da embalagem":"Texto ou modelo cadastrado");
  const dateMatch=original.match(/\b([0-3]?\d)[./-]([01]?\d)[./-]((?:20)?\d{2})\b/);
  let date=dateMatch?dateMatch[1].padStart(2,"0")+"/"+dateMatch[2].padStart(2,"0")+"/"+(dateMatch[3].length===2?"20"+dateMatch[3]:dateMatch[3]):"";
  if(date&&(!/^([0-2]\d|3[01])\/(0[1-9]|1[012])\/20\d\d$/.test(date)||isNaN(Date.parse(date.slice(6)+"-"+date.slice(3,5)+"-"+date.slice(0,2)))))date="";
  const lot=original.match(/\b(?:LOTE|LOT)\s*[:#-]?\s*([0-9A-Z./-]{2,24})\b/i)?.[1]||"";
- const other={barcode:gtin,rastreio:trace,data,lote:lot,peso:weight,produto:group.length===1?group[0].product:""};
+ const other={barcode:gtin,rastreio:trace,data:date,lote:lot,peso:weight,produto:group.length===1?group[0].product:""};
  if(!other.produto&&/\bUVAS?\b/.test(n))other.produto="";
  if(identified.variety)other.varietyDisplay=getName(varieties,identified.variety);
  if(traceSuffix)other.traceSuffix=traceSuffix;
@@ -139,7 +139,7 @@ function showResult(renderOnly=true){
  '<div class="vl2-fact"><small>Classificação</small><strong>'+escape(state.identity.klass||"Não identificada")+'</strong><span>'+escape(state.source.klass||"Confirme quando constar na etiqueta")+'</span></div>'+
  '<div class="vl2-fact"><small>Código de barras</small><strong class="vl2-mono">'+escape(state.fields.barcode||"Não reconhecido")+'</strong><span>'+escape(state.fields.barcode?"Foto / cadastro":"Ainda sem leitura")+'</span></div>'+
  '<div class="vl2-fact"><small>Produto comercial</small><strong>'+escape(state.fields.produto||"A confirmar")+'</strong><span>Referência comercial, quando encontrada</span></div></div>';
- const needEdit=["client","kind","variety"].filter(x=>!state.identity[x]);
+ const needEdit=["client","kind","variety"].concat(state.identity.kind==="caixa"?["klass"]:[]).filter(x=>!state.identity[x]);
  const extra=needEdit.length?'<div class="vl2-unknown"><strong>Precisamos confirmar</strong><p>A foto não permitiu identificar estes dados com segurança.</p><div class="vl2-pickers">'+needEdit.map(showSelection).join("")+'</div></div>':"";
  const dyn=[["rastreio","Rastreabilidade"],["data","Data de embalagem"],["lote","Lote"]].filter(([k])=>k!=="lote"||["caixa","sacola","exportacao"].includes(state.identity.kind));
  const dynEmpty=dyn.filter(x=>!state.fields[x[0]]);
