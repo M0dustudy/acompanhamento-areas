@@ -83,3 +83,15 @@ Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes
 - Novas verificações pertencem ao fluxo v5; registros anteriores não foram alterados e não devem ser confundidos com verificações v5.
 - Só a conta mestre pode ocultar, restaurar ou excluir definitivamente um registro. Excluir exige digitação literal da palavra EXCLUIR e elimina a foto e eventuais padrões aprendidos somente daquele registro; o evento de auditoria permanece.
 - Nenhum registro histórico foi excluído como parte desta atualização.
+
+
+## Revisão de confiabilidade da leitura — 16/11/2026, fluxo v6
+- Corrigir a espera interminável do OCR: carregar o leitor de texto com prazo, reaproveitar o worker, limitar os pixels processados e interromper a tentativa após um tempo máximo. Exibir falha recuperável, sem aprovar e sem exigir nova digitação de informações impressas.
+- Pré-carregar o motor de texto após abrir o módulo para reduzir o tempo de espera da primeira fotografia.
+- Executar no máximo uma releitura complementar da imagem inteira; não rodar várias rotações automáticas pesadas, especialmente em celulares. A galeria mantém rotação manual e recorte opcional, e qualquer rotação invalida o diagnóstico anterior.
+- Para cumbucas, tentar a leitura independente dos 13 dígitos impressos na região próxima ao código de barras reconhecido por leitor nativo ou ZXing. Se não for possível comprová-los, manter pendência; nunca copiar o número decodificado das barras para simular a leitura do texto.
+- O código de rastreabilidade digitado pelo colaborador é uma referência independente. Se a câmera não conseguir ler o código impresso, o diagnóstico deve explicar claramente que o código digitado não comprova a coincidência.
+- Eliminar campos de transcrição de rastreabilidade impressa, peso, EAN, data, lote, CNPJ, GGN e produtor. O sistema deve extrair esses dados da fotografia e compará-los com o banco. Deixar exposto apenas o cliente e a rastreabilidade da produção; exigir classificação da ordem somente em etiquetas de caixa.
+- A classificação impressa na caixa deve coincidir com a classificação informada da ordem de produção. Essa condição é verificada tanto no frontend quanto pela Edge Function no momento do salvamento.
+- Manter a visualização de texto bruto apenas para auditoria, sem permitir que uma correção manual simule reconhecimento automático.
+- Antes de publicar, executar testes de unidade e integração simulada de cumbuca, caixa, rastreabilidade divergente, EAN divergente, GGN incorreto, classe divergente e falha por tempo esgotado. Teste móvel físico continua necessário para medir a confiabilidade real do OCR.
