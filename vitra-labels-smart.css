@@ -545,3 +545,18 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
 .vl2-order-class .vl2-lookup{max-width:440px}
 .vl2-order-class .vl2-lookup>summary{background:#fff;min-height:46px}
 @media(max-width:520px){.vl2-order-class{padding:12px}.vl2-order-class .vl2-lookup{max-width:none}}
+
+
+/* Rastreabilidade: um campo principal, editor de partes recolhido por padrão. */
+.vl2-quick-trace{display:block;margin:12px 0 14px;color:#264c35;font-size:12px;font-weight:750}
+.vl2-quick-trace input{display:block;width:100%;margin-top:7px;padding:13px 14px;min-height:46px;
+ border:1px solid #c8dacf;border-radius:11px;background:#fff;color:#193e2b;
+ font:600 14px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.012em}
+.vl2-quick-trace input:focus{outline:2px solid #88b99b;outline-offset:2px}
+.vl2-trace-manual{padding:0 12px 12px;border:1px solid var(--line);border-radius:11px;background:#fafdfb}
+.vl2-trace-manual summary{padding:12px 0;cursor:pointer;color:#315e43;font-weight:650;font-size:12px}
+.vl2-trace-manual .vl2-trace-grid{margin-top:3px}
+.vl2-trace-inferred strong{font-size:12px;font-weight:650;color:#2e6647}
+.vl2-sample{margin-top:12px}
+.vl2-sample .vl2-evaluate{margin:8px 0 3px}
+@media(max-width:480px){.vl2-quick-trace input{font-size:12px;padding:12px 10px;min-height:44px}}
