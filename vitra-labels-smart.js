@@ -367,8 +367,8 @@ function positionMode(mode){
  if(video)video.hidden=mode!=="camera";
  if(frame)frame.hidden=mode==="crop"?!state.cropActive:mode!=="camera";
  if(cropping)cropping.hidden=mode==="crop"?!state.cropActive:mode!=="camera";
- if(el("vl2-gallery-tools"))el("vl2-gallery-tools").hidden=mode!=="crop";
- if(el("vl2-analyze-full"))el("vl2-analyze-full").hidden=mode!=="crop";
+ if(el("vl2-gallery-tools"))el("vl2-gallery-tools").hidden=!(["crop","ready"].includes(mode)&&!!state.sourceFile);
+ if(el("vl2-analyze-full"))el("vl2-analyze-full").hidden=!(["crop","ready"].includes(mode)&&!!state.sourceFile);
  if(el("vl2-capture"))el("vl2-capture").hidden=mode!=="camera";
  if(el("vl2-apply-crop"))el("vl2-apply-crop").hidden=mode!=="crop"||!state.cropActive;
  if(mode==="camera"||mode==="crop"&&state.cropActive)requestAnimationFrame(drawCrop);
@@ -409,6 +409,16 @@ async function finishCrop(){
  finally{state.processing=false;}
 }
 
+function invalidatePhotoReading(){
+ state.sequence++;
+ if(state.url){URL.revokeObjectURL(state.url);state.url=null;}
+ state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.barcodeRegion=null;
+ state.detected=null;state.fields={};state.sources={};state.matches=[];state.referenceChecks=[];
+ state.referenceProducer=null;state.referenceMerchant=null;
+ state.scanCompleted=false;state.ocrFailed=false;state.analysisError="";
+ state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;
+ state.identity.kind="";state.identity.variety="";state.identity.klass="";
+}
 function fitGalleryImage(){
  const stage=el("vl2-stage"),image=el("vl2-image");
  if(!stage||!image||state.mode==="camera")return;
@@ -434,13 +444,13 @@ async function rotateGallery(angle){
   g.drawImage(bmp,-bmp.width/2,-bmp.height/2);bmp.close?.();
   const file=await photoFromCanvas(canvas);
   state.crop={cx:.5,cy:.5,scale:.92,ratio:canvas.width/canvas.height};state.imageAngle=(state.imageAngle+angle+360)%360;
-  state.cropActive=false;setGalleryPreview(file);notice("Imagem girada. Verifique a etiqueta inteira antes de analisar.");
+  state.cropActive=false;invalidatePhotoReading();setGalleryPreview(file);showResult();notice("Imagem girada. Use Analisar foto inteira para uma nova leitura.");
  }catch{notice("Não foi possível girar a fotografia.",true);}finally{state.processing=false;}
 }
 function toggleGalleryCrop(){
- if(!state.sourceFile)return;state.cropActive=!state.cropActive;
+ if(!state.sourceFile)return;state.cropActive=!state.cropActive;invalidatePhotoReading();
  const img=el("vl2-image");if(state.cropActive&&img?.naturalWidth)state.crop={cx:.5,cy:.5,scale:.92,ratio:img.naturalWidth/img.naturalHeight};
- setGalleryPreview(state.sourceFile);if(state.cropActive)notice("Enquadre toda a etiqueta dentro da região marcada.");
+ setGalleryPreview(state.sourceFile);showResult();if(state.cropActive)notice("Enquadre toda a etiqueta dentro da região marcada.");
 }
 async function analyzeGalleryFull(){
  if(!state.sourceFile||state.processing)return;state.processing=true;
@@ -934,7 +944,7 @@ function diagnosticV4(){
 function showResult(){
  const root=el("vl2-results");if(!root)return;
  if(!state.photo||!state.scanCompleted){
-  root.innerHTML='<div class="vl2-welcome"><strong>Comece pela fotografia</strong><p>Escolha uma fotografia ou abra a câmera traseira. O VITRA lê as informações impressas; você informa apenas o cliente e a rastreabilidade correta da produção.</p></div>';
+  root.innerHTML='<div class="vl2-welcome"><strong>'+esc(state.sourceFile?"Foto preparada para análise":"Comece pela fotografia")+'</strong><p>'+esc(state.sourceFile?"Toque em Analisar foto inteira para reconhecer os dados impressos, ou utilize o recorte opcional.":"Escolha uma fotografia ou abra a câmera traseira. O VITRA lê os dados da etiqueta; você informa apenas cliente e rastreabilidade da produção.")+'</p></div>';
   return;
  }
  if(state.analysisError&&!state.text&&!state.barcodeBars){
