@@ -14,7 +14,7 @@ const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",
 const state={
  photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,
  identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
- expected:{year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
+ expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
  entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null
@@ -47,7 +47,7 @@ function resetScan(){
  state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
- state.expected={year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
+ state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
  state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.reviewRequested=false;state.kindConfirmed=false;
 }
 function validCnpj(raw){
@@ -78,7 +78,13 @@ function modelMethod(){
 function effectiveMethod(){return state.expected.method||modelMethod();}
 function expectedCode(){
  const x=state.expected,unit=category()==="unit",box=category()==="box",method=effectiveMethod();
- if(!(unit||box)||!x.year||!x.area||!x.valve||!x.day||!x.month||!x.variety||(box&&!method))return "";
+ if(!(unit||box))return "";
+ const full=norm(x.raw||"").replace(/\s/g,"");
+ if(full){
+  if(!parseTrace(full))return "";
+  return unit?full.replace(/-([C58])-([A-Z0-9]{2,5})$/,"-*-$2"):full;
+ }
+ if(!x.year||!x.area||!x.valve||!x.day||!x.month||!x.variety||(box&&!method))return "";
  return "R-"+x.year+"-"+norm(x.area).replace(/[^A-Z0-9_./]/g,"")+norm(x.valve).replace(/[^A-Z0-9_./]/g,"")+"-"+x.day+x.month+"-"+(unit?"*":method)+"-"+x.variety;
 }
 function codeMatchesReference(reference,printed){
@@ -797,8 +803,9 @@ function traceBuilder(){
  const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
  return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
-  '<p>Informe a rastreabilidade real da produção. O código lido na foto será comparado separadamente.</p>'+
-  '<div class="vl2-trace-grid">'+
+  '<p>Informe o código correto da ordem de produção. Ele não será copiado da foto.</p>'+
+  '<label class="vl2-quick-trace">Código da ordem de produção<input id="vl2-trace-full" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="R-26-ÁREAVÁLVULA-DDMM-5-SIGLA" value="'+esc(state.expected.raw||"")+'" aria-label="Rastreabilidade da ordem de produção"></label>'+
+  '<details class="vl2-trace-manual"><summary>Ou preencher a rastreabilidade por partes</summary><div class="vl2-trace-grid">'+
   '<label>Prefixo<input readonly value="R" aria-label="Prefixo R"></label>'+
   '<div class="vl2-trace-field"><span>Ano</span>'+traceOptions(years,"year","Ano")+'</div>'+
   '<label class="vl2-trace-area">Área<input data-vl2-trace="area" maxlength="20" list="vl2-areas" value="'+esc(state.expected.area)+'" placeholder="Código do produtor"><datalist id="vl2-areas">'+distinct([...siteAreas,state.detected?.track?.area,...(state.history||[]).map(x=>parseTrace(x?.fields?.rastreio||"")?.area)]).filter(Boolean).map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist></label>'+
@@ -806,7 +813,7 @@ function traceBuilder(){
   '<div class="vl2-trace-field"><span>Dia</span>'+traceOptions(day,"day","Dia")+'</div>'+
   '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
   (box?(autoMethod?'<div class="vl2-trace-field vl2-trace-inferred"><span>Pesagem identificada</span><strong>'+(autoMethod==="5"?"5 kg":"8 kg")+' · dois códigos da etiqueta conferem</strong></div>':'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>'):"")+
-  '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
+  '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div></details>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
 }
@@ -1089,10 +1096,16 @@ function showResult(){
  root.querySelectorAll("[data-vl2-close-lookup]").forEach(b=>b.addEventListener("click",()=>{b.closest("details").open=false;}));
  el("vl2-client-search")?.addEventListener("input",e=>{const q=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(q));});
  root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.reviewRequested=false;showResult();}));
+ el("vl2-trace-full")?.addEventListener("input",e=>{
+  state.expected.raw=e.target.value.toUpperCase().trim();
+  state.reviewRequested=false;state.reviewed=false;
+  const action=el("vl2-evaluate");if(action)action.disabled=!diagnosticV4().ready;
+ });
+ el("vl2-trace-full")?.addEventListener("change",()=>showResult());
  root.querySelectorAll("[data-vl2-trace]").forEach(inp=>{
   const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
    if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
-   state.expected[key]=value;
+   state.expected.raw="";state.expected[key]=value;
    if(state.reviewRequested){
     state.reviewRequested=false;state.reviewed=false;
     const outcome=el("vl2-outcome"),closeout=root.querySelector(".vl2-closeout");
@@ -1110,7 +1123,7 @@ function showResult(){
   const q=norm(e.target.value);e.target.closest(".vl2-lookup-pop").querySelectorAll("[data-pick-label]").forEach(b=>b.hidden=!b.dataset.pickLabel.includes(q));
  }));
  root.querySelectorAll("[data-vl2-option-trace]").forEach(b=>b.addEventListener("click",()=>{
-  state.expected[b.dataset.vl2OptionTrace]=b.dataset.pickValue;state.reviewRequested=false;showResult();
+  state.expected.raw="";state.expected[b.dataset.vl2OptionTrace]=b.dataset.pickValue;state.reviewRequested=false;showResult();
  }));
  root.querySelectorAll("[data-vl2-option-identity]").forEach(b=>b.addEventListener("click",()=>{
   state.identity[b.dataset.vl2OptionIdentity]=b.dataset.pickValue;if(b.dataset.vl2OptionIdentity==="kind")state.kindConfirmed=true;state.reviewRequested=false;showResult();
