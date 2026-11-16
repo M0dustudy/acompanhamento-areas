@@ -815,29 +815,38 @@ function ocrEvidenceScore(value){
 async function readPhoto(deep=false){
  if(!state.photo||!ctx?.canAccess?.())return;
  const seq=++state.sequence,photo=state.photo,progress=el("vl2-progress");
+ const existingPasses=deep?(state.ocrRawPassages||[]).slice():[];
+ const existingBarcode=deep?state.barcodeBars:"";
+ const existingPrinted=deep?state.barcodePrinted:"";
  state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
  state.ocrConflicts=[];state.ocrPasses=0;showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
- let worker=null,recognized="",barcode="",printedNumber="",failure="";
- const passages=[];
+ let worker=null,recognized="",barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
+ const passages=existingPasses;
  const update=message=>{if(seq===state.sequence&&progress)progress.textContent=message;};
  const readPass=async(canvas,ms)=>!worker||seq!==state.sequence?"":str((await limitWork(worker.recognize(canvas),ms,"Tempo de leitura excedido.")).data?.text||"").trim();
  const run=async()=>{
   try{
    update("Inicializando o leitor de texto…");
    await ensureOCR();worker=await getOCRWorker();if(seq!==state.sequence)return;
-   update("Lendo todas as informações da etiqueta…");
-   const canvas=await limitWork(prepareOCRImage(photo,2100),3500,"Falha ao preparar foto.");
-   try{const original=await readPass(canvas,12000);if(original)passages.push(original);}
-   catch(e){failure=e?.message||"A leitura inicial não foi concluída.";discardOCRWorker(worker);worker=null;}
+   if(!passages.length){
+    update("Lendo todas as informações da etiqueta…");
+    const canvas=await limitWork(prepareOCRImage(photo,2100),3500,"Falha ao preparar foto.");
+    try{const original=await readPass(canvas,12000);if(original)passages.push(original);}
+    catch(e){failure=e?.message||"A leitura inicial não foi concluída.";discardOCRWorker(worker);worker=null;}
+   }
    if(seq!==state.sequence)return;
    if(!worker){
     try{update("Reiniciando o reconhecimento para uma nova tentativa…");await ensureOCR();worker=await getOCRWorker();}
     catch(e){failure=e?.message||failure;}
    }
    if(worker&&shouldScanOCRBands(passages.join("\n"),deep)){
-    const bands=[{a:0,b:.59,contrast:false,name:"superior"},
-                 {a:.41,b:1,contrast:true,name:"inferior"}];
+    const needTrace=!ocrTraceCandidates(passages.join("\n")).length;
+    const regions=deep?
+      [{a:0,b:.62,contrast:false,name:"superior"},{a:.38,b:1,contrast:true,name:"inferior"}]:
+      needTrace?[{a:.34,b:1,contrast:true,name:"da rastreabilidade"}]:
+      [{a:0,b:.73,contrast:true,name:"dos dados cadastrais"}];
+    const bands=regions;
     for(const band of bands){
      if(seq!==state.sequence||!worker)break;
      update("Ampliando e verificando a região "+band.name+"…");
@@ -846,14 +855,14 @@ async function readPhoto(deep=false){
       const recognizedBand=await readPass(canvas,8500);
       if(recognizedBand)passages.push(recognizedBand);
      }catch(e){
-      failure=failure||"Uma região não pôde ser lida por completo.";
+      if(!passages.length)failure=failure||"A leitura da região não foi concluída.";
       discardOCRWorker(worker);worker=null;break;
      }
     }
    }
    if(seq!==state.sequence)return;
    recognized=mergeOCRPassages(passages);
-   if(worker&&(!ocrTraceCandidates(recognized).length||(deep&&passages.length<2))){
+   if(worker&&deep&&(!ocrTraceCandidates(recognized).length||passages.length<2)){
     update("Realçando pequenos caracteres e a linha de rastreabilidade…");
     const improved=await limitWork(enhanceForOCR(photo),3500,"Falha no contraste.").catch(()=>null);
     if(improved){
@@ -865,9 +874,9 @@ async function readPhoto(deep=false){
   if(seq!==state.sequence)return;
   state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;state.ocrRawPassages=passages.slice();
   const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
-  if(!likelyBox){update("Decodificando o código de barras…");barcode=await limitWork(scanBarcode(photo,seq),6500,"Tempo de leitura do código de barras excedido.").catch(()=>"");}
+  if(!likelyBox){update("Decodificando o código de barras…");barcode=barcode||await limitWork(scanBarcode(photo,seq),6500,"Tempo de leitura do código de barras excedido.").catch(()=>"");}
   if(seq!==state.sequence)return;
-  printedNumber=getEAN(recognized);
+  printedNumber=printedNumber||getEAN(recognized);
   if(!likelyBox&&barcode&&worker&&!printedNumber){
    update("Lendo separadamente os números impressos sob as barras…");
    printedNumber=await printedEANNearBarcode(photo,worker);
