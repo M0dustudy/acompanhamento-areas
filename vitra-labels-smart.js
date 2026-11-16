@@ -754,7 +754,16 @@ function showResult(){
  root.querySelectorAll("[data-vl2-trace]").forEach(inp=>{
   const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
    if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
-   state.expected[key]=value;state.reviewRequested=false;
+   state.expected[key]=value;
+   if(state.reviewRequested){
+    state.reviewRequested=false;state.reviewed=false;
+    const outcome=el("vl2-outcome"),closeout=root.querySelector(".vl2-closeout");
+    if(closeout)closeout.remove();
+    if(outcome){
+     outcome.innerHTML='<div class="vl2-outcome-reset"><strong>Referência alterada</strong><p>O resultado anterior não é mais válido. Execute a comparação com os novos dados.</p><button type="button" id="vl2-recheck" class="vl2-evaluate">Conferir novamente</button></div>';
+     el("vl2-recheck")?.addEventListener("click",()=>{if(!diagnosticV4().ready)return;state.reviewRequested=true;showResult();});
+    }
+   }
    const action=el("vl2-evaluate");if(action)action.disabled=!diagnosticV4().ready;
   };
   inp.addEventListener("input",update);inp.addEventListener("change",update);
