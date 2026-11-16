@@ -1187,9 +1187,17 @@ function showResult(){
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
- const urgent=report.checks.filter(x=>x.status==="error"&&/CNPJ|GGN|GLN|CEP|COORDENAD|ENDERE|CLASSE|MODELO E VARIEDADE/i.test(x.title)).slice(0,4);
- const quickAlert=urgent.length?'<section class="vl2-quick-alerts" role="status"><strong>Possíveis divergências já detectadas</strong><small>Conferência preliminar da fotografia. Revise a imagem antes de decidir.</small>'+
-   urgent.map(x=>'<div><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p></div>').join("")+'</section>':"";
+ const errors=report.checks.filter(x=>x.status==="error");
+ const pendings=report.checks.filter(x=>x.status==="pending");
+ const checkDone=report.ready&&report.status==="aprovado";
+ const head=errors.length?"Divergências identificadas":checkDone?"Parâmetros conferidos":pendings.length?"Conferência com pendências":"Aguardando referência da produção";
+ const line=errors.length?errors.length+" divergência(s) entre a etiqueta e as referências disponíveis.":
+  checkDone?"Os parâmetros conferidos coincidem com as referências cadastradas.":
+  pendings.length?pendings.length+" item(ns) ainda precisam ser comprovados.":"Confirme a referência da produção para concluir.";
+ const concise='<section class="vl2-quick-alerts vl2-concise-result" role="status"><div class="vl2-concise-head"><small>CONFERÊNCIA DA ETIQUETA</small><strong>'+esc(head)+'</strong><p>'+esc(line)+'</p></div>'+
+  (errors.length?'<div class="vl2-quick-items">'+errors.slice(0,6).map(x=>'<div><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p></div>').join("")+'</div>':"")+
+  (pendings.length?'<div class="vl2-pending-short"><small>A confirmar</small><p>'+esc(pendings.slice(0,6).map(x=>x.title).join(" · "))+'</p></div>':"")+
+  '<small>'+(report.ready?"Consulte as verificações completas abaixo.":"A análise é preliminar até confirmar os dados da ordem de produção.")+'</small></section>';
  const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados da ordem de produção</strong><small>Informe somente os dados que não constam no cadastro.</small></div></div>'+clientChooser()+traceBuilder()+
  (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>O código não possui uma classe única cadastrada. Informe a classificação correta da produção.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
@@ -1213,7 +1221,7 @@ function showResult(){
  '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
  const sampleOption=state.sampleSaved?'<p class="vl2-hint">Amostra registrada como pendente no histórico, sem aprovação.</p>':
   !state.saved&&report.status!=="aprovado"?'<details class="vl2-refine vl2-sample"><summary>Modelo diferente? Guardar foto para ampliar o catálogo</summary><p class="vl2-refine-hint">Registra a foto para estudo, sem aprovação nem criação automática de regras.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>':"";
- root.innerHTML=retry+reading+quickAlert+reference+outcome+deepRetry+sampleOption+
+ root.innerHTML=retry+concise+reading+reference+outcome+deepRetry+sampleOption+
  '<details class="vl2-details-root"><summary>Dados técnicos reconhecidos (somente consulta)</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
