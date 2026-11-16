@@ -131,6 +131,7 @@ function extract(raw,barcode){
  else if(/\bCAMPESITA\b/.test(n))klass="Campesita";
  else if(/\bSELECIONADA\b/.test(n))klass="Selecionada";
  else if(/\bSABOR\b/.test(n))klass="Sabor";
+ else if(/\bEXPORTACAO\b/.test(n))klass="Exportação";
  else if(/\bEXTRA\b/.test(n))klass="Extra";
  // Classe não lida na foto permanece ausente, mesmo quando o catálogo possui uma referência.
  const printedWeight=str(raw).match(/\b(?:PESO\s*[:=]?\s*)?(\d{1,2}(?:[,.]\d{1,2})?)\s*(KG|G)\b/i);
@@ -147,6 +148,7 @@ function extract(raw,barcode){
  const catalogKind=distinct(group.map(x=>x.kind));
  if(explicitCinta&&wG)kind="cinta"+wG;
  else if(explicitCumbuca&&wG)kind="cumbuca"+wG;
+ else if(classCode)kind=classCode[5]==="10"?"sacola":"caixa";
  else if(boxEvidence)kind="caixa";
  else if(/\bSELO\b/.test(n))kind="selo";
  else if(catalogKind.length===1&&catalogKind[0])kind=catalogKind[0];
