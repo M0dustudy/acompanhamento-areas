@@ -611,11 +611,49 @@ async function fetchHistory(){
  if(!ctx?.canAccess?.())return;
  const pane=el("vl2-history");if(!pane)return;
  try{
-  const data=await ctx.api("history");
-  state.history=Array.isArray(data.rows)?data.rows:[];
+  const data=await ctx.api("history");state.history=Array.isArray(data.rows)?data.rows:[];
   if(!el("vl2-history"))return;
-  pane.innerHTML=state.history.length?state.history.slice(0,8).map(x=>'<div class="vl2-history-row"><div><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(varieties,x.variety))+' · '+esc(nameOf(kinds,x.label_kind))+'</small></div><span>'+esc(ctx.stamp(x.created_at))+'</span></div>').join(""):'<p>Nenhuma conferência registrada.</p>';
+  pane.innerHTML=state.history.length?state.history.slice(0,20).map(x=>{
+   const status=x.review_status==="atencao"?"Reprovado / revisar":x.review_status==="conferido"?"Conferido":"Pendente";
+   return '<button class="vl2-history-entry" type="button" data-history-id="'+esc(x.id)+'"><span class="vl2-history-dot vl2-history-'+esc(x.review_status)+'"></span><span class="vl2-history-main"><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(kinds,x.label_kind))+' · '+esc(nameOf(varieties,x.variety))+'</small></span><span class="vl2-history-meta"><b>'+status+'</b><small>'+esc(ctx.stamp(x.created_at))+'</small></span><span class="vl2-history-arrow" aria-hidden="true">›</span></button>';
+  }).join(""):'<p>Nenhuma conferência registrada.</p>';
+  pane.querySelectorAll("[data-history-id]").forEach(btn=>btn.addEventListener("click",()=>openHistory(btn.dataset.historyId)));
  }catch{pane.textContent="Não foi possível carregar o histórico.";}
+}
+async function openHistory(id){
+ if(!ctx?.canAccess?.()||!/^[0-9a-f-]{36}$/i.test(id))return;
+ const host=el("vl2-dialog-host");if(!host)return;
+ host.innerHTML='<div class="vl2-overlay" role="dialog" aria-modal="true" aria-label="Diagnóstico registrado"><div class="vl2-dialog"><header><strong>Carregando diagnóstico…</strong><button id="vl2-close-detail" type="button" aria-label="Fechar">×</button></header></div></div>';
+ const close=()=>{host.replaceChildren();};
+ host.querySelector("#vl2-close-detail")?.addEventListener("click",close);
+ host.querySelector(".vl2-overlay")?.addEventListener("click",e=>{if(e.target.classList.contains("vl2-overlay"))close();});
+ try{
+  const response=await ctx.api("detail",{id}),record=response.review;
+  if(!record||!ctx?.canAccess?.()||!host.querySelector(".vl2-overlay"))return;
+  let image="";
+  if(record.photo_path){
+   try{const signed=await ctx.api("photo_url",{id});if(signed.url&&signed.url.startsWith("https://"))image='<img class="vl2-detail-photo" src="'+esc(signed.url)+'" alt="Fotografia original desta conferência">';}
+   catch{image='<p class="vl2-hint">Foto temporariamente indisponível.</p>';}
+  }
+  const f=record.fields||{},saved=f.diagnostic||{},checks=Array.isArray(saved.checks)?saved.checks:[];
+  const status=saved.status|| (record.review_status==="conferido"?"aprovado":record.review_status==="atencao"?"reprovado":"pendente");
+  const names={aprovado:"Aprovado na conferência",reprovado:"Reprovado / divergência",pendente:"Pendente de confirmação"};
+  const summaries=saved.summary||"Registro histórico. Consulte os itens encontrados e o texto reconhecido.";
+  const items=checks.length?checks.map(x=>'<div class="vl2-check-item vl2-check-'+esc(x.status||"pending")+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>').join(""):Array.isArray(record.checklist)?record.checklist.map(x=>'<div class="vl2-check-item vl2-check-'+(x[0]==="atencao"?"error":"pending")+'"><span aria-hidden="true">?</span><div><strong>'+esc(x[1])+'</strong><p>'+esc(x[2])+'</p></div></div>').join(""):"";
+  const vals=[["Cliente",nameOf(clients,record.client)],["Tipo de etiqueta",nameOf(kinds,record.label_kind)],["Variedade",nameOf(varieties,record.variety)],["Classificação",record.label_class],["Rastreabilidade lida",f.rastreio],["Rastreabilidade de referência",f.expectedRastreio],["GGN",f.ggn],["CNPJ do produtor",f.cnpj],["CNPJ comercial",f.cnpjComercial],["Produtor",f.produtor],["Lote",f.lote],["Data",f.data],["Peso",f.peso],["Código de barras",f.barcode]];
+  host.innerHTML='<div class="vl2-overlay" role="dialog" aria-modal="true" aria-label="Diagnóstico registrado"><div class="vl2-dialog"><header><div><small>CONFERÊNCIA REGISTRADA · '+esc(ctx.stamp(record.created_at))+'</small><h3>Diagnóstico da etiqueta</h3></div><button id="vl2-close-detail" type="button" aria-label="Fechar">×</button></header>'+
+   '<div class="vl2-detail-status vl2-status-'+esc(status)+'"><strong>'+esc(names[status]||"Registro de conferência")+'</strong><p>'+esc(summaries)+'</p></div>'+
+   (image||"")+'<div class="vl2-detail-facts">'+vals.filter(x=>x[1]).map(x=>'<div><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>').join("")+'</div>'+
+   '<h4>Itens da conferência</h4><div class="vl2-check-list">'+(items||'<p class="vl2-hint">O relatório antigo não contém diagnóstico detalhado.</p>')+'</div>'+
+   (record.notes?'<div class="vl2-detail-note"><strong>Observação registrada</strong><p>'+esc(record.notes)+'</p></div>':"")+
+   '<footer>Fonte: '+esc(record.rule_version||"Referência não registrada")+' · Registro preservado no histórico.</footer></div></div>';
+  host.querySelector("#vl2-close-detail")?.addEventListener("click",close);
+  host.querySelector(".vl2-overlay")?.addEventListener("click",e=>{if(e.target.classList.contains("vl2-overlay"))close();});
+  host.querySelector("#vl2-close-detail")?.focus();
+ }catch(e){
+  if(host.querySelector(".vl2-dialog"))host.querySelector(".vl2-dialog").innerHTML='<header><strong>Não foi possível abrir o diagnóstico.</strong><button id="vl2-close-detail" type="button">Fechar</button></header><p class="vl2-hint">'+esc(e.message||"Tente novamente.")+'</p>';
+  host.querySelector("#vl2-close-detail")?.addEventListener("click",close);
+ }
 }
 async function saveReview(){
  if(!ctx?.canAccess?.()||state.saved)return;
@@ -623,14 +661,18 @@ async function saveReview(){
   notice("Confirme o cliente e complete a rastreabilidade. Se a foto estiver ilegível, corrija o tipo de etiqueta ou a variedade em ajustes.",true);return;
  }
  const btn=el("vl2-save");if(btn)btn.disabled=true;
- const issues=computeIssues(),hasAlert=issues.some(x=>x.type==="atencao"),hasPending=issues.some(x=>x.type==="confirmar");
- const status=hasAlert?"atencao":state.reviewed&&!hasPending&&state.fields.barcode&&eanValid(state.fields.barcode)&&state.sources.barcode!=="Corrigido manualmente"?"conferido":"pendente";
+ const report=diagnose();
+ const status=report.status==="reprovado"?"atencao":report.status==="aprovado"&&state.reviewed?"conferido":"pendente";
  const fields={...state.fields,expectedRastreio:expectedCode(),clientConfirmed:state.clientConfirmed,
-  sources:state.sources,barcodeMatched:state.matches.length>0,producerReference:state.detected?.producer?.[0]||""};
+  sources:state.sources,barcodeMatched:state.matches.some(x=>x.client===state.identity.client),
+  producerReference:state.referenceProducer?.name||"",
+  diagnostic:{status:report.status,summary:report.summary,checks:report.checks},
+  verification:{validated:status==="conferido",referenceComplete:report.referenceComplete,
+  barcodeOrigin:state.sources.barcode==="Corrigido manualmente"?"manual":"photo"}};
  const payload={client:state.identity.client,variety:state.identity.variety||expectedVariety(),
   label_kind:state.identity.kind,label_class:state.identity.klass||"",packaging:nameOf(kinds,state.identity.kind),
   review_status:status,detected_text:state.text.slice(0,12000),fields,
-  checklist:issues.map(x=>[x.type==="atencao"?"atencao":"pendente",x.title,x.body]),
+  checklist:report.checks.filter(x=>x.status!=="ok").map(x=>[x.status==="error"?"atencao":"pendente",x.title,x.detail]),
   notes:state.notes||""};
  const form=new FormData();form.append("action","save");form.append("payload",JSON.stringify(payload));form.append("photo",state.photo,state.photo.name);
  try{
@@ -674,7 +716,7 @@ function mount(adapter){
   '<div id="vl2-progress" class="vl2-progress" hidden>Reconhecendo dados…</div><div id="vl2-notice" class="vl2-notice" hidden></div>'+
   '<p class="vl2-photo-foot">A foto é analisada após o recorte. O reconhecimento pode falhar com reflexos, letras pequenas ou imagens desfocadas.</p></section>'+
   '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Dados e conferência</h3><p>Somente cliente e rastreabilidade precisam de confirmação habitual.</p></div></div><div id="vl2-results"></div></section></div>'+
-  '<section class="vl2-recent"><h3>Conferências recentes</h3><div id="vl2-history">Carregando histórico…</div></section>'+
+  '<section class="vl2-recent"><div class="vl2-history-head"><h3>Histórico de diagnósticos</h3><small>Toque em um registro para abrir os resultados e a foto</small></div><div id="vl2-history">Carregando histórico…</div></section><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">Teste restrito ao administrador. Verificações dependem da qualidade da foto e das regras disponíveis para o cliente. Nenhum resultado é aprovado apenas por OCR.</p></section>';
  el("vl2-back")?.addEventListener("click",()=>{releasePhoto();ctx.back();});
  el("vl2-open-camera")?.addEventListener("click",beginCamera);
