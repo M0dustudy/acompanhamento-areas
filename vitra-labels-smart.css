@@ -510,3 +510,30 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
  .vl2-history-actions{width:100%;padding:0 6px 4px;justify-content:flex-end}
  .vl2-history-action{min-width:80px;font-size:11px!important}
 }
+
+
+/* v6 · recuperação de leitura e informações condicionais, sem formulários de transcrição */
+.vl2-reading-failure{border:1px solid #e5d7ae;background:#fffaf0;padding:19px;border-radius:14px;margin-bottom:15px;display:grid;gap:10px}
+.vl2-reading-failure>strong{display:block;color:#795c28;font-weight:780;font-size:16px;line-height:1.3}
+.vl2-reading-failure>p{font-size:12px;color:#776d57;line-height:1.6;margin:0}
+.vl2-reading-failure>button{justify-self:start;min-height:42px;padding:10px 16px!important;
+ border-radius:10px!important;border:1px solid #cce1cf!important;background:#236443!important;
+ color:#fff!important;-webkit-text-fill-color:#fff!important;font-size:12px!important;font-weight:750!important}
+.vl2-reading-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+.vl2-photo-reading{background:#fff!important}
+.vl2-photo-reading .vl2-reading-facts>div{background:#f8fbf8}
+.vl2-photo-reading .vl2-reading-facts>div strong{word-break:break-word}
+.vl2-refine{padding:0;margin:0 0 12px}
+.vl2-refine>summary{display:block;padding:10px 0;font-size:12px;color:#436a4c;cursor:pointer}
+.vl2-refine .vl2-option-field{margin-top:10px}
+.vl2-refine-hint{font-size:11px;line-height:1.65;color:#748776;margin:5px 0}
+.vl2-raw>summary{font-size:11px;cursor:pointer;color:#597960}
+.vl2-raw pre{max-height:230px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:10px;background:#f7faf7;border-radius:10px;padding:12px}
+@media(max-width:620px){
+ .vl2-reading-facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .vl2-photo-reading .vl2-reading-facts>div{padding:10px}
+ .vl2-reading-facts>div strong{font-size:11px;line-height:1.45}
+ .vl2-reading-barcode strong{font-size:12px!important;letter-spacing:.03em!important}
+ .vl2-reading-failure{padding:16px}
+}
+@media(max-width:350px){.vl2-reading-facts{grid-template-columns:1fr}.vl2-reading-facts .vl2-reading-barcode{grid-column:auto}}
