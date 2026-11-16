@@ -902,15 +902,41 @@ function renderHistoryRows(rows,archive=false){
    '<span class="vl2-history-dot vl2-history-'+esc(x.review_status)+'"></span>'+
    '<span class="vl2-history-main"><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(kinds,x.label_kind))+' · '+esc(nameOf(varieties,x.variety))+'</small><small>Responsável: '+esc(x.reviewer_name||"Não identificado")+'</small></span>'+
    '<span class="vl2-history-meta"><b>'+status+'</b><small>'+esc(ctx.stamp(x.created_at))+'</small></span><span class="vl2-history-arrow">›</span></button>'+
-   (ctx?.isMaster?.()?'<button type="button" class="vl2-history-action" data-history-action="'+(archive?"restore":"hide")+'" data-history-target="'+esc(x.id)+'">'+(archive?"Restaurar":"Ocultar")+'</button>':"")+
+   (ctx?.isMaster?.()?'<div class="vl2-history-actions"><button type="button" class="vl2-history-action" data-history-action="'+(archive?"restore":"hide")+'" data-history-target="'+esc(x.id)+'">'+(archive?"Restaurar":"Ocultar")+'</button><button type="button" class="vl2-history-action vl2-history-delete" data-history-action="delete" data-history-target="'+esc(x.id)+'">Excluir</button></div>':"")+
    '</div>';
  }).join("");
+}
+function askDeleteReview(id){
+ if(!ctx?.isMaster?.())return;
+ const host=el("vl2-dialog-host");if(!host)return;
+ host.innerHTML='<div class="vl2-overlay" role="dialog" aria-modal="true" aria-label="Excluir definitivamente"><div class="vl2-dialog vl2-delete-confirm"><header><div><small>ADMINISTRADOR</small><h3>Excluir definitivamente?</h3></div><button type="button" id="vl2-delete-close" aria-label="Fechar">×</button></header>'+
+  '<p>Esta ação apaga o registro e a fotografia do histórico. A operação será registrada na auditoria e não poderá ser desfeita.</p>'+
+  '<label>Digite <strong>EXCLUIR</strong> para confirmar<input id="vl2-delete-phrase" type="text" autocomplete="off" placeholder="EXCLUIR"></label>'+
+  '<div class="vl2-delete-buttons"><button type="button" id="vl2-delete-cancel">Cancelar</button><button type="button" id="vl2-delete-final" disabled>Excluir definitivamente</button></div></div></div>';
+ const close=()=>host.replaceChildren();
+ el("vl2-delete-close")?.addEventListener("click",close);el("vl2-delete-cancel")?.addEventListener("click",close);
+ host.querySelector(".vl2-overlay")?.addEventListener("click",e=>{if(e.target===e.currentTarget)close();});
+ const input=el("vl2-delete-phrase"),button=el("vl2-delete-final");
+ input?.addEventListener("input",()=>{button.disabled=input.value.trim()!=="EXCLUIR";});
+ button?.addEventListener("click",async()=>{
+  if(!ctx?.isMaster?.()||input.value.trim()!=="EXCLUIR")return;
+  button.disabled=true;button.textContent="Excluindo…";
+  try{
+   const result=await ctx.api("delete",{id,confirmation:"EXCLUIR"});
+   close();await fetchHistory();if(el("vl2-archive")?.open)await fetchArchived();
+   notice(result.message||"Registro excluído definitivamente.");
+  }catch(e){button.disabled=false;button.textContent="Excluir definitivamente";
+   const error=document.createElement("p");error.className="vl2-delete-error";error.textContent=e.message||"Falha ao excluir.";host.querySelector(".vl2-dialog")?.appendChild(error);
+  }
+ });
+ input?.focus();
 }
 function bindHistoryActions(pane){
  pane.querySelectorAll("[data-history-id]").forEach(b=>b.addEventListener("click",()=>openHistory(b.dataset.historyId)));
  pane.querySelectorAll("[data-history-action]").forEach(b=>b.addEventListener("click",async()=>{
   if(!ctx?.isMaster?.())return;
   const action=b.dataset.historyAction,id=b.dataset.historyTarget;
+  if(action==="delete"){askDeleteReview(id);return;}
   const question=action==="hide"?"Ocultar esta conferência da lista? A fotografia e os dados serão preservados para auditoria e poderão ser restaurados.":"Restaurar esta conferência ao histórico?";
   if(!window.confirm(question))return;
   b.disabled=true;
