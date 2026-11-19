@@ -66,7 +66,7 @@ O conteúdo da avaliação, e não apenas o nome do arquivo, determina se um rel
 - **Conferência obrigatória antes do vínculo:** verificar se o nome padronizado já existe no GitHub, se o número de relatório já consta no estoque e se o conteúdo corresponde a uma avaliação existente. Com acesso de escrita autorizado, renomear o arquivo diretamente no GitHub e atualizar os vínculos, sem exigir procedimento técnico do usuário. Nomes automáticos exclusivos do Clicq permanecem inalterados.
 - **Nunca sobrescrever:** quando o nome já existir ou houver dúvida sobre lote/identificador, interromper o procedimento, revisar e propor outro nome seguro. Arquivo repetido não gera avaliação nova. Não remover, sobrescrever ou renomear documentos já publicados para abrir espaço para outro.
 - **Dados insuficientes:** se o número de relatório ou lote estiver ausente/ilegível, avisar antes do envio e usar uma identificação exclusiva somente após comprovar a identidade e ausência de colisão. Não inventar dados para compor nomes.
-- **Autorização permanente de 13/11/2026:** padronizar os PDFs de estoque com nomes genéricos já existentes e os futuros antes de ativar qualquer link no VITRA. Manter os bytes originais dos PDFs, criar backup e atualizar conjuntamente `stockData`, `stockVerifiedFiles`, `visualizador.html` e o caminho no GitHub. A renomeação não altera identificadores internos, dados, resultados nem histórico.
+- **Autorização permanente de 13/11/2026:** conferir e, quando necessário, padronizar PDFs de estoque com nomes genéricos antes de ativar links no VITRA, preservando os bytes originais e um backup. Atualizar o cadastro e conferir os links gerados automaticamente a partir dos nomes reais dos arquivos. Não manter listas paralelas de PDFs no visualizador. A renomeação não altera identificadores internos, dados, resultados nem histórico.
 - Antes de cadastrar, conferir data e horário da avaliação, produtor/área, variedade, lote, mercado, classificação, pallets e identificação do relatório. Usar o hash SHA-256 para identificar arquivos binariamente idênticos quando possível; hashes diferentes não provam que sejam avaliações diferentes.
 - Se o conteúdo for igual a uma avaliação já cadastrada, **não criar registro duplicado**, mesmo que o nome do arquivo seja diferente. Se houver dúvida sobre a identidade, suspender o cadastro e solicitar confirmação.
 - Preservar os dados originais, as observações, o PDF e todo o histórico. Não inventar campos ausentes e não sobrescrever documentos.
@@ -82,8 +82,22 @@ O conteúdo da avaliação, e não apenas o nome do arquivo, determina se um rel
 
 - Arquivos antigos depositados em `relatorios/arquivados_sem_cadastro/` não representam avaliações cadastradas. Quando não for possível confirmar data, documento e lote, usar apenas o nome técnico `ARQUIVADO_SEM_CADASTRO_ID_<identificador-original>.pdf` nessa pasta; **esse nome não é um laudo padronizado nem autoriza link no VITRA**.
 - Antes de migrar qualquer arquivado para `relatorios/estoque/`, ler o documento original, confirmar seus metadados e ausência de duplicidade, atribuir o nome completo no padrão `ESTOQUE_...`, cadastrar as caixas e medições e validar a relação 1:1.
-- O validador `scripts/validar-vitra.mjs` deve reprovar arquivos de estoque com nomes genéricos, nomes padronizados incompatíveis com os metadados, PDFs hospedados sem cadastro, cadastro com arquivo ausente (salvo pendência explícita sem link) e visualizador desatualizado. Esta proteção se aplica também aos próximos uploads.
+- O validador `scripts/validar-vitra.mjs` deve reprovar PDFs sem identidade comprovada, nomes padronizados incompatíveis com os metadados, PDFs hospedados sem cadastro, cadastro com arquivo ausente (salvo pendência explícita sem link) e rotas do visualizador incorretas. Arquivos originais com nome exclusivo `aplicacoes_<identificador>.pdf` podem ser mantidos quando sua identidade e vínculo 1:1 forem conferidos. Esta proteção se aplica também aos próximos uploads.
 
 ### Regra crítica de disponibilidade
 
 Não publicar alterações no `index.html` sem validar a sintaxe de todo o JavaScript e a integridade dos registros. Manter backup recuperável antes de alterações de maior risco. Tela vazia ou falha de inicialização é defeito crítico: interromper a publicação e restaurar a última versão funcional quando necessário.
+
+
+## REGRA PRINCIPAL E CRÍTICA — Abertura e integridade de todos os relatórios
+
+**É proibido considerar uma atualização concluída só porque o PDF está hospedado no GitHub. O botão “Visualizar online” e o acesso ao documento original também devem funcionar.**
+
+- Esta regra abrange **todos os blocos do VITRA**: avaliações de campo, estoque em câmara fria, recepção, titulação e demais módulos que usem relatórios ou arquivos.
+- A cada cadastro, correção ou publicação, conferir **todas as referências e rotas de documentos existentes**, não apenas as modificadas. Validar vínculo 1:1, existência no GitHub, identificação do relatório, nome completo, endereço gerado pelo dashboard, visualização e acesso direto ao arquivo.
+- O visualizador deve usar o **nome real do arquivo cadastrado**, na respectiva pasta do repositório, sem depender de listas manuais copiadas do dashboard. A entrada de novos relatórios não pode exigir atualizar uma lista paralela dentro de `visualizador.html`.
+- Quando a prévia integrada não puder carregar, disponibilizar **Abrir PDF original** e **Baixar PDF**, sem exibir falsamente que o relatório desapareceu. Tratar links inválidos como erro de integridade a ser corrigido.
+- Executar `scripts/validar-vitra.mjs` em **todos os pushes na `main`**, sob demanda e na verificação periódica do GitHub Actions. O teste deve abranger todas as rotas geradas para os arquivos de campo e estoque e falhar se houver divergência ou arquivo ausente.
+- **Testes estáticos não substituem um teste real de navegador.** Conferir a visualização no GitHub Pages em computador e celular quando o acesso permitir. Se a execução no navegador não puder ser confirmada, informar a limitação claramente; não declarar essa etapa concluída.
+- Preservar sempre os arquivos originais, o histórico e os dados. Em qualquer problema, apresentar a causa e, logo abaixo, o **nome completo do PDF**, incluindo `.pdf`. Nunca informar somente o identificador.
+- O cadastro de novos registros só está encerrado depois da conferência do vínculo entre o registro e o PDF, dos botões e da integridade dos outros módulos. Corrigir falhas detectadas sem inventar dados, apagar avaliações ou alterar classificações originais.
