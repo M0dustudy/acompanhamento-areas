@@ -122,6 +122,35 @@ try {
     'Visualizador não carrega a URL resolvida do PDF');
   assert(!viewerHtml.includes('const fieldVerifiedFiles=new Set('),
     'Visualizador possui lista duplicada de documentos de campo');
+
+  // Testar as URLs que o próprio visualizador produz para cada PDF registrado.
+  const viewerModule = viewerHtml.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+  assert(Boolean(viewerModule), 'Script do visualizador ausente');
+  const routePrefix = viewerModule?.split('if(url){')[0];
+  assert(Boolean(routePrefix && routePrefix.includes('const url=')),
+    'Resolução de URL do visualizador mudou sem atualizar os testes');
+  const routeScript = routePrefix
+    ? new Script(routePrefix + '\n({url,name,category,validName});',
+        { filename: 'visualizador.html' })
+    : null;
+  const checkRoute = (filename, kind) => {
+    if (!routeScript) return;
+    const query = new URLSearchParams({ [kind]: filename }).toString();
+    const result = routeScript.runInNewContext({
+      location: {
+        search: '?' + query,
+        href: 'https://m0dustudy.github.io/acompanhamento-areas/visualizador.html'
+      },
+      URL, URLSearchParams,
+      document: { getElementById: () => ({}) }
+    }, { timeout: 1000 });
+    const folder = kind === 'campo' ? 'acompanhamento de área' : 'estoque';
+    const expectedPath = '/acompanhamento-areas/relatorios/' + folder + '/' + filename;
+    assert(result.validName === true && result.name === filename &&
+      result.category === kind && result.url &&
+      decodeURIComponent(new URL(result.url).pathname) === expectedPath,
+      'Visualizador não resolve o PDF corretamente: ' + filename);
+  };
   unique([...verified], 'Lista de PDFs verificados');
   for (const item of estoque) {
     const path = 'relatorios/estoque/' + item.file;
@@ -193,6 +222,8 @@ try {
     'Relação de PDFs de campo não está 1:1 com os registros');
   assert(stockFiles.length === stockRefs.size,
     'Relação de PDFs de estoque não está 1:1 com os registros');
+  for (const path of fieldFiles) checkRoute(path.split('/').pop(), 'campo');
+  for (const path of stockFiles) checkRoute(path.split('/').pop(), 'estoque');
 
   console.log('Áreas com avaliação:', Object.keys(areas).length);
   console.log('Situações de áreas:', groupCodes.length);
