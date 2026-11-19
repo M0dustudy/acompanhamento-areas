@@ -93,15 +93,35 @@ try {
   const pendingStock = estoque.filter(x => x.pendingPdf === true);
   const namePattern = /^ESTOQUE_(\d{4})-(\d{2})-(\d{2})_DOC_(\d+)_LOT(ES|E)_([\d-]+)\.pdf$/;
   const automaticPattern = /^AVALIACAO_DE_ESTOQUE_EM_CAMARA_FRIA_-_FOR\.CQ\.-\d+-pt_BR\.pdf$/;
-  const isGeneric = name => /^aplicacoes?[_-]/i.test(name) ||
-    /FOR\.CQ\.068\s*-\s*\d+\.pdf$/i.test(name);
-  const verifiedMatch = html.match(/const stockVerifiedFiles=new Set\((\[[^;]+?\])\);/);
-  assert(Boolean(verifiedMatch), 'Lista de PDFs verificados ausente');
-  const verified = new Set(verifiedMatch ? JSON.parse(verifiedMatch[1]) : []);
+  // PDFs com nome "aplicacoes_" são válidos quando correspondem a uma
+  // avaliação identificada; nunca eliminá-los apenas pela nomenclatura.
+  const applicationsPattern = /^aplicacoes_\d+\.pdf$/;
+  const isGeneric = name => /FOR\.CQ\.068\s*-\s*\d+\.pdf$/i.test(name);
+  assert(html.includes('const stockVerifiedFiles=new Set(stockData.filter('),
+    'Estoque deve obter os links diretamente dos registros, sem lista paralela');
+  assert(html.includes('const fieldVerifiedFiles={has(filename)'),
+    'Campo deve obter os links diretamente dos registros, sem lista paralela');
+  const verified = new Set(estoque.filter(x => !x.pendingPdf).map(x => x.file));
   const viewerHtml = readFileSync(join(root, 'visualizador.html'), 'utf8');
   const viewerMatch = viewerHtml.match(/const map=(\{[^;]+\});/);
-  assert(Boolean(viewerMatch), 'Mapa do visualizador ausente');
+  assert(Boolean(viewerMatch), 'Mapa de compatibilidade do visualizador ausente');
   const viewerMap = viewerMatch ? JSON.parse(viewerMatch[1]) : {};
+  // Regra crítica: os links gerados no dashboard devem usar o nome real do PDF.
+  // Não basta que o arquivo exista no GitHub: ele precisa abrir pelo visualizador.
+  assert(html.includes('visualizador.html?v=20261119pdf2&amp;campo=\'+encodeURIComponent(pdf)'),
+    'Campo não aponta para o visualizador por nome de arquivo');
+  assert(html.includes('visualizador.html?v=20261119pdf2&amp;estoque=\'+encodeURIComponent(x.file)'),
+    'Estoque não aponta para o visualizador por nome de arquivo');
+  assert(viewerHtml.includes('const requestedField=params.get("campo")'),
+    'Visualizador não recebe arquivos de campo');
+  assert(viewerHtml.includes('const requestedStock=params.get("estoque")'),
+    'Visualizador não recebe arquivos de estoque');
+  assert(viewerHtml.includes('new URL("./relatorios/"'),
+    'Visualizador não usa o endereço local dos arquivos');
+  assert(viewerHtml.includes('getDocument(url)'),
+    'Visualizador não carrega a URL resolvida do PDF');
+  assert(!viewerHtml.includes('const fieldVerifiedFiles=new Set('),
+    'Visualizador possui lista duplicada de documentos de campo');
   unique([...verified], 'Lista de PDFs verificados');
   for (const item of estoque) {
     const path = 'relatorios/estoque/' + item.file;
@@ -109,7 +129,8 @@ try {
       'Nome do PDF de estoque inválido: ' + item.id);
     assert(!isGeneric(item.file), 'PDF genérico vinculado ao VITRA: ' + item.file);
     const standardized = namePattern.exec(item.file);
-    assert(automaticPattern.test(item.file) || Boolean(standardized),
+    assert(automaticPattern.test(item.file) || Boolean(standardized) ||
+      applicationsPattern.test(item.file),
       'Nome de estoque fora do padrão: ' + item.file);
     if (standardized) {
       const expectedDate = String(item.date || '').replace(
@@ -168,6 +189,10 @@ try {
   }
   const fieldFiles = [...tracked].filter(x => x.startsWith('relatorios/acompanhamento de área/') && x.endsWith('.pdf'));
   for (const path of fieldFiles) assert(fieldRefs.has(path), 'PDF de campo sem registro: ' + path);
+  assert(fieldFiles.length === fieldRefs.size,
+    'Relação de PDFs de campo não está 1:1 com os registros');
+  assert(stockFiles.length === stockRefs.size,
+    'Relação de PDFs de estoque não está 1:1 com os registros');
 
   console.log('Áreas com avaliação:', Object.keys(areas).length);
   console.log('Situações de áreas:', groupCodes.length);
