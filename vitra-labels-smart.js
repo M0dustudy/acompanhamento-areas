@@ -638,7 +638,8 @@ function prepareOCRImage(file,maxSide=2300){
  return createImageBitmap(file,{imageOrientation:"from-image"}).then(bitmap=>{
   try{
    // Etiquetas pequenas precisam de caracteres maiores no OCR; imagens grandes são reduzidas.
-   const scale=Math.min(2.3,maxSide/Math.max(bitmap.width,bitmap.height));
+   state.photoAspect=bitmap.width/bitmap.height;
+    const scale=Math.min(2.3,maxSide/Math.max(bitmap.width,bitmap.height));
    const canvas=document.createElement("canvas");
    canvas.width=Math.max(1,Math.round(bitmap.width*scale));
    canvas.height=Math.max(1,Math.round(bitmap.height*scale));
@@ -756,6 +757,45 @@ async function prepareOCRBand(file,from,to,contrast=false){
   ctx.drawImage(bmp,0,top,bmp.width,height,0,0,canvas.width,canvas.height);
   return canvas;
  }finally{bmp?.close?.();}
+}
+// Isola duas etiquetas em uma foto sem misturar CNPJ/endereço da caixa com EAN da cumbuca.
+// Uma divisão de quadro é apenas uma tentativa: se não reconhecer dois rótulos,
+// permanece pendente e oferece recorte opcional, jamais inventa dados.
+async function prepareOCRHalf(file,side){
+ const bitmap=await createImageBitmap(file,{imageOrientation:"from-image"});
+ try{
+  const vertical=bitmap.width<=bitmap.height*1.05;
+  const width=vertical?bitmap.width:Math.ceil(bitmap.width*.53);
+  const height=vertical?Math.ceil(bitmap.height*.53):bitmap.height;
+  const x=vertical?0:(side===0?0:bitmap.width-width);
+  const y=vertical?(side===0?0:bitmap.height-height):0;
+  const zoom=Math.min(2.5,2500/width,3000/height);
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.max(1,Math.round(width*zoom));
+  canvas.height=Math.max(1,Math.round(height*zoom));
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+  ctx.drawImage(bitmap,x,y,width,height,0,0,canvas.width,canvas.height);
+  return canvas;
+ }finally{bitmap.close?.();}
+}
+function interpretPairedText(a,b,barcode=""){
+ const scanned=[a,b].map(text=>{
+  const normalized=norm(text);
+  return {text,box:/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|MEI\s*[-]?\s*(?:PA|V|P)(?:50|80))\b/.test(normalized),
+   unit:/\b(?:EMB(?:ALADO|ALAGEM)?\s*[:\-]?\s*\d|CUMBUCA|EAN)\b/.test(normalized)||!!getEAN(text)};
+ });
+ const boxIndex=scanned.findIndex(x=>x.box);
+ const unitIndex=scanned.findIndex((x,i)=>i!==boxIndex&&x.unit&&!x.box);
+ if(boxIndex===-1||unitIndex===-1)return null;
+ const box=extract(scanned[boxIndex].text,""),unit=extract(scanned[unitIndex].text,barcode);
+ return {detected:true,orientation:boxIndex===0?"caixa à esquerda/acima":"caixa à direita/abaixo",
+  boxText:scanned[boxIndex].text,unitText:scanned[unitIndex].text,
+  box:{trace:box.fields.rastreio||"",variety:box.identity.variety||"",model:box.boxModel?.code||"",
+   klass:box.identity.klass||"",producer:box.fields.produtor||"",merchant:box.fields.comercializado||""},
+  unit:{trace:unit.fields.rastreio||"",variety:unit.identity.variety||"",
+   ean:barcode||unit.fields.barcode||"",date:unit.printedDate||""}};
 }
 function ocrTraceCandidates(raw){
  const re=/\bR[\s\-–—]*(\d{2})[\s\-–—]*([0-9A-Za-z_./]{2,40})[\s\-–—]*(\d{4})[\s\-–—]*([C58])[\s\-–—]*([A-Za-z0-9]{2,5})\b/gi;
