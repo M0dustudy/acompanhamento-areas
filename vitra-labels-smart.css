@@ -592,3 +592,20 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
 .vl2-concise-result>small:last-child{display:block;margin-top:8px;font-size:11px;line-height:1.4;color:#718178}
 .vl2-trace>.vl2-trace-grid{margin:10px 0 12px}
 @media(max-width:600px){.vl2-concise-result{padding:13px 14px}.vl2-concise-head strong{font-size:16px}}
+
+/* VITRA · leitura vinculada de caixa e cumbuca — sem alterar outros módulos. */
+.vl2-pair-section{margin:14px 0 17px;padding:17px;background:#f7faf8;border:1px solid #d8e7dd;border-radius:15px}
+.vl2-pair-section .vl2-reading-head{margin-bottom:13px}
+.vl2-pair-section .vl2-reading-head strong{font-size:15px;color:#204735}
+.vl2-pair-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.vl2-pair-grid article{min-width:0;display:flex;flex-direction:column;gap:5px;padding:14px;background:#fff;border:1px solid #deebe3;border-radius:12px}
+.vl2-pair-grid article small{font-size:10px;font-weight:800;letter-spacing:.06em;color:#5a7566}
+.vl2-pair-grid article strong{font-size:15px;line-height:1.35;color:#173e2b;overflow-wrap:anywhere}
+.vl2-pair-grid article p{margin:1px 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere;color:#526758}
+.vl2-pair-warning{background:#fff9f1;border-color:#e6d5b8}
+.vl2-pair-warning strong{color:#704a20}
+.vl2-pair-warning p{font-size:12px;line-height:1.5;margin:5px 0 0}
+.vl2-read-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.vl2-read-actions .vl2-retry-deep{width:auto;min-width:190px;flex:1;margin:0}
+.vl2-capture-duo{background:#e9f4eb!important;color:#22543b!important;border:1px solid #a4ccb3!important}
+@media(max-width:620px){.vl2-pair-section{padding:12px}.vl2-pair-grid{grid-template-columns:minmax(0,1fr)}.vl2-pair-grid article{padding:12px}.vl2-read-actions{display:grid;grid-template-columns:1fr}.vl2-read-actions .vl2-retry-deep{width:100%}}
