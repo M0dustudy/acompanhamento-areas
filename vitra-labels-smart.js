@@ -560,7 +560,8 @@ async function useFile(file){
  if(!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>10*1024*1024){notice("Escolha imagem JPG, PNG ou WebP de até 10 MB.",true);return;}
  releasePhoto();resetScan();state.crop={cx:.5,cy:.5,scale:.92,ratio:1};state.cropActive=false;
  setGalleryPreview(file);showResult();
- notice("Foto pronta para análise. Use Girar se a etiqueta estiver de lado.");
+ notice("Foto recebida. Lendo automaticamente as etiquetas e seus códigos…");
+ await analyzeGalleryFull();
 }
 async function beginCamera(){
  if(!navigator.mediaDevices?.getUserMedia){notice("Câmera integrada indisponível. Use «Escolher foto».",true);return;}
@@ -671,7 +672,7 @@ async function scanBarcode(file,token=state.sequence){
  const put=(raw,format,region=null)=>{
   const value=str(raw).trim().slice(0,800),label=str(format).toLowerCase();
   if(!value||codes.some(x=>x.value===value&&x.format===label))return;
-  const number=digits(value);
+  const digitsRead=digits(value),number=/upc.a/.test(label)&&digitsRead.length===12?"0"+digitsRead:digitsRead;
   const ean=(/ean.13|upc.a/.test(label)||(/^\d{13}$/.test(value)&&!/qr|data.matrix/.test(label)))&&eanValid(number)?number:"";
   codes.push({value,format:label||"desconhecido",ean});
   if(ean&&region&&token===state.sequence&&!state.barcodeRegion)
