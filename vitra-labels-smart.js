@@ -1296,6 +1296,17 @@ function diagnosticV4(){
   }else add("pending","Data da cumbuca","Não foi possível ler a data impressa na etiqueta menor.");
  }else if(state.pairRequested)add("pending","Duas etiquetas não separadas",
   "A fotografia contém um par solicitado, mas caixa e cumbuca não foram reconhecidas independentemente. "+(pair?.reason||"Refaça a foto ou amplie a região."));
+ // Modelo de caixa reconhecido não autoriza aprovação se campos essenciais do rótulo
+ // deixaram de ser extraídos na foto. Ausência de leitura é PENDÊNCIA, nunca "correto".
+ if(box&&(state.detected?.boxModel||state.pairedEvidence?.detected)){
+  if(!state.detected?.weightPhoto)add("pending","Peso da caixa na fotografia","O modelo informa a pesagem, mas o peso impresso não foi reconhecido separadamente.");
+  if(!f.cnpj)add("pending","CNPJ do produtor na fotografia","O leitor não recuperou os 14 dígitos do produtor. Confira a foto ampliada.");
+  if(!f.cnpjComercial)add("pending","CNPJ do comercializador na fotografia","O leitor não recuperou os 14 dígitos da empresa comercializadora.");
+  if(!/\bPRODUZIDO\s+POR\b/.test(norm(state.text)))add("pending","Seção Produzido por","Não foi possível ler o título e os dados do produtor nesta foto.");
+  if(!/\bCOMERCIALIZADO\s+POR\b/.test(norm(state.text)))add("pending","Seção Comercializado por","Não foi possível ler o título e os dados da empresa comercializadora.");
+ }
+ if(/\bQR\s*(?:CODE|CODIGO)?\b/.test(norm(state.text))&&!(state.codeEvidence||[]).some(x=>/qr/.test(x.format)))
+  add("pending","QR Code não decodificado","A foto menciona um QR Code, mas a câmera não conseguiu recuperar seu conteúdo.");
  if(state.ocrConflicts.length)add("pending","Leituras diferentes na fotografia","O reconhecimento encontrou valores conflitantes para: "+state.ocrConflicts.join(", ")+". É necessário conferir a foto antes de aprovar.");
  if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
