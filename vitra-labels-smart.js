@@ -867,7 +867,7 @@ async function readPhoto(deep=false){
  const existingBarcode=deep?state.barcodeBars:"";
  const existingPrinted=deep?state.barcodePrinted:"";
  state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
- state.ocrConflicts=[];state.ocrPasses=0;showResult();
+ state.ocrConflicts=[];state.ocrPasses=0;state.pairedEvidence=null;showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
  let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
  const passages=existingPasses;
@@ -929,13 +929,40 @@ async function readPhoto(deep=false){
    update("Lendo separadamente os números impressos sob as barras…");
    printedNumber=await printedEANNearBarcode(photo,worker);
   }
+  const boxText=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|MEI\s*[-]?\s*(?:PA|V|P)(?:50|80))\b/.test(norm(recognized));
+  const pairSuspected=boxText&&(barcode||/\b(?:EMB(?:ALAGEM)?|CUMBUCA|EAN)\b/.test(norm(recognized)));
+  if(worker&&(pairSuspected||state.pairRequested)&&state.photoAspect>.45){
+   update("Conferindo caixa e cumbuca separadamente na mesma fotografia…");
+   try{
+    const halves=[];
+    for(const half of [0,1]){
+     const canvas=await limitWork(prepareOCRHalf(photo,half),3600,"Falha ao ampliar uma das etiquetas.");
+     halves.push(await readPass(canvas,7800));
+    }
+    const pair=interpretPairedText(halves[0],halves[1],barcode);
+    if(pair){
+     state.pairedEvidence=pair;
+     recognized=pair.boxText;
+     passages.splice(0,passages.length,pair.boxText);
+     state.ocrConflicts=ocrConflictKeys(passages);
+     state.ocrPasses+=2;
+     state.ocrRawPassages=passages.slice();
+     printedNumber=printedNumber||getEAN(pair.unitText);
+    }else if(state.pairRequested){
+     state.pairedEvidence={detected:false,reason:"As duas regiões não foram identificadas como caixa e cumbuca."};
+    }
+   }catch(err){
+    if(state.pairRequested)state.pairedEvidence={detected:false,reason:err?.message||"Fotografia insuficiente."};
+   }
+  }
  };
- try{await limitWork(run(),33000,"Limite de leitura atingido. A foto foi preservada.");}
+ try{await limitWork(run(),state.pairRequested?56000:45000,"Limite de leitura atingido. A foto foi preservada.");}
  catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
    try{
-    const data=supplementExtractedFields(extract(recognized,barcode),passages,barcode);
+    const codeForLabel=state.pairedEvidence?.detected?"":barcode;
+    const data=supplementExtractedFields(extract(recognized,codeForLabel),passages,codeForLabel);
     state.text=recognized;state.barcode=barcode||data.fields.barcode;
     state.barcodeBars=barcode;state.barcodePrinted=printedNumber||getEAN(recognized);
     state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
