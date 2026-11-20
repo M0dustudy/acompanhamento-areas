@@ -106,6 +106,11 @@ try {
   const viewerMatch = viewerHtml.match(/const map=(\{[^;]+\});/);
   assert(Boolean(viewerMatch), 'Mapa de compatibilidade do visualizador ausente');
   const viewerMap = viewerMatch ? JSON.parse(viewerMatch[1]) : {};
+  const historicalMatch = viewerHtml.match(/const historicLegacyIds=new Set\((\[[^;]+\])\);/);
+  assert(Boolean(historicalMatch), 'Vínculos legados de relatórios antigos ausentes');
+  const historicalIds = historicalMatch ? JSON.parse(historicalMatch[1]) : [];
+  assert(new Set(historicalIds).size === historicalIds.length,
+    'Vínculos históricos duplicados');
   // Regra crítica: os links gerados no dashboard devem usar o nome real do PDF.
   // Não basta que o arquivo exista no GitHub: ele precisa abrir pelo visualizador.
   assert(html.includes('visualizador.html?v=20261120pdf3&amp;campo=\'+encodeURIComponent(pdf)'),
@@ -116,7 +121,7 @@ try {
     'Visualizador não recebe arquivos de campo');
   assert(viewerHtml.includes('const requestedStock=params.get("estoque")'),
     'Visualizador não recebe arquivos de estoque');
-  assert(viewerHtml.includes('https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/main/relatorios/'),
+  assert(viewerHtml.includes('https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/'),
     'Visualizador deve ler os PDFs pelo GitHub Raw, pois estão excluídos do GitHub Pages');
   assert(viewerHtml.includes('getDocument(url)'),
     'Visualizador não carrega a URL resolvida do PDF');
@@ -225,6 +230,19 @@ try {
     'Relação de PDFs de estoque não está 1:1 com os registros');
   for (const path of fieldFiles) checkRoute(path.split('/').pop(), 'campo');
   for (const path of stockFiles) checkRoute(path.split('/').pop(), 'estoque');
+  for (const id of historicalIds) {
+    assert(Boolean(viewerMap[id]), 'ID legado sem nome de PDF: ' + id);
+    if (!routeScript || !viewerMap[id]) continue;
+    const result = routeScript.runInNewContext({
+      location: {search: '?pdf=' + encodeURIComponent(id),
+        href: 'https://m0dustudy.github.io/acompanhamento-areas/visualizador.html'},
+      URL, URLSearchParams, document: {getElementById: () => ({})}
+    }, {timeout: 1000});
+    const expectedPath = '/M0dustudy/acompanhamento-areas/ba9a5f023c08bfe7fc75ffde9be6015de5305249/relatorios/estoque/' + viewerMap[id];
+    assert(result.validName === true && result.category === 'estoque' &&
+      decodeURIComponent(new URL(result.url).pathname) === expectedPath,
+      'PDF histórico não resolve o arquivo original: ' + id);
+  }
 
   console.log('Áreas com avaliação:', Object.keys(areas).length);
   console.log('Situações de áreas:', groupCodes.length);

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'index.html'), 'utf8');
 const BASE = 'https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/main/';
+const ARCHIVE_BASE = 'https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/ba9a5f023c08bfe7fc75ffde9be6015de5305249/';
 
 function readCollection(name) {
   const prefix = 'const ' + name + '=';
@@ -49,6 +50,15 @@ for (const r of stock.filter(x => !x.pendingPdf)) {
   docs.set('estoque/' + r.file, { name: r.file, category: 'estoque', code: r.doc || r.id });
 }
 
+const viewerHtml = readFileSync(join(root, 'visualizador.html'), 'utf8');
+const legacyMap = JSON.parse(viewerHtml.match(/const map=(\{[^;]+\});/)?.[1] || '{}');
+const historicalIds = JSON.parse(viewerHtml.match(/const historicLegacyIds=new Set\((\[[^;]+\])\);/)?.[1] || '[]');
+for (const id of historicalIds) {
+  const name = legacyMap[id];
+  if (!name || !/^[a-z0-9_.-]+\.pdf$/i.test(name))
+    throw new Error('PDF histórico inválido: ' + id);
+  docs.set('historico/' + id, {name, category: 'estoque', code: id, historical: true});
+}
 const all = [...docs.values()];
 const errors = [];
 let checked = 0;
@@ -58,7 +68,7 @@ async function inspect(record) {
   const subdir = record.category === 'campo'
     ? 'relatorios/acompanhamento%20de%20%C3%A1rea/'
     : 'relatorios/estoque/';
-  const url = BASE + subdir + encodeURIComponent(record.name);
+  const url = (record.historical ? ARCHIVE_BASE : BASE) + subdir + encodeURIComponent(record.name);
   let message = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
