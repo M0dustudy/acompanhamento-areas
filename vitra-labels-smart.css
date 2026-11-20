@@ -609,3 +609,11 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
 .vl2-read-actions .vl2-retry-deep{width:auto;min-width:190px;flex:1;margin:0}
 .vl2-capture-duo{background:#e9f4eb!important;color:#22543b!important;border:1px solid #a4ccb3!important}
 @media(max-width:620px){.vl2-pair-section{padding:12px}.vl2-pair-grid{grid-template-columns:minmax(0,1fr)}.vl2-pair-grid article{padding:12px}.vl2-read-actions{display:grid;grid-template-columns:1fr}.vl2-read-actions .vl2-retry-deep{width:100%}}
+
+.vl2-confirmed-area{margin-top:13px;padding:13px;border:1px solid #d3e5d8;background:#f7fbf8;border-radius:12px}
+.vl2-confirmed-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.vl2-confirmed-head strong{font-size:13px;color:#22593d}
+.vl2-confirmed-head small{font-size:11px;color:#668073}
+.vl2-confirmed-area .vl2-check-ok{border-color:#c8e4d1;background:#fff}
+.vl2-confirmed-area .vl2-check-ok>span{background:#d8efdf;color:#17643a;border-radius:50%}
+.vl2-confirmed-area .vl2-passed{margin-top:10px}
