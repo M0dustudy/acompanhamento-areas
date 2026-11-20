@@ -108,16 +108,16 @@ try {
   const viewerMap = viewerMatch ? JSON.parse(viewerMatch[1]) : {};
   // Regra crítica: os links gerados no dashboard devem usar o nome real do PDF.
   // Não basta que o arquivo exista no GitHub: ele precisa abrir pelo visualizador.
-  assert(html.includes('visualizador.html?v=20261119pdf2&amp;campo=\'+encodeURIComponent(pdf)'),
+  assert(html.includes('visualizador.html?v=20261120pdf3&amp;campo=\'+encodeURIComponent(pdf)'),
     'Campo não aponta para o visualizador por nome de arquivo');
-  assert(html.includes('visualizador.html?v=20261119pdf2&amp;estoque=\'+encodeURIComponent(x.file)'),
+  assert(html.includes('visualizador.html?v=20261120pdf3&amp;estoque=\'+encodeURIComponent(x.file)'),
     'Estoque não aponta para o visualizador por nome de arquivo');
   assert(viewerHtml.includes('const requestedField=params.get("campo")'),
     'Visualizador não recebe arquivos de campo');
   assert(viewerHtml.includes('const requestedStock=params.get("estoque")'),
     'Visualizador não recebe arquivos de estoque');
-  assert(viewerHtml.includes('new URL("./relatorios/"'),
-    'Visualizador não usa o endereço local dos arquivos');
+  assert(viewerHtml.includes('https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/main/relatorios/'),
+    'Visualizador deve ler os PDFs pelo GitHub Raw, pois estão excluídos do GitHub Pages');
   assert(viewerHtml.includes('getDocument(url)'),
     'Visualizador não carrega a URL resolvida do PDF');
   assert(!viewerHtml.includes('const fieldVerifiedFiles=new Set('),
@@ -145,9 +145,10 @@ try {
       document: { getElementById: () => ({}) }
     }, { timeout: 1000 });
     const folder = kind === 'campo' ? 'acompanhamento de área' : 'estoque';
-    const expectedPath = '/acompanhamento-areas/relatorios/' + folder + '/' + filename;
+    const expectedPath = '/M0dustudy/acompanhamento-areas/main/relatorios/' + folder + '/' + filename;
     assert(result.validName === true && result.name === filename &&
       result.category === kind && result.url &&
+      new URL(result.url).origin === 'https://raw.githubusercontent.com' &&
       decodeURIComponent(new URL(result.url).pathname) === expectedPath,
       'Visualizador não resolve o PDF corretamente: ' + filename);
   };

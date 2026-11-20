@@ -29,6 +29,5 @@ jobs:
         run: node scripts/validar-vitra.mjs
       - name: Conferir reconhecimento e regras de etiquetas
         run: node scripts/testar-ocr-etiquetas.mjs
-      - name: Conferir disponibilidade dos PDFs no GitHub Pages
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      - name: Conferir disponibilidade online dos PDFs no GitHub Raw
         run: node scripts/verificar-pdfs-publicados.mjs

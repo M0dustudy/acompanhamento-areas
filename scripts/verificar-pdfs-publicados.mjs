@@ -1,4 +1,4 @@
-// VITRA: validação externa dos PDFs publicados no GitHub Pages.
+// VITRA: validação externa dos PDFs originais servidos pelo GitHub Raw.
 // Executar sob demanda ou via workflow diário. Não altera dados.
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'index.html'), 'utf8');
-const BASE = 'https://m0dustudy.github.io/acompanhamento-areas/';
+const BASE = 'https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/main/';
 
 function readCollection(name) {
   const prefix = 'const ' + name + '=';
@@ -88,7 +88,7 @@ async function worker() {
   }
 }
 await Promise.all(Array.from({ length: Math.min(concurrency, all.length) }, () => worker()));
-console.log('Relatórios de campo e estoque verificados no GitHub Pages:', checked, '/', all.length);
+console.log('Relatórios de campo e estoque verificados no GitHub Raw:', checked, '/', all.length);
 if (errors.length) {
   console.error('Falha em ' + errors.length + ' arquivo(s). Exibição do nome completo:');
   for (const err of errors) {

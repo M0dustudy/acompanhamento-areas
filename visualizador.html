@@ -11,7 +11,7 @@ const category=requestedField||legacyFieldFiles[oldId]?"campo":"estoque";
 const name=requestedField||requestedStock||fileFromLegacy;
 const validName=typeof name==="string"&&/^[a-z0-9_.-]+\.pdf$/i.test(name)&&!name.includes("..");
 const folder=category==="campo"?"acompanhamento de área":"estoque";
-const url=validName?new URL("./relatorios/"+folder.split("/").map(encodeURIComponent).join("/")+"/"+encodeURIComponent(name),location.href).href:null;
+const url=validName?"https://raw.githubusercontent.com/M0dustudy/acompanhamento-areas/main/relatorios/"+folder.split("/").map(encodeURIComponent).join("/")+"/"+encodeURIComponent(name):null;
 const pages=document.getElementById("pages");
 const status=document.getElementById("status");
 const zoomEl=document.getElementById("zoom");
@@ -44,7 +44,7 @@ function alternative(error){
 async function render(){
   if(!pdf)return;
   pages.replaceChildren();
-  status.textContent="Renderizando "+pdf.numPages+" página(s)…";
+  status.textContent="Abrindo relatório · "+pdf.numPages+" página(s)…";
   const maxWidth=Math.max(280,Math.min(900,document.documentElement.clientWidth-20));
   for(let n=1;n<=pdf.numPages;n++){
     const page=await pdf.getPage(n);
@@ -58,8 +58,8 @@ async function render(){
     canvas.style.height=Math.floor(viewport.height)+"px";
     pages.appendChild(canvas);
     await page.render({canvasContext:canvas.getContext("2d"),viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null}).promise;
+    status.textContent=n===pdf.numPages?"Relatório exibido online · "+pdf.numPages+" página(s)":"Relatório aberto online · "+n+" de "+pdf.numPages+" página(s) carregada(s)";
   }
-  status.textContent="Relatório exibido online · "+pdf.numPages+" página(s)";
   zoomEl.textContent=Math.round(zoom*100)+"%";
 }
 (async()=>{
