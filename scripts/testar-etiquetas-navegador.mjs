@@ -38,6 +38,12 @@ try{
    window.__labelSmoke.showResult();
   });
   if(await page.locator('.vl2-pair-grid article').count()!==2)throw Error('Duas etiquetas não exibidas lado a lado/empilhadas.');
+  const referenceInput=page.locator('[data-vl2-trace="raw"]');
+  if(await referenceInput.count()!==1)throw Error('Rastreabilidade de referência em campo único não encontrada.');
+  await referenceInput.fill('R-26-0106B-2110-C-VI');
+  if(await page.evaluate(()=>window.__labelSmoke.state.expected.raw)!=='R-26-0106B-2110-C-VI')
+   throw Error('Campo de referência não preservou o código informado pelo operador.');
+
   const evidence=await page.evaluate(()=>({errors:window.__labelSmoke.state.diag?.checks?.filter(x=>x.status==='error').length||0,summary:window.__labelSmoke.state.diag?.summary||''}));
   if(!evidence.errors||!await page.locator('.vl2-summary-error').count())throw Error('A divergência do par precisa aparecer em vermelho na prévia.');
   const result=await page.locator('#vl2-results').innerText();
