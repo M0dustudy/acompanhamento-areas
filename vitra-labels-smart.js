@@ -1022,7 +1022,9 @@ function traceBuilder(){
  const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
  return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
-  '<p>Selecione os dados corretos da ordem de produção para comparar com a etiqueta.</p>'+
+  '<p>Informe o código correto da ordem de produção. O VITRA fará a comparação com o texto reconhecido na fotografia.</p>'+
+  '<label class="vl2-quick-trace">Rastreabilidade da ordem<input data-vl2-trace="raw" type="text" inputmode="text" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="70" value="'+esc(state.expected.raw||"")+'" placeholder="R-26-0106B-2110-C-VI"></label>'+
+  '<details class="vl2-trace-manual"><summary>Não tem o código completo? Montar por partes</summary>'+
   '<div class="vl2-trace-grid">'+
   '<label>Prefixo<input readonly value="R" aria-label="Prefixo R"></label>'+
   '<div class="vl2-trace-field"><span>Ano</span>'+traceOptions(years,"year","Ano")+'</div>'+
@@ -1031,7 +1033,7 @@ function traceBuilder(){
   '<div class="vl2-trace-field"><span>Dia</span>'+traceOptions(day,"day","Dia")+'</div>'+
   '<div class="vl2-trace-field"><span>Mês</span>'+traceOptions(month,"month","Mês")+'</div>'+
   (box?(autoMethod?'<div class="vl2-trace-field vl2-trace-inferred"><span>Pesagem identificada</span><strong>'+(autoMethod==="5"?"5 kg":"8 kg")+' · dois códigos da etiqueta conferem</strong></div>':'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>'):"")+
-  '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div>'+
+  '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div></details>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
   '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
 }
@@ -1409,7 +1411,8 @@ function showResult(){
  root.querySelectorAll("[data-vl2-trace]").forEach(inp=>{
   const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
    if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
-   state.expected.raw="";state.expected[key]=value;
+   if(key==="raw")state.expected.raw=norm(value).replace(/\s/g,"").slice(0,70);
+    else{state.expected.raw="";state.expected[key]=value;}
    if(state.reviewRequested){
     state.reviewRequested=false;state.reviewed=false;
     const outcome=el("vl2-outcome"),closeout=root.querySelector(".vl2-closeout");
