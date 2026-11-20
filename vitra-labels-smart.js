@@ -12,7 +12,7 @@ const classes=["Campesita","Happy Tree / Extra A","Extra","Sacola","Selecionada"
 const producers=[];
 const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{sensitivity:"base"}));
 const state={
- photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,
+ photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,codeEvidence:[],
  identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
@@ -44,7 +44,7 @@ function releasePhoto(){
  state.photo=null;state.sourceFile=null;
 }
 function resetScan(){
- state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;
+ state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;state.codeEvidence=[];
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
@@ -494,7 +494,7 @@ async function finishCrop(){
 function invalidatePhotoReading(){
  state.sequence++;
  if(state.url){URL.revokeObjectURL(state.url);state.url=null;}
- state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.barcodeRegion=null;
+ state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.barcodeRegion=null;state.codeEvidence=[];
  state.detected=null;state.fields={};state.sources={};state.matches=[];state.referenceChecks=[];
  state.referenceProducer=null;state.referenceMerchant=null;
  state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.analysisError="";
@@ -635,58 +635,47 @@ function prepareOCRImage(file,maxSide=2300){
  });
 }
 async function scanBarcode(file,token=state.sequence){
- let bmp=null;
+ let bitmap=null;
+ const codes=[];
+ const put=(raw,format,region=null)=>{
+  const value=str(raw).trim().slice(0,800),label=str(format).toLowerCase();
+  if(!value||codes.some(x=>x.value===value&&x.format===label))return;
+  const number=digits(value);
+  const ean=(/ean.13|upc.a/.test(label)||(/^\d{13}$/.test(value)&&!/qr|data.matrix/.test(label)))&&eanValid(number)?number:"";
+  codes.push({value,format:label||"desconhecido",ean});
+  if(ean&&region&&token===state.sequence&&!state.barcodeRegion)
+   state.barcodeRegion={x:region.x,y:region.y,w:region.width,h:region.height,iw:region.iw,ih:region.ih};
+ };
  try{
-  bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
-  const factor=Math.min(1,2400/Math.max(bmp.width,bmp.height));
+  bitmap=await createImageBitmap(file,{imageOrientation:"from-image"});
+  const scale=Math.min(1,2600/Math.max(bitmap.width,bitmap.height));
   const canvas=document.createElement("canvas");
-  canvas.width=Math.max(1,Math.round(bmp.width*factor));
-  canvas.height=Math.max(1,Math.round(bmp.height*factor));
-  canvas.getContext("2d").drawImage(bmp,0,0,canvas.width,canvas.height);
-  if(typeof BarcodeDetector!=="undefined"){
-   try{
-    const detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a"]});
-    const codes=await limitWork(detector.detect(canvas),1300,"Tempo esgotado no leitor nativo");
-    for(const x of codes){
-     const value=digits(x.rawValue),ean=value.length===12?"0"+value:value;
-     if(!eanValid(ean))continue;
-     const bounds=x.boundingBox;
-     if(state.sequence===token&&bounds?.width&&bounds?.height)state.barcodeRegion={x:bounds.x,y:bounds.y,w:bounds.width,h:bounds.height,iw:canvas.width,ih:canvas.height};
-     return ean;
-    }
-   }catch{}
-  }
-  try{
-   const mod=await limitWork(import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm"),2300,"Biblioteca de barras não respondeu");
-   const reader=new mod.BrowserMultiFormatOneDReader();
-   const samples=[canvas];
-   const rotated=rotateBitmapCanvas(canvas,90,2300);samples.push(rotated);
-   for(const sample of samples){
+  canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+  canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);
+  if(typeof BarcodeDetector!=="undefined")try{
+   const formats=["ean_13","ean_8","upc_a","code_128","qr_code","data_matrix","pdf417"];
+   const available=typeof BarcodeDetector.getSupportedFormats==="function"
+    ?await limitWork(BarcodeDetector.getSupportedFormats(),1500,"Formatos não consultados"):formats;
+   const enabled=formats.filter(x=>available.includes(x));
+   if(enabled.length)for(const code of await limitWork(new BarcodeDetector({formats:enabled}).detect(canvas),4300,"Leitor nativo indisponível")){
+    const b=code.boundingBox;
+    put(code.rawValue,code.format,b?.width?{x:b.x,y:b.y,width:b.width,height:b.height,iw:canvas.width,ih:canvas.height}:null);
+   }
+  }catch{}
+  if(!codes.some(x=>x.ean)||!codes.some(x=>/qr|data.matrix/.test(x.format)))try{
+   const mod=await limitWork(import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm"),3600,"ZXing indisponível");
+   const reader=new mod.BrowserMultiFormatReader();
+   for(const sample of [canvas,rotateBitmapCanvas(canvas,90,2300)]){
     try{
-     const code=await limitWork(reader.decodeFromCanvas(sample),1900,"O leitor não localizou as barras");
-     const value=digits(code?.getText?.()||code?.text||"");
-     const ean=value.length===12?"0"+value:value;
-     if(eanValid(ean)){
-      const points=code?.getResultPoints?.()||[];
-      if(state.sequence===token&&points.length>=2){
-       const rect=points.map(p=>{
-        let x=p.getX?.()??p.x??0,y=p.getY?.()??p.y??0;
-        if(sample!==canvas){const originalX=y,originalY=canvas.height-x;x=originalX;y=originalY;}
-        return {x,y};
-       });
-       const minX=Math.min(...rect.map(p=>p.x)),maxX=Math.max(...rect.map(p=>p.x));
-       const centerY=rect.reduce((n,p)=>n+p.y,0)/rect.length;
-       state.barcodeRegion={x:Math.max(0,minX-canvas.width*.04),y:Math.max(0,centerY-canvas.height*.075),
-        w:Math.max(canvas.width*.24,maxX-minX+canvas.width*.08),
-        h:Math.max(20,canvas.height*.15),iw:canvas.width,ih:canvas.height};
-      }
-      return ean;
-     }
+     const result=await limitWork(reader.decodeFromCanvas(sample),2500,"Código não encontrado");
+     put(str(result?.getText?.()||result?.text||""),str(result?.getBarcodeFormat?.()??"zxing"));
     }catch{}
    }
   }catch{}
-  return "";
- }catch{return "";}finally{bmp?.close?.();}
+ }catch{}finally{bitmap?.close?.();}
+ if(token===state.sequence)state.codeEvidence=codes;
+ const valid=distinct(codes.map(x=>x.ean));
+ return valid.length===1?valid[0]:"";
 }
 async function printedEANNearBarcode(file,worker){
  const r=state.barcodeRegion;if(!r?.w||!r.ih)return "";
@@ -878,10 +867,10 @@ async function readPhoto(deep=false){
   if(seq!==state.sequence)return;
   state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;state.ocrRawPassages=passages.slice();
   const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
-  if(!likelyBox){update("Decodificando o código de barras…");barcode=barcode||await limitWork(scanBarcode(photo,seq),6500,"Tempo de leitura do código de barras excedido.").catch(()=>"");}
+  update("Lendo códigos de barras e QR Code…");barcode=barcode||await limitWork(scanBarcode(photo,seq),9200,"Leitura dos códigos interrompida.").catch(()=>"");
   if(seq!==state.sequence)return;
   printedNumber=printedNumber||getEAN(recognized);
-  if(!likelyBox&&barcode&&worker&&!printedNumber){
+  if(barcode&&worker&&!printedNumber){
    update("Lendo separadamente os números impressos sob as barras…");
    printedNumber=await printedEANNearBarcode(photo,worker);
   }
@@ -1164,6 +1153,13 @@ function diagnosticV4(){
   if(f.ggnComercial&&digits(f.ggnComercial).length!==13)add(state.ocrConflicts.includes("ggnComercial")?"pending":"error","GGN do comerciante","Lidos "+digits(f.ggnComercial).length+" dígitos no campo comercial; confira os 13 dígitos.");
   if(/\bGLN\b/i.test(state.text)&&!f.gln&&!f.glnComercial)add("pending","GLN ilegível","Há indicação de GLN na etiqueta, mas os dígitos não foram reconhecidos com segurança.");
  }
+ for(const code of (state.codeEvidence||[]).filter(x=>/qr|data.matrix/.test(x.format)||/^https?:\/\//i.test(x.value))){
+  const traces=ocrTraceCandidates(code.value),observed=state.fields?.rastreio||"";
+  if(traces.length&&observed)add(traces.includes(observed)?"ok":"error","QR Code × rastreabilidade","QR: "+traces.join(" / ")+" · etiqueta: "+observed+".");
+  else add("pending","Código 2D reconhecido","Conteúdo: "+code.value.slice(0,140)+". A leitura do código não substitui a conferência documental.");
+ }
+ if(distinct((state.codeEvidence||[]).map(x=>x.ean)).length>1)
+  add("pending","Múltiplos EAN na foto","Foram decodificados EANs diferentes. Identifique cada etiqueta antes de aprovar.");
  if(state.ocrConflicts.length)add("pending","Leituras diferentes na fotografia","O reconhecimento encontrou valores conflitantes para: "+state.ocrConflicts.join(", ")+". É necessário conferir a foto antes de aprovar.");
  if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
