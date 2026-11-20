@@ -65,14 +65,14 @@ try {
   for (const code of Object.keys(areas)) {
     assert(groupCodes.includes(code), 'Área cadastrada sem situação: ' + code);
     const area = areas[code];
-    for (const field of ['originalHarvestDate','finalizedDate','harvestClosureDate']) {
+    for (const field of ['originalHarvestDate','finalizedDate','harvestClosureDate','areaFinalizationDate']) {
       if (area[field] === undefined) continue;
       const m = String(area[field]).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       const dt = m ? new Date(+m[3],+m[2]-1,+m[1]) : null;
       assert(Boolean(dt && dt.getFullYear()===+m[3] && dt.getMonth()===+m[2]-1 && dt.getDate()===+m[1]),
         'Data histórica inválida: '+code+' · '+field);
     }
-    if (area.finalizedDate || area.harvestClosureDate)
+    if (area.finalizedDate || area.harvestClosureDate || area.areaFinalizationDate)
       assert(groups.fim.includes(code), 'Data real em área não finalizada: '+code);
     if (area.harvestClosureKind==='sem_colheita_integral')
       assert(Boolean(area.harvestClosureDate) && !area.finalizedDate, 'Encerramento parcial tratado como finalização integral: '+code);
