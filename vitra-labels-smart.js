@@ -12,7 +12,7 @@ const classes=["Campesita","Happy Tree / Extra A","Extra","Sacola","Selecionada"
 const producers=[];
 const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{sensitivity:"base"}));
 const state={
- photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,codeEvidence:[],
+ photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,codeEvidence:[],pairedEvidence:null,pairRequested:false,
  identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
@@ -44,7 +44,7 @@ function releasePhoto(){
  state.photo=null;state.sourceFile=null;
 }
 function resetScan(){
- state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;state.codeEvidence=[];
+ state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;state.codeEvidence=[];state.pairedEvidence=null;state.pairRequested=false;
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
@@ -452,6 +452,7 @@ function positionMode(mode){
  if(el("vl2-gallery-tools"))el("vl2-gallery-tools").hidden=!(["crop","ready"].includes(mode)&&!!state.sourceFile);
  if(el("vl2-analyze-full"))el("vl2-analyze-full").hidden=!(["crop","ready"].includes(mode)&&!!state.sourceFile);
  if(el("vl2-capture"))el("vl2-capture").hidden=mode!=="camera";
+ if(el("vl2-capture-full"))el("vl2-capture-full").hidden=mode!=="camera";
  if(el("vl2-apply-crop"))el("vl2-apply-crop").hidden=mode!=="crop"||!state.cropActive;
  if(mode==="camera"||mode==="crop"&&state.cropActive)requestAnimationFrame(drawCrop);
 }
@@ -494,7 +495,7 @@ async function finishCrop(){
 function invalidatePhotoReading(){
  state.sequence++;
  if(state.url){URL.revokeObjectURL(state.url);state.url=null;}
- state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.barcodeRegion=null;state.codeEvidence=[];
+ state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.barcodeRegion=null;state.codeEvidence=[];state.pairedEvidence=null;state.pairRequested=false;
  state.detected=null;state.fields={};state.sources={};state.matches=[];state.referenceChecks=[];
  state.referenceProducer=null;state.referenceMerchant=null;
  state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.analysisError="";
@@ -569,7 +570,21 @@ async function beginCamera(){
  state.crop={cx:.5,cy:.5,scale:.85,ratio:1.5};positionMode("camera");
  try{await video.play();}catch{stopCamera();positionMode("empty");notice("Não foi possível iniciar a câmera traseira.",true);return;}
  showResult();
- notice("Centralize uma única etiqueta dentro do quadro. Apenas essa área será fotografada.");
+ notice("Para uma etiqueta, use o recorte; para caixa e cumbuca juntas, capture a foto inteira.");
+}
+async function captureCameraFull(){
+ const video=el("vl2-video");
+ if(!cameraStream||!video?.videoWidth||state.processing)return;
+ state.processing=true;
+ try{
+  const canvas=document.createElement("canvas");
+  canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+  canvas.getContext("2d").drawImage(video,0,0,canvas.width,canvas.height);
+  const file=await photoFromCanvas(canvas);
+  stopCamera();setPhoto(file);state.pairRequested=true;
+  await readPhoto();
+ }catch{notice("Não foi possível capturar as duas etiquetas. Refotografe com boa nitidez.",true);}
+ finally{state.processing=false;}
 }
 async function captureCamera(){
  const video=el("vl2-video");if(!cameraStream||!video?.videoWidth||state.processing)return;
@@ -946,7 +961,7 @@ function category(){
 }
 function detailsView(){
  const k=state.identity.kind,v=state.identity.variety,f=state.fields,src=state.sources;
- if(!state.photo)return '<div class="vl2-start"><strong>Fotografe uma única etiqueta</strong><p>O VITRA identifica o modelo, lê os dados impressos e cruza o que foi reconhecido com o manual e os padrões cadastrados.</p></div>';
+ if(!state.photo)return '<div class="vl2-start"><strong>Fotografe uma etiqueta ou as duas juntas</strong><p>O VITRA identifica o modelo, lê os dados impressos e cruza o que foi reconhecido com o manual e os padrões cadastrados.</p></div>';
  let facts=fact("Tipo de etiqueta",nameOf(kinds,k),k?"Reconhecido · alterável em ajustes":"Não foi possível identificar com segurança")+
   fact("Variedade",nameOf(varieties,v),v?"Rastreabilidade / texto / catálogo":"A confirmar")+
   fact("Classificação",state.identity.klass,"Identificada quando disponível");
@@ -1007,7 +1022,7 @@ function diagnose(){
  const summary=status==="reprovado"
   ?errors.length+" divergência(s) detectada(s). "+errors.slice(0,2).map(x=>x[1]).join(" e ")+". Confira os itens antes de utilizar a etiqueta."
   :status==="pendente"?"A leitura ainda não permite validar todos os dados exigidos. "+pending.length+" item(ns) precisam de confirmação."
-  :status==="aprovado"?"Os dados reconhecidos coincidem com as referências consultadas. A aplicação física e a ordem de produção ainda exigem conferência.":"Posicione uma única etiqueta na câmera para iniciar o diagnóstico.";
+  :status==="aprovado"?"Os dados reconhecidos coincidem com as referências consultadas. A aplicação física e a ordem de produção ainda exigem conferência.":"Posicione as etiquetas na câmera para iniciar o diagnóstico.";
  return {status,summary,checks,errors:errors.length,pending:pending.length,ok:checks.filter(x=>x.status==="ok").length,referenceComplete:status==="aprovado"&&state.refsLoaded&&state.catalogLoaded};
 }
 function diagnosticV4(){
@@ -1535,11 +1550,11 @@ function mount(adapter){
  const p=el("panel");if(!p)return;
  p.innerHTML='<section class="vl2" aria-label="Conferência de etiquetas">'+
   '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2><p>Fotografe o rótulo, informe os dados da ordem de produção e confira o resultado antes de salvar.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
-  '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>A foto da galeria é analisada inteira. Recorte apenas quando houver outras etiquetas na imagem.</p></div></div>'+
+  '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>A foto pode conter caixa e cumbuca juntas. O recorte é opcional.</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
   '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
   '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Abrir câmera traseira</button><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
-  '<button id="vl2-capture" type="button" class="vl2-apply" hidden>Capturar somente a área marcada</button>'+
+  '<button id="vl2-capture" type="button" class="vl2-apply" hidden>Capturar somente a área marcada</button><button id="vl2-capture-full" type="button" class="vl2-apply vl2-capture-duo" hidden>Capturar foto inteira · caixa + cumbuca</button>'+
   '<div id="vl2-gallery-tools" class="vl2-gallery-tools" hidden><button id="vl2-rotate-left" type="button">↶ Girar</button><button id="vl2-rotate-right" type="button">Girar ↷</button><button id="vl2-crop-toggle" type="button">Recortar uma etiqueta</button></div>'+
   '<button id="vl2-analyze-full" type="button" class="vl2-apply" hidden>Analisar foto inteira</button>'+
   '<button id="vl2-apply-crop" type="button" class="vl2-apply" hidden>Aplicar recorte e analisar</button>'+
@@ -1553,6 +1568,7 @@ function mount(adapter){
  el("vl2-open-camera")?.addEventListener("click",beginCamera);
  el("vl2-gallery")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
  el("vl2-capture")?.addEventListener("click",captureCamera);
+ el("vl2-capture-full")?.addEventListener("click",captureCameraFull);
  el("vl2-apply-crop")?.addEventListener("click",finishCrop);
  el("vl2-analyze-full")?.addEventListener("click",analyzeGalleryFull);
  el("vl2-crop-toggle")?.addEventListener("click",toggleGalleryCrop);
