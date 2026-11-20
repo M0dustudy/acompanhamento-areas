@@ -1242,6 +1242,41 @@ function diagnosticV4(){
  }
  if(distinct((state.codeEvidence||[]).map(x=>x.ean)).length>1)
   add("pending","Múltiplos EAN na foto","Foram decodificados EANs diferentes. Identifique cada etiqueta antes de aprovar.");
+ const pair=state.pairedEvidence;
+ if(pair?.detected){
+  const a=parseTrace(pair.box.trace),b=parseTrace(pair.unit.trace);
+  if(!a||!b)add("pending","Rastreabilidade caixa × cumbuca","Uma das etiquetas não teve o código lido com segurança. Não é permitido preencher um código a partir do outro.");
+  else{
+   const same=a.year===b.year&&a.areaValve===b.areaValve&&a.day===b.day&&a.month===b.month&&a.variety===b.variety;
+   add(same?"ok":"error","Caixa × cumbuca · rastreabilidade",
+    "Caixa: "+pair.box.trace+" · cumbuca: "+pair.unit.trace+(same?" · Ano, identificação, data e variedade coincidem; a modalidade pode ser distinta.":" · Os identificadores não coincidem; confira o par e a ordem de produção."));
+  }
+  if(pair.box.variety&&pair.unit.variety)
+   add(pair.box.variety===pair.unit.variety?"ok":"error","Variedade caixa × cumbuca",
+    "Caixa: "+nameOf(varieties,pair.box.variety)+" · cumbuca: "+nameOf(varieties,pair.unit.variety)+".");
+  else add("pending","Variedade nas duas etiquetas","Não foi possível identificar a variedade em ambos os rótulos independentemente.");
+  const ean=pair.unit.ean,bars=state.barcodeBars||"",printed=state.barcodePrinted||"";
+  if(!ean||!eanValid(ean))add("pending","EAN da cumbuca","O EAN-13 não foi decodificado e confirmado nesta etiqueta.");
+  else{
+   if(!bars)add("pending","Barras da cumbuca","Os 13 dígitos podem estar no texto, mas as barras não foram decodificadas.");
+   if(!printed)add("pending","Números abaixo das barras","Não foi possível reconhecer separadamente os 13 dígitos impressos.");
+   if(bars&&printed)add(bars===printed?"ok":"error","EAN impresso × barras","Barras: "+bars+" · impresso: "+printed+".");
+   if(state.clientConfirmed&&selected){
+    const authorized=distinct(catalog.filter(x=>x.barcode===ean).map(x=>x.client));
+    add(authorized.includes(catalogClient(selected))?"ok":authorized.length?"error":"pending",
+     "EAN × cliente da ordem",authorized.includes(catalogClient(selected))?"EAN "+ean+" pertence aos padrões autorizados para "+nameOf(clients,selected)+".":"EAN "+ean+" cadastrado para "+authorized.map(x=>nameOf(clients,x)).join(" / ")+"; cliente da ordem: "+nameOf(clients,selected)+".");
+   }
+  }
+  if(pair.unit.date){
+   const parts=pair.unit.date.split("/");
+   if(parts.length===3&&!validateDate(parts[0],parts[1],parts[2]))
+    add("error","Data de embalagem da cumbuca","Data inválida: "+pair.unit.date+".");
+   else if(b&&pair.unit.date!==b.day+"/"+b.month+"/20"+b.year)
+    add("pending","Data da cumbuca × código","Data impressa: "+pair.unit.date+" · data do código: "+b.day+"/"+b.month+"/20"+b.year+". Não assumir que essas datas representam o mesmo evento sem regra documental.");
+   else add("ok","Data da cumbuca","Data impressa reconhecida: "+pair.unit.date+".");
+  }else add("pending","Data da cumbuca","Não foi possível ler a data impressa na etiqueta menor.");
+ }else if(state.pairRequested)add("pending","Duas etiquetas não separadas",
+  "A fotografia contém um par solicitado, mas caixa e cumbuca não foram reconhecidas independentemente. "+(pair?.reason||"Refaça a foto ou amplie a região."));
  if(state.ocrConflicts.length)add("pending","Leituras diferentes na fotografia","O reconhecimento encontrou valores conflitantes para: "+state.ocrConflicts.join(", ")+". É necessário conferir a foto antes de aprovar.");
  if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
@@ -1287,6 +1322,12 @@ function showResult(){
   unit?
   '<div class="vl2-reading-barcode"><small>Código de barras · EAN-13</small><strong>'+esc(code)+'</strong><p>'+esc(codeContext)+'</p><p>'+esc(state.barcodeBars&&state.barcodePrinted?(state.barcodeBars===state.barcodePrinted?"Barras e número impresso conferem.":"Divergência entre barras e número impresso."):"Comparação entre barras e número impresso pendente.")+'</p></div>':
   '<div class="vl2-reading-barcode"><small>Identificadores</small><strong>Aguardando identificação do modelo</strong></div>';
+ const pair=state.pairedEvidence;
+ const pairView=pair?.detected?
+ '<section class="vl2-pair-section"><div class="vl2-reading-head"><div><strong>Caixa e cumbuca · mesma fotografia</strong><small>Leituras individuais confrontadas com a ordem e o cadastro.</small></div></div>'+
+ '<div class="vl2-pair-grid"><article><small>ETIQUETA DA CAIXA</small><strong>'+esc(pair.box.model||"Modelo ainda não lido")+'</strong><p>'+esc(pair.box.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.box.klass||"Classe pendente")+' · '+esc(nameOf(varieties,pair.box.variety))+'</p></article>'+
+ '<article><small>ETIQUETA DA CUMBUCA</small><strong>EAN '+esc(pair.unit.ean||"pendente")+'</strong><p>'+esc(pair.unit.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.unit.date||"Data pendente")+' · '+esc(nameOf(varieties,pair.unit.variety))+'</p></article></div></section>':
+ state.pairRequested?'<section class="vl2-pair-section vl2-pair-warning"><strong>Não foi possível comparar as duas etiquetas</strong><p>O modelo e as informações continuam pendentes. Use imagem mais nítida ou amplie a região.</p></section>':"";
  const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · '+state.ocrPasses+' passagem(ns) de OCR · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
   photoValue("Modelo",kind?name:"Não identificado")+photoValue("Variedade / produto",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
@@ -1321,12 +1362,12 @@ function showResult(){
   if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a aplicação física e o modelo da etiqueta com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
   else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
  }
- const deepRetry=state.photo&&state.scanCompleted?'<button type="button" id="vl2-deep-read" class="vl2-retry-deep">Reexaminar foto em alta resolução</button>':"";
+ const deepRetry=state.photo&&state.scanCompleted?'<div class="vl2-read-actions"><button type="button" id="vl2-deep-read" class="vl2-retry-deep">Reexaminar foto em alta resolução</button><button type="button" id="vl2-pair-read" class="vl2-retry-deep">Comparar caixa e cumbuca da foto</button></div>':"";
  const retry=state.analysisError?
  '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
  const sampleOption=state.sampleSaved?'<p class="vl2-hint">Amostra registrada como pendente no histórico, sem aprovação.</p>':
   !state.saved&&report.status!=="aprovado"?'<details class="vl2-refine vl2-sample"><summary>Modelo diferente? Guardar foto para ampliar o catálogo</summary><p class="vl2-refine-hint">Registra a foto para estudo, sem aprovação nem criação automática de regras.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>':"";
- root.innerHTML=retry+concise+reading+reference+outcome+deepRetry+sampleOption+
+ root.innerHTML=retry+concise+pairView+reading+reference+outcome+deepRetry+sampleOption+
  '<details class="vl2-details-root"><summary>Dados técnicos reconhecidos (somente consulta)</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
@@ -1366,6 +1407,7 @@ function showResult(){
  el("vl2-confirm-kind")?.addEventListener("click",()=>{state.kindConfirmed=true;showResult();});
  el("vl2-retry-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto().finally(()=>{state.processing=false;});});
  el("vl2-deep-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto(true).finally(()=>{state.processing=false;});});
+ el("vl2-pair-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.pairRequested=true;state.processing=true;readPhoto(true).finally(()=>{state.processing=false;});});
  el("vl2-evaluate")?.addEventListener("click",()=>{state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
  el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
@@ -1533,7 +1575,7 @@ async function saveReview(){
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
  const visualEvidence=await collectVisualEvidence(state.photo,state.text);
- const fields={...state.fields,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,
+ const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
