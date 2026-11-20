@@ -215,3 +215,9 @@ Os totais descrevem o cadastro existente nessa consulta, não significam defeito
 - **Pendente:** baixa nitidez, caracteres ambíguos, QR sem esquema, ausência de referência confiável, campo não extraído ou modelo não reconhecido. Não trocar pendência por aprovação.
 - Não prometer 100% de precisão com qualquer câmera e qualquer fotografia; os ensaios com aparelhos móveis, etiquetas pequenas, reflexo e impressão desgastada continuam indispensáveis.
 - O histórico e os registros de campo, estoque, recepção e titulação permanecem intocados pela revisão do módulo de etiquetas.
+
+## EAN compartilhado e datas reais de colheita — regra confirmada em 20/11/2026
+
+- Um EAN-13 pode ter **vários clientes autorizados**: o compartilhamento não é erro. Exemplo documentado no DOC.CQ.056: `7898366001754` para Doce Mel e Trielo. Exibir todos os clientes vinculados, preservar os dois no cadastro e comparar o destinatário **independentemente** informado pela ordem de produção.
+- Usar marca impressa, modelo e demais evidências fotográficas para distinguir clientes quando existirem; uma marca comprovadamente diferente do cliente da ordem é erro, mas o compartilhamento do EAN não é. Se a marca não estiver legível ou não constar na etiqueta, não inventar identificação a partir do número.
+- Em Áreas finalizadas, exibir previsão original e data **documentada** de conclusão, sem confundí-la com a data em que o operador informou o status. Se o dia não foi comprovado, marcar **Data não informada**. Encerramento sem colheita integral deve ser identificado separadamente, com sua data confirmada.

@@ -377,8 +377,11 @@ function computeIssues(){
   const certain=detected.wordClients.length===1||detected.codeClients.length===1;
   add(certain?"atencao":"confirmar","Cliente divergente","O cliente selecionado é "+nameOf(clients,chosen)+", mas a identificação da foto sugere "+nameOf(clients,real)+".");
  }
- if(!real&&detected?.clientAmbiguous)add("confirmar","Cliente compartilhado","Esse código de barras aparece em mais de um cliente do catálogo. Confira a marca impressa.");
- if(!real&&state.clientConfirmed)add("confirmar","Cliente não reconhecido na foto","O cliente foi informado, mas a imagem não permitiu identificá-lo para confirmar a correspondência.");
+ const ownersEAN=distinct(catalog.filter(item=>item.barcode===digits(f.barcode||"")).map(item=>item.client));
+ const clientEANAuthorized=chosen&&state.clientConfirmed&&ownersEAN.includes(catalogClient(chosen));
+ // EAN compartilhado é permitido; a ordem de produção identifica o destino.
+ if(!real&&detected?.clientAmbiguous&&!clientEANAuthorized)add("confirmar","Cliente da ordem","O EAN é compartilhado por "+ownersEAN.map(k=>nameOf(clients,k)).join(" / ")+". Confirme qual é o cliente da ordem; isso não é defeito na etiqueta.");
+ if(!real&&state.clientConfirmed&&!clientEANAuthorized)add("confirmar","Cliente não reconhecido na foto","O cliente foi informado, mas o catálogo e a imagem não permitem confirmar a correspondência.");
  if(detected?.wordClients?.length>1&&!detected.codeClients.length)add("confirmar","Marcas diferentes","A imagem contém nomes de mais de um cliente. Confira o modelo correto.");
  if(f.barcode&&!eanValid(f.barcode))add("atencao","Código de barras","O dígito verificador do EAN-13 não corresponde.");
  if(f.barcode&&chosen&&detected?.codeClients.length===1&&detected.codeClients[0]!==chosen&&detected.wordClients.length===0){
@@ -1153,7 +1156,14 @@ function diagnosticV4(){
    else if(selected&&state.clientConfirmed&&!owners.includes(catalogClient(selected))){
     add("error","EAN incompatível com o cliente","EAN-13 "+ean+" consta para "+ownerNames.join(", ")+", não para "+display+". Verifique se existe autorização expressa para uso do EAN da fazenda.");
    }else if(selected&&state.clientConfirmed){
-    add("ok","EAN e cliente","EAN-13 "+ean+" cadastrado para "+display+(owners.length>1?". Também consta para "+ownerNames.join(" e ")+".":"."),"DOC.CQ.056 · códigos por cliente");
+    add("ok",owners.length>1?"EAN compartilhado autorizado":"EAN e cliente",
+      owners.length>1?"EAN-13 "+ean+" é autorizado para "+ownerNames.join(" / ")+". Cliente confirmado pela ordem: "+display+". Compartilhamento permitido; o EAN sozinho não identifica a marca.":"EAN-13 "+ean+" cadastrado para "+display+".","DOC.CQ.056 · códigos por cliente");
+    // A marca impressa, quando realmente lida, é evidência independente do EAN.
+    const marcas=distinct((state.detected?.wordClients||[]).map(catalogClient).filter(Boolean));
+    if(marcas.length===1&&selected&&state.clientConfirmed){
+      if(marcas[0]===catalogClient(selected))add("ok","Marca e cliente da ordem","Marca "+display+" reconhecida na foto e correspondente à ordem.");
+      else add("error","Marca divergente do cliente","Marca da fotografia: "+nameOf(clients,marcas[0])+" · cliente da ordem: "+display+". A divergência é da marca, não do compartilhamento de EAN.");
+    }else if(marcas.length>1)add("pending","Marcas diferentes na foto","Há mais de uma marca identificada; confira as etiquetas antes da conclusão.");
    }
   }
  }else if(box){
@@ -1343,7 +1353,7 @@ function showResult(){
  const f=state.fields,code=f.barcode||"Não identificado",box=category()==="box",unit=category()==="unit";
  const owners=distinct(catalog.filter(x=>x.barcode===code).map(x=>x.client));
  const ownerNames=owners.map(x=>nameOf(clients,x)).sort((a,b)=>a.localeCompare(b,"pt-BR"));
- const codeContext=owners.length>1?"Código EAN-13 cadastrado para "+ownerNames.join(" e ")+". Não é necessariamente uma irregularidade.":owners.length===1?"EAN-13 associado a "+ownerNames[0]+".":"Código não cadastrado ou ainda não identificado.";
+ const codeContext=owners.length>1?"EAN compartilhado por "+ownerNames.join(" / ")+". "+(state.clientConfirmed&&owners.includes(catalogClient(state.identity.client))?"Cliente confirmado pela ordem: "+nameOf(clients,state.identity.client)+". Compartilhamento não é irregularidade.":"Confirme o cliente usando a ordem de produção. O EAN, sozinho, não identifica o destinatário."):owners.length===1?"EAN-13 associado a "+ownerNames[0]+".":"Código não cadastrado ou ainda não identificado.";
  const photoValue=(label,value)=>!value?"":'<div><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong></div>';
  const evidence=box?
   photoValue("Origem",state.referenceProducer?.name||f.produtor)+

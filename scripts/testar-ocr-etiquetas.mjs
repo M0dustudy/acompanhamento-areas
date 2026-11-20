@@ -88,6 +88,18 @@ assert.equal(t.extract("UVA VITORIA\nR-26-109A5-1611-5-VI","7898366001754").iden
 assert.equal(t.extract("MEI-V50VI10","").identity.kind,"sacola");
 assert.equal(t.extract("MEI-V50VI20","").identity.variety,"vitoria");
 assert.equal(t.extract("VITORIA\n7898366001754","7898366001754").identity.kind,"cumbuca");
+assert(source.includes("EAN compartilhado autorizado"),"Não criar erro automático por EAN compartilhado.");
+const shared=t.extract("UVA VITORIA\n7898366001754","7898366001754");
+assert.equal(shared.codeClients.length,2);
+for (const client of ["docemel","trielo"]) {
+ t.state.photo={};t.state.scanCompleted=true;t.state.clientConfirmed=true;
+ t.state.identity={client,kind:"cumbuca500",variety:"vitoria",klass:""};
+ t.state.fields={barcode:"7898366001754",rastreio:"R-26-109A5-1611-5-VI"};
+ t.state.detected={identity:{kind:"cumbuca500",variety:"vitoria"},wordClients:[],kindConfidence:"high"};
+ const diagnosis=t.diagnosticV4();
+ assert(diagnosis.checks.some(x=>x.title==="EAN compartilhado autorizado"&&x.status==="ok"),"EAN compartilhado autorizado para "+client);
+ assert(!diagnosis.checks.some(x=>x.title==="EAN incompatível com o cliente"&&x.status==="error"),"EAN compartilhado não é erro.");
+}
 
 // Simulações não fotográficas do fluxo de alto volume:
 // uma passagem no caso completo; somente uma passagem complementar no caso incompleto.
