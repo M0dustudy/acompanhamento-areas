@@ -18,8 +18,8 @@ const context={
 const testHook='ctx={canAccess:()=>true};window.__test={ocrTraceCandidates,ocrConflictKeys,mergeOCRPassages,shouldScanOCRBands,canonicalCoordinates,extract,supplementExtractedFields,registryAudit,diagnosticV4,interpretPairedText,readPhoto,state};'+marker;
 new Script(source.replace(marker,testHook)).runInNewContext(context);
 const t=context.window.__test,trace="R-26-109A5-1611-5-SR",other="R-27-109A5-1611-5-SR";
-const pair=t.interpretPairedText("BRS VITÓRIA\\nMEI-PA50VI20\\nCOMERCIALIZADO POR EXPOFRUT\\nPRODUZIDO POR NOVO RUMO\\nR-26-0106B-2110-C-VI",
-"UVA BRS VITÓRIA\\nEmb 19/11/2026\\nR-26-0106B-2110-5-VI\\n7898366001754","7898366001754");
+const pair=t.interpretPairedText("BRS VITÓRIA\nMEI-PA50VI20\nCOMERCIALIZADO POR EXPOFRUT\nPRODUZIDO POR NOVO RUMO\nR-26-0106B-2110-C-VI",
+"UVA BRS VITÓRIA\nEmb 19/11/2026\nR-26-0106B-2110-5-VI\n7898366001754","7898366001754");
 assert.equal(pair?.detected,true,"O par físico deve gerar duas leituras sem mesclar dados.");
 assert.equal(pair.box.model,"MEI-PA50VI20");
 assert.equal(pair.unit.ean,"7898366001754");
