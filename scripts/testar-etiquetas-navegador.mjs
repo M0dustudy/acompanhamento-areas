@@ -38,7 +38,8 @@ try{
    window.__labelSmoke.showResult();
   });
   if(await page.locator('.vl2-pair-grid article').count()!==2)throw Error('Duas etiquetas não exibidas lado a lado/empilhadas.');
-  const errorsLabel=await page.locator('.vl2-check-error').count();
+  const evidence=await page.evaluate(()=>({errors:window.__labelSmoke.state.diag?.checks?.filter(x=>x.status==='error').length||0,summary:window.__labelSmoke.state.diag?.summary||''}));
+  if(!evidence.errors||!await page.locator('.vl2-summary-error').count())throw Error('A divergência do par precisa aparecer em vermelho na prévia.');
   const result=await page.locator('#vl2-results').innerText();
   if(!result.includes('R-28-000V4-1411-5-VI')||!result.includes('R-26-0106B-2110-C-VI'))throw Error('Identificadores das duas etiquetas ausentes.');
   const measured=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,vw:window.innerWidth}));
