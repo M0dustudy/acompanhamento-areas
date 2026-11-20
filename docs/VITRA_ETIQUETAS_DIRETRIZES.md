@@ -200,6 +200,14 @@ Esta revisão utiliza a foto real enviada no chat (etiqueta branca da caixa e et
 - Etiqueta laranja: EAN `7898366001754`, variedade Vitória e data de embalagem impressa `19/11/2026` (conforme foto). No catálogo DOC.CQ.056, o EAN se associa a **Doce Mel e Trielo**. O EAN isolado **não distingue os dois clientes**; a ordem de produção deve confirmar o cliente.
 - A foto apresenta dois códigos de rastreabilidade visualmente diferentes, portanto não se deve aprovar automaticamente a associação como "mesmo embalamento" sem leitura confiável de ambos, comparação com a ordem e conferência física.
 
+### Cobertura real da base de referência (auditoria de 20/11/2026)
+
+A consulta direta ao banco VITRA identificou **196 vínculos EAN/cliente**, correspondentes a **163 EANs diferentes** e **17 clientes**; **18 EANs** aparecem vinculados a mais de um cliente. Esses casos exigem evidência adicional da marca/ordem para não inferir um cliente pelo EAN compartilhado.
+
+A tabela institucional contém **49 entidades**, com endereço cadastrado para todas. Porém **37** não possuem CNPJ cadastrado, **24** não possuem GGN, **47** não possuem coordenadas e **49** não possuem GLN. IE, e-mail e site também não integram os campos homologados dessa tabela. **Uma fotografia mais nítida não corrige a ausência da referência:** quando a etiqueta mostrar algum desses dados e a base não permitir a conferência, o VITRA deve exibir o valor lido e manter o item pendente, nunca verde.
+
+Os totais descrevem o cadastro existente nessa consulta, não significam defeito nas etiquetas e podem mudar com inclusão futura de referências oficiais. Não preencher os campos ausentes por pesquisa genérica na internet nem por aproximação; cada correção exige manual, documento oficial ou autorização específica.
+
 ### Estados e encerramento
 
 - **Verde:** valor realmente extraído da fotografia e comparado, com sucesso, à referência aprovada e identificada; ou correspondência entre dois valores lidos independentemente quando isso bastar para a verificação específica.
