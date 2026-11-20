@@ -45,7 +45,7 @@ try{
   const measured=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,vw:window.innerWidth}));
   if(measured.sw>measured.vw+18)throw Error('Largura horizontal excede a tela: '+JSON.stringify(measured));
   if(errors.length)throw Error('JavaScript falhou no navegador: '+errors.join('; '));
-  console.log('Interface de etiquetas conferida em '+width+'px; par de rastreabilidades visível; itens críticos: '+errorsLabel+'.');
+  console.log('Interface de etiquetas conferida em '+width+'px; par de rastreabilidades visível; divergências detectadas: '+evidence.errors+'.');
   await page.close();
  }
 }finally{await browser.close();}
