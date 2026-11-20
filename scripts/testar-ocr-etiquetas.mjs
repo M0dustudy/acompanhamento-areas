@@ -71,9 +71,10 @@ const registry=t.registryAudit();
 assert.equal(registry.producer?.name,"FAZENDA TESTE");
 assert(registry.rows.some(x=>x.type==="ok"&&x.title==="CNPJ do produtor"));
 assert(registry.rows.some(x=>x.type==="ok"&&x.title==="GGN do produtor"));
-// Regressão da interface solicitada: rastreabilidade sem campo de digitação, parecer centralizado.
+// Regressão da interface atual: um único campo para a ordem, composição detalhada opcional.
 assert(!source.includes('id="vl2-trace-full"'));
-assert(!source.includes('class="vl2-trace-manual"'));
+assert(source.includes('data-vl2-trace="raw"'));
+assert(source.includes('class="vl2-trace-manual"'));
 assert(source.includes('class="vl2-trace-grid"'));
 assert(source.includes("vl2-concise-result"));
 assert(source.includes('readPass(canvas,12000)'));
