@@ -173,6 +173,10 @@ function extract(raw,barcode){
  };
  const ggnProdutor=numberAfter(producedSection,"GGN"),ggnComercial=numberAfter(companySection,"GGN");
  const glnProdutor=numberAfter(producedSection,"GLN"),glnComercial=numberAfter(companySection,"GLN");
+ const emailOf=part=>str(part).match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i)?.[0]||"";
+ const siteOf=part=>str(part).match(/\b(?:https?:\/\/|www\.)[A-Z0-9.-]+\.[A-Z]{2,}(?:\/[^\s]*)?/i)?.[0]||"";
+ const ieOf=part=>digits(str(part).match(/\b(?:I\.?\s*E\.?|INSCRI[CÇ][AÃ]O\s+ESTADUAL)\s*[:#-]?\s*([0-9.\/-]{5,20})/i)?.[1]||"");
+ const cepOf=part=>digits(str(part).match(/\bCEP\s*[:#-]?\s*(\d{5}[-\s]?\d{3})/i)?.[1]||"");
  const cnpj=producerCnpj||(candidates.length===1&&!companySection?candidates[0]:"");
  const ggn=str(raw).match(/\b(?:GGN|GLOBALGAP|GLOBAL\s*G\.?A\.?P\.?)\s*[:#-]?\s*([0-9][0-9 \t-]{10,20})/i)?.[1]||"";
  const ggnNumber=digits(ggn);
@@ -182,7 +186,7 @@ function extract(raw,barcode){
  const boxModel=classCode?{market:classCode[1],color:classCode[2],weight:classCode[3],variety:classCode[4],package:classCode[5],code:classCode[0]}:null;
  return {
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
-  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||(!companySection?ggnNumber:""),ggnComercial,gln:glnProdutor,glnComercial,produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
+  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||(!companySection?ggnNumber:""),ggnComercial,gln:glnProdutor,glnComercial,ieProdutor:ieOf(producedSection),ieComercial:ieOf(companySection),emailProdutor:emailOf(producedSection),emailComercial:emailOf(companySection),siteProdutor:siteOf(producedSection),siteComercial:siteOf(companySection),cepProdutor:cepOf(producedSection),cepComercial:cepOf(companySection),produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
   producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high",varietySource
  };
@@ -272,6 +276,17 @@ function registryAudit(){
   if(!f.cnpjComercial&&/\bCNPJ\b/i.test(marketed))add("confirmar","CNPJ do comerciante","O CNPJ está na etiqueta, mas não foi lido integralmente.",ref(merchant));
   if(f.ggnComercial&&merchant.ggn)compare("ggnComercial","GGN comercial",f.ggnComercial,merchant.ggn,merchant);
   else if(f.ggnComercial)add("confirmar","GGN comercial","Número impresso, mas o cadastro consultado não contém GGN comercial para conferir.",ref(merchant));
+ }
+ // Campos impressos sem referência específica não recebem aprovação automática.
+ for(const [label,field] of [
+  ["Inscrição estadual do produtor","ieProdutor"],
+  ["Inscrição estadual do comercializador","ieComercial"],
+  ["E-mail do produtor","emailProdutor"],
+  ["E-mail comercial","emailComercial"],
+  ["Site do produtor","siteProdutor"],
+  ["Site comercial","siteComercial"]
+ ]){
+  if(f[field])add("confirmar",label,"Lido na etiqueta: "+f[field]+". A base documental disponível não possui campo homologado para confirmar essa informação.");
  }
  const compareGLN=(name,read,entity)=>{
   if(!read)return;
@@ -809,7 +824,7 @@ function ocrConflictKeys(passages){
  return Object.entries(values).filter(([key,list])=>list.length>1).map(([key])=>key);
 }
 function supplementExtractedFields(data,passages,barcode){
- const fields=["rastreio","cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial","lote"];
+ const fields=["rastreio","cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial","lote","ieProdutor","ieComercial","emailProdutor","emailComercial","siteProdutor","siteComercial","cepProdutor","cepComercial"];
  const candidates=passages.map(text=>extract(text,barcode).fields);
  for(const key of fields){
   const readings=distinct(candidates.map(x=>x[key]).filter(Boolean));
@@ -1035,11 +1050,15 @@ function detailsView(){
  if(category()==="box"){
   facts+=fact("Peso da caixa",f.peso,src.peso)+fact("Lote",f.lote,src.lote)+
     fact("Produtor",state.referenceProducer?.name||f.produtor,state.referenceProducer?"Identificação na base privada":"Foto / referência")+
-    fact("Endereço do produtor",state.referenceProducer?.address||"","DOC.CQ.056, conforme cadastro")+
+    fact("Endereço cadastrado · produtor",state.referenceProducer?.address||"","Referência; não substitui a foto")+
     fact("CNPJ do produtor",f.cnpj,src.cnpj)+fact("GGN",f.ggn,src.ggn)+
     fact("Comercializado por",state.referenceMerchant?.name||f.comercializado,src.comercializado)+
-    fact("Endereço comercial",state.referenceMerchant?.address||"","DOC.CQ.056, conforme cadastro")+
+    fact("Endereço cadastrado · comercialização",state.referenceMerchant?.address||"","Referência; não substitui a foto")+
     fact("CNPJ comercial",f.cnpjComercial,src.cnpjComercial)+
+    fact("CEP do produtor",f.cepProdutor,"Foto")+fact("CEP comercial",f.cepComercial,"Foto")+
+    fact("Inscrição estadual do produtor",f.ieProdutor,"Foto")+fact("Inscrição estadual comercial",f.ieComercial,"Foto")+
+    fact("E-mail comercial",f.emailComercial,"Foto")+fact("E-mail do produtor",f.emailProdutor,"Foto")+
+    fact("Site comercial",f.siteComercial,"Foto")+fact("Site do produtor",f.siteProdutor,"Foto")+
     fact("Data de embalagem",f.data,src.data)+fact("Código de barras",f.barcode,src.barcode);
  }else if(category()==="unit"){
   facts+=fact("Peso da unidade",f.peso,src.peso)+fact("Código de barras",f.barcode,src.barcode)+
