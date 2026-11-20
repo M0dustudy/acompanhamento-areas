@@ -1257,10 +1257,10 @@ function diagnosticV4(){
   if(f.ggnComercial&&digits(f.ggnComercial).length!==13)add(state.ocrConflicts.includes("ggnComercial")?"pending":"error","GGN do comerciante","Lidos "+digits(f.ggnComercial).length+" dígitos no campo comercial; confira os 13 dígitos.");
   if(/\bGLN\b/i.test(state.text)&&!f.gln&&!f.glnComercial)add("pending","GLN ilegível","Há indicação de GLN na etiqueta, mas os dígitos não foram reconhecidos com segurança.");
  }
- for(const code of (state.codeEvidence||[]).filter(x=>/qr|data.matrix/.test(x.format)||/^https?:\/\//i.test(x.value))){
+ for(const code of (state.codeEvidence||[]).filter(x=>/qr|data.matrix|code.128|pdf.?417/.test(x.format)||/^https?:\/\//i.test(x.value))){
   const traces=ocrTraceCandidates(code.value),observed=state.fields?.rastreio||"";
   if(traces.length&&observed)add(traces.includes(observed)?"ok":"error","QR Code × rastreabilidade","QR: "+traces.join(" / ")+" · etiqueta: "+observed+".");
-  else add("pending","Código 2D reconhecido","Conteúdo: "+code.value.slice(0,140)+". A leitura do código não substitui a conferência documental.");
+  else add("pending","Código codificado reconhecido","Formato: "+code.format+" · conteúdo: "+code.value.slice(0,140)+". Sem regra ou referência independente, a decodificação não comprova conformidade.");
  }
  if(distinct((state.codeEvidence||[]).map(x=>x.ean)).length>1)
   add("pending","Múltiplos EAN na foto","Foram decodificados EANs diferentes. Identifique cada etiqueta antes de aprovar.");
