@@ -15,9 +15,20 @@ const context={
  createImageBitmap:async()=>({width:1600,height:1000,close(){}}),
  setTimeout,clearTimeout
 };
-const testHook='ctx={canAccess:()=>true};window.__test={ocrTraceCandidates,ocrConflictKeys,mergeOCRPassages,shouldScanOCRBands,canonicalCoordinates,extract,supplementExtractedFields,registryAudit,diagnosticV4,readPhoto,state};'+marker;
+const testHook='ctx={canAccess:()=>true};window.__test={ocrTraceCandidates,ocrConflictKeys,mergeOCRPassages,shouldScanOCRBands,canonicalCoordinates,extract,supplementExtractedFields,registryAudit,diagnosticV4,interpretPairedText,readPhoto,state};'+marker;
 new Script(source.replace(marker,testHook)).runInNewContext(context);
 const t=context.window.__test,trace="R-26-109A5-1611-5-SR",other="R-27-109A5-1611-5-SR";
+const pair=t.interpretPairedText("BRS VITÓRIA\nMEI-PA50VI20\nCOMERCIALIZADO POR EXPOFRUT\nPRODUZIDO POR NOVO RUMO\nR-26-0106B-2110-C-VI",
+"UVA BRS VITÓRIA\nEmb 19/11/2026\nR-26-0106B-2110-5-VI\n7898366001754","7898366001754");
+assert.equal(pair?.detected,true,"O par físico deve gerar duas leituras sem mesclar dados.");
+assert.equal(pair.box.model,"MEI-PA50VI20");
+assert.equal(pair.unit.ean,"7898366001754");
+assert.equal(pair.box.trace,"R-26-0106B-2110-C-VI");
+assert.equal(pair.unit.trace,"R-26-0106B-2110-5-VI");
+t.state.pairedEvidence={detected:true,box:pair.box,unit:{...pair.unit,trace:"R-28-000V4-1411-5-VI"}};t.state.scanCompleted=true;t.state.photo={};t.state.identity.kind="caixa";t.state.fields={rastreio:pair.box.trace};t.state.clientConfirmed=false;
+assert(t.diagnosticV4().checks.some(x=>x.title==="Caixa × cumbuca · rastreabilidade"&&x.status==="error"),"Rastreabilidades divergentes do par devem impedir aprovação.");
+t.state.pairedEvidence=null;t.state.photo=null;t.state.scanCompleted=false;
+
 assert.equal(t.ocrTraceCandidates("RASTREABILIDADE "+trace)[0],trace);
 assert.equal(t.ocrTraceCandidates("R 26 -109A5 - 1611 - 5 - SR").length,1);
 assert(t.ocrConflictKeys(["LOTE "+trace,"LOTE "+other]).includes("rastreio"));
@@ -60,17 +71,35 @@ const registry=t.registryAudit();
 assert.equal(registry.producer?.name,"FAZENDA TESTE");
 assert(registry.rows.some(x=>x.type==="ok"&&x.title==="CNPJ do produtor"));
 assert(registry.rows.some(x=>x.type==="ok"&&x.title==="GGN do produtor"));
-// Regressão da interface solicitada: rastreabilidade sem campo de digitação, parecer centralizado.
+// Regressão da interface atual: um único campo para a ordem, composição detalhada opcional.
 assert(!source.includes('id="vl2-trace-full"'));
-assert(!source.includes('class="vl2-trace-manual"'));
+assert(source.includes('data-vl2-trace="raw"'));
+assert(source.includes('class="vl2-trace-manual"'));
 assert(source.includes('class="vl2-trace-grid"'));
 assert(source.includes("vl2-concise-result"));
 assert(source.includes('readPass(canvas,12000)'));
-assert(source.includes('await limitWork(run(),33000'));
+assert(source.includes('await limitWork(run(),state.pairRequested?56000:45000'));
+assert(source.includes('function interpretPairedText('));
+assert(source.includes('"qr_code"'));
+assert(source.includes('vl2-capture-full'));
+assert(source.includes('Caixa × cumbuca · rastreabilidade'));
+assert(source.includes('state.pairedEvidence'));
 assert.equal(t.extract("UVA VITORIA\nR-26-109A5-1611-5-VI","7898366001754").identity.variety,"vitoria");
 assert.equal(t.extract("MEI-V50VI10","").identity.kind,"sacola");
 assert.equal(t.extract("MEI-V50VI20","").identity.variety,"vitoria");
 assert.equal(t.extract("VITORIA\n7898366001754","7898366001754").identity.kind,"cumbuca");
+assert(source.includes("EAN compartilhado autorizado"),"Não criar erro automático por EAN compartilhado.");
+const shared=t.extract("UVA VITORIA\n7898366001754","7898366001754");
+assert.equal(shared.codeClients.length,2);
+for (const client of ["docemel","trielo"]) {
+ t.state.photo={};t.state.scanCompleted=true;t.state.clientConfirmed=true;
+ t.state.identity={client,kind:"cumbuca500",variety:"vitoria",klass:""};
+ t.state.fields={barcode:"7898366001754",rastreio:"R-26-109A5-1611-5-VI"};
+ t.state.detected={identity:{kind:"cumbuca500",variety:"vitoria"},wordClients:[],kindConfidence:"high"};
+ const diagnosis=t.diagnosticV4();
+ assert(diagnosis.checks.some(x=>x.title==="EAN compartilhado autorizado"&&x.status==="ok"),"EAN compartilhado autorizado para "+client);
+ assert(!diagnosis.checks.some(x=>x.title==="EAN incompatível com o cliente"&&x.status==="error"),"EAN compartilhado não é erro.");
+}
 
 // Simulações não fotográficas do fluxo de alto volume:
 // uma passagem no caso completo; somente uma passagem complementar no caso incompleto.

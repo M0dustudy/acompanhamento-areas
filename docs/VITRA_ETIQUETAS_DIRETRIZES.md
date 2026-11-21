@@ -175,3 +175,51 @@ Validar com etiquetas reais de caixa e cumbuca, múltiplos produtores, variantes
 - A integridade das avaliações históricas é checada pelo fluxo automático no GitHub.
 - Testes não fotográficos exercitam identificação de variedade, reconhecimento de modelos, formulário e uma passagem OCR quando a leitura simulada está completa, com segunda passagem seletiva quando não está.
 - **Não declarar taxa de acerto nem tempo real por etiqueta sem ensaio com fotos e celulares da operação.** O resultado verdadeiro só pode ser confirmado com exemplos reais de todas as famílias e tamanhos de etiqueta. Em caso de dúvida, apresentar pendência e preservar a foto.
+
+
+## Auditoria crítica de rótulos em par — 20/11/2026
+
+### Fonte e limite da revisão
+
+Esta revisão utiliza a foto real enviada no chat (etiqueta branca da caixa e etiqueta laranja da cumbuca), os códigos e modelos **já documentados** nas diretrizes do DOC.CQ.056 e as referências privadas atualmente disponíveis no VITRA. O PDF integral do manual está armazenado de forma privada, com acesso restrito ao administrador; **não presumir que cada página/modelo foi reinspecionado diretamente nesta revisão**. Uma foto pode não conter resolução suficiente para ler todos os caracteres, mesmo com realce.
+
+### Leitura de duas etiquetas em uma única foto
+
+- Não misturar as informações institucionais da etiqueta de caixa com o EAN da cumbuca. Em fotos horizontais, tentar duas regiões parcialmente sobrepostas; em fotos verticais, tentar regiões superior e inferior. Manter a fotografia original e disponibilizar recorte opcional em caso de ambiguidade.
+- Comparar separadamente os dois códigos de rastreabilidade. Conferir ano, área/válvula, data codificada e sigla de variedade em ambos. A modalidade `C`, `5` ou `8` pode indicar embalagens diferentes, portanto exige regra específica antes de sinalizar divergência por esse elemento isolado.
+- Conferir variedade por texto, código do modelo, sigla da rastreabilidade e, quando houver, catálogo EAN. Duas etiquetas da mesma embalagem física podem possuir textos distintos; a semelhança de cor ou proximidade na imagem **não comprova** que pertencem ao mesmo lote.
+- EAN e QR Code devem ser decodificados diretamente da imagem. Para EAN-13, confirmar o dígito verificador e diferenciar as barras decodificadas dos 13 números impressos abaixo. Não copiar uma leitura para fingir que a outra foi comprovada. QR ou Data Matrix podem conter dados diferentes de EAN; sem esquema/documentação, exibir o conteúdo como pendente, nunca inventar significado.
+- Em etiquetas de caixa, confrontar classe, peso, código de mercado, cor, variedade e modalidade, produtor e comercializador como entidades distintas. Conferir CNPJ, GGN, GLN, CEP, endereço completo e coordenadas quando impressos e houver referência independente. IE, e-mail e site **só podem aparecer em verde** se estiverem na base de referência aprovada; na falta dela, exibir a leitura e sinalizar pendência.
+- Em etiquetas arredondadas ou selos/bolinhas da ARRA, modelos novos e formatos desconhecidos, não homologar automaticamente com regras de caixa ou cumbuca. Exigir evidências reais e revisão humana para criar um padrão.
+
+### Referências documentadas do exemplo fornecido
+
+- `MEI-PA50VI20`: `MEI` = mercado interno; `PA` = caixa parda; `50` = caixa de 5 kg; `VI` = variedade Vitória; `20` = modalidade de cumbuca 500 g, conforme glossário já documentado.
+- Classe de caixa impressa: **Extra**; variedade: **BRS Vitória**; peso impresso: **5,00 kg**. Classe Extra é distinta de Extra A; não normalizar uma na outra.
+- Etiqueta da caixa: comercializadora Expofrut Brasil Importadora e Exportadora LTDA, CNPJ registrado `04420687000256`; produtora Fazenda Novo Rumo Agricola LTDA, CNPJ registrado `03438392000163`. Estas referências existem na base privada, com endereço e coordenadas documentados no DOC.CQ.056, p. 38. Para a Fazenda Novo Rumo, GGN cadastrado `4069453004221`. Esses identificadores precisam ser **lidos na foto** e comparados à base; valores da base não podem substituir OCR ausente.
+- Etiqueta laranja: EAN `7898366001754`, variedade Vitória e data de embalagem impressa `19/11/2026` (conforme foto). No catálogo DOC.CQ.056, o EAN se associa a **Doce Mel e Trielo**. O EAN isolado **não distingue os dois clientes**; a ordem de produção deve confirmar o cliente.
+- A foto apresenta dois códigos de rastreabilidade visualmente diferentes, portanto não se deve aprovar automaticamente a associação como "mesmo embalamento" sem leitura confiável de ambos, comparação com a ordem e conferência física.
+
+### Cobertura real da base de referência (auditoria de 20/11/2026)
+
+A consulta direta ao banco VITRA identificou **196 vínculos EAN/cliente**, correspondentes a **163 EANs diferentes** e **17 clientes**; **18 EANs** aparecem vinculados a mais de um cliente. Esses casos exigem evidência adicional da marca/ordem para não inferir um cliente pelo EAN compartilhado.
+
+A tabela institucional contém **49 entidades**, com endereço cadastrado para todas. Porém **37** não possuem CNPJ cadastrado, **24** não possuem GGN, **47** não possuem coordenadas e **49** não possuem GLN. IE, e-mail e site também não integram os campos homologados dessa tabela. **Uma fotografia mais nítida não corrige a ausência da referência:** quando a etiqueta mostrar algum desses dados e a base não permitir a conferência, o VITRA deve exibir o valor lido e manter o item pendente, nunca verde.
+
+Os totais descrevem o cadastro existente nessa consulta, não significam defeito nas etiquetas e podem mudar com inclusão futura de referências oficiais. Não preencher os campos ausentes por pesquisa genérica na internet nem por aproximação; cada correção exige manual, documento oficial ou autorização específica.
+
+### Estados e encerramento
+
+- **Verde:** valor realmente extraído da fotografia e comparado, com sucesso, à referência aprovada e identificada; ou correspondência entre dois valores lidos independentemente quando isso bastar para a verificação específica.
+- **Vermelho:** divergência comprovada entre valores lidos com segurança, ou código incompatível com o cadastro aprovado. Exibir o valor observado, o esperado e a origem.
+- **Pendente:** baixa nitidez, caracteres ambíguos, QR sem esquema, ausência de referência confiável, campo não extraído ou modelo não reconhecido. Não trocar pendência por aprovação.
+- Não prometer 100% de precisão com qualquer câmera e qualquer fotografia; os ensaios com aparelhos móveis, etiquetas pequenas, reflexo e impressão desgastada continuam indispensáveis.
+- O histórico e os registros de campo, estoque, recepção e titulação permanecem intocados pela revisão do módulo de etiquetas.
+
+## EAN compartilhado e datas reais de colheita — regra confirmada em 20/11/2026
+
+- Um EAN-13 pode ter **vários clientes autorizados**: o compartilhamento não é erro. Exemplo documentado no DOC.CQ.056: `7898366001754` para Doce Mel e Trielo. Exibir todos os clientes vinculados, preservar os dois no cadastro e comparar o destinatário **independentemente** informado pela ordem de produção.
+- Usar marca impressa, modelo e demais evidências fotográficas para distinguir clientes quando existirem; uma marca comprovadamente diferente do cliente da ordem é erro, mas o compartilhamento do EAN não é. Se a marca não estiver legível ou não constar na etiqueta, não inventar identificação a partir do número.
+- Em Áreas finalizadas, exibir previsão original e data **documentada** de conclusão, sem confundí-la com a data em que o operador informou o status. Se o dia não foi comprovado, marcar **Data não informada**. Encerramento sem colheita integral deve ser identificado separadamente, com sua data confirmada.
+
+- Distinção documental adicional: quando a fonte informa apenas que a **área** foi finalizada, a data é apresentada como **finalização registrada da área**, nunca como conclusão comprovada da colheita. Exemplo: 108B em 06/10/2026. Essa data não serve para calcular atraso de conclusão da colheita sem confirmação específica.

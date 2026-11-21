@@ -2,6 +2,21 @@
 
 Dashboard de acompanhamento das áreas de uva e controle de qualidade.
 
+## Regra crítica máxima — ciclo obrigatório de PDFs e auditoria real de visualização e download (20/11/2026)
+
+**Prioridade máxima, ao lado da preservação dos dados:** nenhum envio de PDFs ou cadastro de relatórios do VITRA pode ser declarado concluído apenas porque os arquivos existem no GitHub ou porque os links respondem a um teste HTTP. **É obrigatório verificar a associação à avaliação correta, a visualização online e o download.** Aplicar a todos os relatórios documentais, principalmente acompanhamento diário de campo e estoque em câmara fria, incluindo o histórico.
+
+**Sequência obrigatória, sem pular etapas:**
+
+1. **Recebimento pelo chat:** contar os documentos enviados, confirmar ao usuário a quantidade exata, registrar nomes/identificadores e analisar cada original individualmente. Receber no chat **não** significa que o GitHub já recebeu os PDFs.
+2. **Envio ao GitHub pelo usuário:** após o usuário avisar que concluiu o envio pelo GitHub Desktop/Git, verificar diretamente o repositório oficial na branch `main`, os nomes reais, quantidades, tamanhos e, quando disponíveis, as assinaturas SHA dos arquivos. Não presumir que um commit local foi publicado; não duplicar arquivos que já existam.
+3. **Cadastro e vínculo:** conferir duplicidades antes de alterar dados; cadastrar somente os relatórios novos, preservar todos os registros anteriores e relacionar cada avaliação ao seu PDF exato. Para estoque, respeitar documento, área/produtor, data da avaliação, lote, pallet, classificação e caixas. Para campo, respeitar área, prazo de 21/14/07 dias e reavaliações. Nunca reaproveitar medições ou atribuir links inventados.
+4. **Auditoria de todos os documentos, não apenas dos recém-chegados:** comparar cada registro com o arquivo hospedado, testar o endereço real usado pelo botão **Visualizar online**, verificar resposta HTTP e assinatura de conteúdo PDF por requisição **GET** (não só `HEAD`) e conferir que o botão **Baixar PDF** aponta para o arquivo correspondente. Executar teste real em navegador da renderização de PDFs de amostragem representativa, incluindo campo, estoque, histórico e um arquivo grande; conferir também o download no navegador. Priorizar validação em computador e celular quando houver recursos para isso. Testes de rota, GET e amostragem de navegador **não autorizam afirmar que todos os 100% dos PDFs foram renderizados e baixados individualmente**; distinguir exatamente o alcance de cada teste.
+5. **Correção obrigatória de falhas:** PDF que não abre, download que falha, arquivo ausente, link errado ou registro duplicado é pendência crítica. Corrigir sem apagar originais, repetir a auditoria e identificar nominalmente qualquer exceção que não possa ser sanada.
+6. **Encerramento verificável:** conferir totais anteriores e posteriores, histórico preservado, commit na `main`, verificação automática aprovada e implantação do GitHub Pages concluída. Só confirmar visualização ou download como funcionais quando o teste correspondente tiver sido executado e aprovado. Informar explicitamente qualquer validação ainda pendente.
+
+**Esta regra se aplica a cada atualização futura, mesmo quando o usuário pedir apenas para cadastrar relatórios; não depender de solicitação adicional de auditoria.** Uma auditoria com falha não é conclusão bem-sucedida.
+
 ## Regra permanente — cadastro, organização e vínculo de todos os relatórios
 
 **Diretriz geral do VITRA (13/11/2026):** sempre manter os relatórios recebidos e os arquivos hospedados no GitHub **organizados, conferidos, cadastrados e vinculados às respectivas avaliações**, em todos os módulos: acompanhamento de áreas, colheita, recepção, titulação e estoque em câmara fria. Uma atualização não está concluída somente porque o PDF foi enviado ao repositório.

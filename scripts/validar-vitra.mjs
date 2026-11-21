@@ -64,7 +64,20 @@ try {
   unique(groupCodes, 'Área em mais de uma situação');
   for (const code of Object.keys(areas)) {
     assert(groupCodes.includes(code), 'Área cadastrada sem situação: ' + code);
+    const area = areas[code];
+    for (const field of ['originalHarvestDate','finalizedDate','harvestClosureDate','areaFinalizationDate']) {
+      if (area[field] === undefined) continue;
+      const m = String(area[field]).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      const dt = m ? new Date(+m[3],+m[2]-1,+m[1]) : null;
+      assert(Boolean(dt && dt.getFullYear()===+m[3] && dt.getMonth()===+m[2]-1 && dt.getDate()===+m[1]),
+        'Data histórica inválida: '+code+' · '+field);
+    }
+    if (area.finalizedDate || area.harvestClosureDate || area.areaFinalizationDate)
+      assert(groups.fim.includes(code), 'Data real em área não finalizada: '+code);
+    if (area.harvestClosureKind==='sem_colheita_integral')
+      assert(Boolean(area.harvestClosureDate) && !area.finalizedDate, 'Encerramento parcial tratado como finalização integral: '+code);
   }
+  assert(html.includes('area-harvest-history'), 'Cartão finalizado sem histórico de colheita');
 
   const recepcoes = [];
   const fieldRefs = new Set();
@@ -85,6 +98,22 @@ try {
     assert(Array.isArray(item.rows) && item.rows.length > 0,
       'Titulação sem medições originais: ' + key);
   }
+
+  const amostra208A=titulacoes['208A|21/11'];
+  assert(Boolean(amostra208A) && amostra208A.tipoAmostragem==='ruas_em_colheita',
+    'Titulação da 208A em 21/11 deve preservar amostragem das ruas em colheita');
+  assert(amostra208A.rows.length===5 && amostra208A.rows[0][0]==='1 a 5',
+    'As cinco ruas da imagem devem ser preservadas');
+  assert(amostra208A.rows.every(row=>row[1]==='Verde'),
+    'A condição da fruta no arquivo original precisa ser mantida nos dados');
+  assert(amostra208A.observacaoRisco==='A área apresenta grande quantidade de cachos translúcidos.',
+    'Falta a observação de cachos translúcidos');
+  assert((areas['208A']?.t||[]).filter(row=>row[0]==='21/11').length===1,
+    'Titulação duplicada ou ausente para 208A em 21/11');
+  assert(areas['208A'].t.find(row=>row[0]==='21/11')[1].includes('Ruas em colheita: Brix 13,80 · Acidez 0,422 · Ratio 33,20'),
+    'Médias da titulação representativa incorretas');
+  assert(areas['208A'].t.find(row=>row[0]==='21/11')[1].includes('cachos translúcidos'),
+    'Observação precisa constar no resumo da titulação');
 
   assert(Array.isArray(estoque), 'Estoque precisa ser uma lista');
   unique(estoque.map(x => String(x.id)), 'Identificador de estoque');

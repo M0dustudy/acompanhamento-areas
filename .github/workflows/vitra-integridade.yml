@@ -11,7 +11,7 @@ jobs:
   validar:
     name: Conferir avaliações e documentos
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -31,3 +31,9 @@ jobs:
         run: node scripts/testar-ocr-etiquetas.mjs
       - name: Conferir disponibilidade online dos PDFs no GitHub Raw
         run: node scripts/verificar-pdfs-publicados.mjs
+      - name: Instalar ferramenta de teste de navegador
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright-core@1.56.1
+      - name: Testar renderização e download real em navegador
+        run: node scripts/testar-pdfs-navegador.mjs
+      - name: Testar layout de etiquetas em computador e celular
+        run: node scripts/testar-etiquetas-navegador.mjs
