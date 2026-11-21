@@ -99,6 +99,22 @@ try {
       'Titulação sem medições originais: ' + key);
   }
 
+  const amostra208A=titulacoes['208A|21/11'];
+  assert(Boolean(amostra208A) && amostra208A.tipoAmostragem==='ruas_em_colheita',
+    'Titulação da 208A em 21/11 deve preservar amostragem das ruas em colheita');
+  assert(amostra208A.rows.length===5 && amostra208A.rows[0][0]==='1 a 5',
+    'As cinco ruas da imagem devem ser preservadas');
+  assert(amostra208A.rows.every(row=>row[1]==='Verde'),
+    'A condição da fruta no arquivo original precisa ser mantida nos dados');
+  assert(amostra208A.observacaoRisco==='A área apresenta grande quantidade de cachos translúcidos.',
+    'Falta a observação de cachos translúcidos');
+  assert((areas['208A']?.t||[]).filter(row=>row[0]==='21/11').length===1,
+    'Titulação duplicada ou ausente para 208A em 21/11');
+  assert(areas['208A'].t.find(row=>row[0]==='21/11')[1].includes('Ruas em colheita: Brix 13,80 · Acidez 0,422 · Ratio 33,20'),
+    'Médias da titulação representativa incorretas');
+  assert(areas['208A'].t.find(row=>row[0]==='21/11')[1].includes('cachos translúcidos'),
+    'Observação precisa constar no resumo da titulação');
+
   assert(Array.isArray(estoque), 'Estoque precisa ser uma lista');
   unique(estoque.map(x => String(x.id)), 'Identificador de estoque');
   unique(estoque.map(x => String(x.file)), 'PDF de estoque');
