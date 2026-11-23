@@ -780,25 +780,85 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}body{min-width:0!important
 .tit-issue-note span{font-size:12px;font-weight:600;overflow-wrap:anywhere}
 </style>
 <style id="vitra-datas-colheita-20261123">
-/* As datas são eventos distintos: nunca condensar previsão e início, mesmo se coincidirem. */
-.premium-area-card .area-identity.is-harvesting{align-items:stretch}
-.premium-area-card .area-identity.is-harvesting .area-identity-text{min-width:0}
-.premium-area-card .area-harvest-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;width:100%;min-width:0;margin-top:12px}
-.premium-area-card .area-harvest-date{display:flex;flex-direction:column;gap:5px;min-width:0;padding:11px 12px;border:1px solid #dce7df;border-radius:12px;background:#f7faf8}
-.premium-area-card .area-harvest-date.is-start{background:#edf7f0;border-color:#cbe3d3}
-.premium-area-card .area-harvest-date .area-harvest-label{display:block;font-size:11px;line-height:1.35;font-weight:650;color:#597265;overflow-wrap:break-word}
-.premium-area-card .area-harvest-date .area-harvest-value{display:block;font-size:15px;line-height:1.25;font-weight:800;letter-spacing:-.015em;font-variant-numeric:tabular-nums;color:#184934;overflow-wrap:anywhere}
-.premium-area-card .area-harvest-date.is-start .area-harvest-value{color:#0d603d}
-.premium-area-card .area-harvest-date .area-harvest-value.is-unconfirmed{font-size:12px;font-weight:600;letter-spacing:0;color:#758178}
-@media(min-width:1051px){.premium-area-card .area-harvest-dates{grid-template-columns:1fr}.premium-area-card .area-harvest-date{padding:10px 11px}}
-@media(max-width:1050px){
- .premium-area-card .area-identity.is-harvesting{display:grid;grid-template-columns:100px minmax(0,1fr);gap:12px;align-items:center}
- .premium-area-card .area-identity.is-harvesting>.area-photo{grid-column:1;grid-row:1}
- .premium-area-card .area-identity.is-harvesting>.area-identity-text{grid-column:2;grid-row:1}
- .premium-area-card .area-identity.is-harvesting>.area-harvest-dates{grid-column:1/-1;grid-row:2;margin-top:2px}
+/* Cartões responsivos: nenhuma foto pode ultrapassar sua própria coluna. */
+#panel .premium-area-card .area-identity{min-width:0;box-sizing:border-box}
+#panel .premium-area-card .area-identity-text{min-width:0;max-width:100%;width:100%;align-items:flex-start}
+#panel .premium-area-card .area-code{max-width:100%;white-space:nowrap;line-height:1.15}
+#panel .premium-area-card .area-variety{max-width:100%;min-width:0;white-space:normal;word-break:normal;overflow-wrap:normal;hyphens:none;line-height:1.35}
+#panel .premium-area-card .area-state{max-width:100%;line-height:1.35;overflow-wrap:normal;word-break:normal}
+#panel .premium-area-card .area-harvest-dates{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;min-width:0;margin-top:12px}
+#panel .premium-area-card .area-harvest-date{display:flex;flex-direction:column;gap:5px;min-width:0;padding:11px 12px;border:1px solid #dce7df;border-radius:12px;background:#f7faf8}
+#panel .premium-area-card .area-harvest-date.is-start{background:#edf7f0;border-color:#cbe3d3}
+#panel .premium-area-card .area-harvest-date.is-combined{grid-column:1/-1}
+#panel .premium-area-card .area-harvest-label{display:block;font-size:11px;line-height:1.4;font-weight:650;color:#597265;white-space:normal;word-break:normal}
+#panel .premium-area-card .area-harvest-value{display:block;font-size:clamp(13px,1.4vw,15px);line-height:1.3;font-weight:800;font-variant-numeric:tabular-nums;color:#184934;white-space:nowrap;letter-spacing:-.015em}
+#panel .premium-area-card .area-harvest-date.is-start .area-harvest-value,
+#panel .premium-area-card .area-harvest-date.is-combined .area-harvest-value{color:#0d603d}
+#panel .premium-area-card .area-harvest-value.is-unconfirmed{font-size:12px;font-weight:600;color:#758178;white-space:normal}
+
+/* Legenda de Brix: cada amostra mantém ícone e texto dentro do seu item. */
+#panel .brix-legend{box-sizing:border-box;width:100%;max-width:100%;padding:13px 14px;overflow:hidden}
+#panel .brix-legend .brix-legend-items{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px;row-gap:10px;align-items:start;font-size:12px;line-height:1.45}
+#panel .brix-legend .brix-legend-items>span{display:flex!important;align-items:flex-start!important;gap:8px!important;min-width:0;max-width:100%;white-space:normal;word-break:normal;overflow-wrap:break-word}
+#panel .brix-legend .brix-legend-items>span>.brix-dot{width:13px;height:13px;flex:0 0 13px;margin-top:2px}
+#panel .brix-legend .brix-legend-items>.vitra-delay-legend{grid-column:1/-1;display:flex!important;border-top:1px solid #e2eae4;padding-top:9px}
+#panel .brix-legend .brix-legend-items>.vitra-delay-legend>.vitra-delay-dot{flex:0 0 8px;margin:4px 3px 0}
+
+/* Desktop: informações da área em coluna, histórico em largura plena. */
+@media(min-width:1051px){
+ #panel .premium-area-card .area-identity{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+ #panel .premium-area-card .area-identity>.area-photo.variety-photo{width:100%!important;max-width:100%!important;flex:none!important}
+ #panel .premium-area-card .area-harvest-dates{grid-template-columns:1fr}
+ #panel .premium-area-card .area-harvest-history{width:100%}
 }
-@media(max-width:760px){.premium-area-card .area-identity.is-harvesting{grid-template-columns:90px minmax(0,1fr);gap:10px}.premium-area-card .area-harvest-date{padding:10px}}
-@media(max-width:360px){.premium-area-card .area-harvest-dates{gap:7px}.premium-area-card .area-harvest-date{padding:8px}.premium-area-card .area-harvest-date .area-harvest-value{font-size:13px}}
+
+/* Celular e tablet: foto e identificação em colunas independentes. */
+@media(max-width:1050px){
+ #panel .premium-area-card .area-identity{
+  display:grid!important;
+  grid-template-columns:clamp(100px,18vw,124px) minmax(0,1fr)!important;
+  gap:12px 14px!important;
+  align-items:center!important;
+  padding:clamp(12px,2vw,16px)!important;
+ }
+ #panel .premium-area-card .area-identity>.area-photo.variety-photo{
+  grid-column:1!important;grid-row:1!important;
+  width:100%!important;height:auto!important;aspect-ratio:1/1;
+  max-width:100%!important;min-width:0!important;min-height:0!important;
+  flex:none!important;align-self:center!important;justify-self:stretch!important;
+  box-sizing:border-box!important;
+ }
+ #panel .premium-area-card .area-identity>.area-identity-text{
+  grid-column:2!important;grid-row:1!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+ }
+ #panel .premium-area-card .area-identity>.area-harvest-dates,
+ #panel .premium-area-card .area-identity>.area-harvest-history{
+  grid-column:1/-1!important;grid-row:2!important;
+  width:100%!important;min-width:0!important;margin-top:0!important;
+ }
+ #panel .premium-area-card .area-harvest-history{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ #panel .premium-area-card .area-identity{
+  grid-template-columns:clamp(88px,25vw,108px) minmax(0,1fr)!important;
+  gap:10px 12px!important;padding:12px!important
+ }
+ #panel .premium-area-card .area-code{font-size:clamp(24px,6.1vw,30px)!important}
+ #panel .premium-area-card .area-variety{font-size:clamp(14px,3.7vw,16px)!important;margin:3px 0 9px}
+ #panel .premium-area-card .area-state{font-size:10px;padding:8px 10px}
+ #panel .premium-area-card .area-harvest-date{padding:10px 11px}
+ #panel .brix-legend .brix-legend-items{grid-template-columns:1fr;gap:9px}
+ #panel .brix-legend .brix-legend-items>.vitra-delay-legend{grid-column:1}
+}
+@media(max-width:360px){
+ #panel .premium-area-card .area-identity{grid-template-columns:84px minmax(0,1fr)!important;gap:9px!important;padding:10px!important}
+ #panel .premium-area-card .area-harvest-dates,
+ #panel .premium-area-card .area-harvest-history{grid-template-columns:1fr}
+ #panel .premium-area-card .area-code{font-size:23px!important}
+ #panel .premium-area-card .area-state{font-size:9px;padding:7px 9px}
+ #panel .premium-area-card .area-harvest-date{padding:9px 10px}
+}
 </style>
 </head><body><div class="vitra-shell"><aside class="vitra-sidebar"><div class="sidebar-logo" onclick="showHome()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHome()}" aria-label="Voltar à visão geral"><span class="sidebar-monogram" aria-hidden="true">V</span><div><strong>VITRA</strong><small>Inteligência e Rastreabilidade da Uva</small></div></div><div class="sidebar-label">NAVEGAÇÃO</div><nav class="cards" id="cards" aria-label="Módulos do VITRA"></nav></aside><main class="vitra-main"><div class="vitra-hero"><div class="hero-content"><span class="hero-eyebrow">VITRA • INTELIGÊNCIA E RASTREABILIDADE DA UVA</span><h1>Excelência em cada detalhe.</h1></div><div class="hero-seal" aria-hidden="true"><span>V</span><small>VITRA</small></div></div><div class="vitra-kpis" id="vitraKpis"></div><div class="panel" id="panel"><section class="vitra-home" id="vitraHome"><div class="home-welcome"><span class="home-overline">PAINEL DE CONTROLE</span><h2>Seu trabalho, em uma visão clara.</h2><p>Acompanhe avaliações, titulações, recepção e estoque em um só lugar.</p></div></section></div><footer class="vitra-footer">VITRA</footer></main></div>
 <script>
@@ -1182,9 +1242,12 @@ const harvestHistory=st==="fim"?'<div class="area-harvest-history" aria-label="P
 // com a data informada pelo usuário nessa transferência. Preservar originalHarvestDate.
 // Nunca atribuir a data atual apenas porque o cartão foi visualizado.
 const inicioColheita=dataHistoricaValida(a.harvestStartDate)?a.harvestStartDate:"";
+const mesmoDiaDePrevisaoEInicio=!!inicioColheita&&inicioColheita===prazoHistorico;
 const dadosColheita=st==="colh"?'<div class="area-harvest-dates" aria-label="Datas da colheita">'+
+ (mesmoDiaDePrevisaoEInicio?
+ '<div class="area-harvest-date is-combined"><span class="area-harvest-label">Previsão e início da colheita</span><strong class="area-harvest-value">'+esc(inicioColheita)+'</strong></div>':
  '<div class="area-harvest-date is-forecast"><span class="area-harvest-label">Previsão de colheita</span><strong class="area-harvest-value'+(prazoHistorico==="Não documentada"?' is-unconfirmed':'')+'">'+esc(prazoHistorico)+'</strong></div>'+
- '<div class="area-harvest-date is-start"><span class="area-harvest-label">Início da colheita</span><strong class="area-harvest-value'+(inicioColheita?'':' is-unconfirmed')+'">'+esc(inicioColheita||"Data não registrada")+'</strong></div>'+
+ '<div class="area-harvest-date is-start"><span class="area-harvest-label">Início da colheita</span><strong class="area-harvest-value'+(inicioColheita?'':' is-unconfirmed')+'">'+esc(inicioColheita||"Data não registrada")+'</strong></div>')+
  '</div>':"";
 const previsaoPausa=st==="pausa"&&prazoHistorico!=="Não documentada"?'<small class="area-forecast"><span class="area-forecast-label">Previsão de colheita</span><strong class="area-forecast-date">'+esc(prazoHistorico)+'</strong></small>':"";
 const notaOriginal=String(a.note||"").trim();
@@ -1200,7 +1263,7 @@ for(const trecho of repeticoesEncerramento){
  if(notaExibida.endsWith(" "+trecho)){notaExibida=notaExibida.slice(0,-trecho.length).trim();break}
 }
 
-return '<article class="premium-area-card" id="area-'+esc(code)+'">'+avisoAtrasoColheita(a)+'<div class="area-identity'+(st==="colh"?' is-harvesting':'')+'"><div class="area-photo variety-photo" role="img" aria-label="Imagem da variedade '+esc(a.v||"não informada")+'"><div class="variety-photo-fallback" aria-hidden="true"><span class="fallback-leaf">❧</span></div>'+(varietyImage?'<img src="'+esc(varietyImage)+'" alt="Fotografia do cacho da variedade '+esc(a.v)+'" data-variedade="'+esc(a.v)+'" data-svg-fallback="'+esc(varietySvgFallback)+'" loading="eager" decoding="async" fetchpriority="high" referrerpolicy="no-referrer" onload="vitraVarietyPhotoReady(this)" onerror="vitraVarietyImageFallback(this)">':'')+'</div><div class="area-identity-text"><span class="area-code">'+esc(code)+'</span><span class="area-variety">'+esc(a.v||"Variedade não informada")+'</span><span class="area-state '+esc(st)+'"><i></i>'+areaStatusLabel(st)+'</span>' +harvestHistory+previsaoPausa+(st==="acomp"&&a.f&&!calcularAtrasoColheita(a)?'<small class="area-forecast"><span class="area-forecast-label">Previsão original</span><strong class="area-forecast-date">'+esc(a.originalHarvestDate||(/^\d{2}\/\d{2}$/.test(a.f)?a.f+'/2026':a.f))+'</strong></small>':"")+'</div>'+dadosColheita+'</div><div class="area-information"><div class="area-column field-column"><h3>🌿 CAMPO</h3>'+areaTabs(code,a.c,"c",idx.c)+'<div class="body">'+(c?campoFmt(c[1])+(c[2]?'<div class="prob campodanos"><b>⚠️ DANOS E PROBLEMAS IDENTIFICADOS</b><div>'+renderDanosCampo(c[2],pdfOK?pdf:null,code,idx.c)+'</div></div>':"")+docLinks:'<span class="muted">Sem avaliação de campo registrada.</span>')+'</div></div><div class="area-column tit-column"><h3>🧪 TITULAÇÃO</h3>'+areaTabs(code,ts,"t",idx.t)+'<div class="body">'+(t?split(t[1]):'<span class="muted">Sem titulação registrada.</span>')+'</div></div><div class="area-column reception-column"><h3>📦 RECEPÇÃO</h3>'+areaTabs(code,rs,"r",idx.r)+'<div class="body">'+(r?renderRecepcaoClassificacao(r[1],r[2])+'<div class="prob campodanos"><b>⚠️ DANOS E OBSERVAÇÕES</b><div>'+esc(normalizarDescricaoDanos(r[3]||"Não informado.",code,(a.r||[]).indexOf(r),"recepcao"))+indicacaoTranslucidosRecepcao(r[3]||"")+'</div></div>'+dormidaTag:'<div class="empty-reception"><span class="empty-icon">▤</span><strong>Sem recepção registrada</strong></div>')+'</div></div></div>'+(t?historicoRuasPorData(code,ts,idx.t):'')+(notaExibida?'<div class="area-note">'+esc(notaExibida)+'</div>':"")+'</article>'}
+return '<article class="premium-area-card" id="area-'+esc(code)+'">'+avisoAtrasoColheita(a)+'<div class="area-identity'+(st==="colh"?' is-harvesting':'')+'"><div class="area-photo variety-photo" role="img" aria-label="Imagem da variedade '+esc(a.v||"não informada")+'"><div class="variety-photo-fallback" aria-hidden="true"><span class="fallback-leaf">❧</span></div>'+(varietyImage?'<img src="'+esc(varietyImage)+'" alt="Fotografia do cacho da variedade '+esc(a.v)+'" data-variedade="'+esc(a.v)+'" data-svg-fallback="'+esc(varietySvgFallback)+'" loading="eager" decoding="async" fetchpriority="high" referrerpolicy="no-referrer" onload="vitraVarietyPhotoReady(this)" onerror="vitraVarietyImageFallback(this)">':'')+'</div><div class="area-identity-text"><span class="area-code">'+esc(code)+'</span><span class="area-variety">'+esc(a.v||"Variedade não informada")+'</span><span class="area-state '+esc(st)+'"><i></i>'+areaStatusLabel(st)+'</span>' +previsaoPausa+(st==="acomp"&&a.f&&!calcularAtrasoColheita(a)?'<small class="area-forecast"><span class="area-forecast-label">Previsão original</span><strong class="area-forecast-date">'+esc(a.originalHarvestDate||(/^\d{2}\/\d{2}$/.test(a.f)?a.f+'/2026':a.f))+'</strong></small>':"")+'</div>'+harvestHistory+dadosColheita+'</div><div class="area-information"><div class="area-column field-column"><h3>🌿 CAMPO</h3>'+areaTabs(code,a.c,"c",idx.c)+'<div class="body">'+(c?campoFmt(c[1])+(c[2]?'<div class="prob campodanos"><b>⚠️ DANOS E PROBLEMAS IDENTIFICADOS</b><div>'+renderDanosCampo(c[2],pdfOK?pdf:null,code,idx.c)+'</div></div>':"")+docLinks:'<span class="muted">Sem avaliação de campo registrada.</span>')+'</div></div><div class="area-column tit-column"><h3>🧪 TITULAÇÃO</h3>'+areaTabs(code,ts,"t",idx.t)+'<div class="body">'+(t?split(t[1]):'<span class="muted">Sem titulação registrada.</span>')+'</div></div><div class="area-column reception-column"><h3>📦 RECEPÇÃO</h3>'+areaTabs(code,rs,"r",idx.r)+'<div class="body">'+(r?renderRecepcaoClassificacao(r[1],r[2])+'<div class="prob campodanos"><b>⚠️ DANOS E OBSERVAÇÕES</b><div>'+esc(normalizarDescricaoDanos(r[3]||"Não informado.",code,(a.r||[]).indexOf(r),"recepcao"))+indicacaoTranslucidosRecepcao(r[3]||"")+'</div></div>'+dormidaTag:'<div class="empty-reception"><span class="empty-icon">▤</span><strong>Sem recepção registrada</strong></div>')+'</div></div></div>'+(t?historicoRuasPorData(code,ts,idx.t):'')+(notaExibida?'<div class="area-note">'+esc(notaExibida)+'</div>':"")+'</article>'}
 function areaBrixPreview(code){const a=A[code]||{},t=titulacoesOrdenadas(a)[0];if(!t)return {cls:"brix-sem",label:"Sem titulação"};const body=String(t[1]||"");const white=/sugar crisp|sweet globe|autumn crisp|arra 15|timpson/i.test(a.v||"");const dark=/brs vit[oó]ria|vit[oó]ria|brs [ií]sis|[ií]sis|itum 9|arra cherry|cherry crush|rachely crush/i.test(a.v||"");if(!white&&!dark)return {cls:"brix-sem",label:"Sem classificação"};const lines=body.split(/\n|<br\s*\/?\s*>|[|•]/i);const predominance=(body.match(/predomin[aâ]ncia[^|.\n<]*/i)||[])[0]||"";let target="";if(/verdes?|brancas?/i.test(predominance))target="verde";else if(/madur|[aâ]mbar|amarel/i.test(predominance))target="madur";else if(/negr[ao]s?|fechado/i.test(predominance))target="negra";else if(/rosad/i.test(predominance))target="rosad";else if(/vermelh/i.test(predominance))target="vermelh";if(!target)return {cls:"brix-sem",label:"Sem predominância"};let chosen=null;for(const line of lines){if(!line.toLowerCase().includes(target)||!/brix\s*[:=]?\s*\d/i.test(line))continue;const m=line.match(/brix\s*[:=]?\s*(\d+(?:[,.]\d+)?)/i);if(m){chosen=Number(m[1].replace(",","."));break}}if(chosen===null||!Number.isFinite(chosen))return {cls:"brix-sem",label:"Sem Brix predominante"};return {cls:white?(chosen<15?"brix-branca-baixo":"brix-branca-alto"):(chosen<16?"brix-cor-baixo":"brix-cor-alto"),label:chosen.toLocaleString("pt-BR",{maximumFractionDigits:2})+" °Brix"}}
 function render(){const p=document.querySelector("#panel");if(!st)return;const codes=groups[st]||[];const search=areaSearch.trim().toLocaleLowerCase("pt-BR");const visible=codes.filter(code=>{const a=A[code]||{};return !search||[code,a.v,a.f].join(" ").toLocaleLowerCase("pt-BR").includes(search)});if(!visible.includes(ar))ar=visible[0]||null;p.innerHTML='<div class="workspace-title"><div><span class="workspace-eyebrow">PAINEL DE QUALIDADE</span><h2>'+vitraIcon(st)+labels[st]+'</h2><p>'+codes.length+' área(s)</p></div><div class="workspace-search"><input class="searchbar" id="areaSearch" placeholder="Buscar área ou variedade..." value="'+esc(areaSearch)+'"></div></div>'+(st==="acomp"?'<div class="brix-legend"><span class="brix-legend-title">Brix da coloração predominante</span><div class="brix-legend-items"><span><i class="brix-dot brix-branca-baixo"></i>Brancas: abaixo de 15</span><span><i class="brix-dot brix-branca-alto"></i>Brancas: 15 ou mais</span><span><i class="brix-dot brix-cor-baixo"></i>Vermelhas/negras: abaixo de 16</span><span><i class="brix-dot brix-cor-alto"></i>Vermelhas/negras: 16 ou mais</span><span class="vitra-delay-legend"><i class="vitra-delay-dot" aria-hidden="true"></i>Área com colheita atrasada</span></div></div>':"")+'<div class="vitra-area-overview" aria-label="Situação de Brix das áreas">'+visible.map(code=>{const q=st==="acomp"?areaBrixPreview(code):{cls:"brix-sem",label:"Área "+areaStatusLabel(st)};const atraso=st==="acomp"?atrasoParaStatus(A[code]||{},st):null;return '<button type="button" class="vitra-area-mini '+q.cls+(atraso?' overdue-forecast':'')+(code===ar?' selected':'')+'" data-preview-area="'+esc(code)+'" aria-label="Abrir área '+esc(code)+' — '+esc(q.label)+(atraso?' — Colheita atrasada: '+esc(atraso.tempo):'')+'"><strong>'+esc(code)+'</strong></button>'}).join("")+'</div><div id="selectedArea">'+(ar?renderAreaCard(ar):'<div class="note">Nenhuma área encontrada.</div>')+'</div>';p.querySelectorAll("[data-preview-area]").forEach(b=>b.addEventListener("click",()=>{ar=b.dataset.previewArea;latest();render();}));const input=p.querySelector("#areaSearch");if(input)input.addEventListener("input",e=>{areaSearch=e.target.value;const pos=e.target.selectionStart;render();const next=document.querySelector("#areaSearch");if(next){next.focus();next.setSelectionRange(pos,pos)}})};
 
