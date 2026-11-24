@@ -8,6 +8,7 @@ const JS=["vitra-access-config.js","vitra-access.js","vitra-areas.js","vitra-lab
 const FILES=["index.html",...CSS,...JS];
 const FRAME=document.querySelector("#view");
 const STATUS=document.querySelector("#sync-status");
+const STATUS_LABEL=document.querySelector("#sync-label");
 const POLL_MS=90000; // a cada 90 segundos, e imediatamente ao puxar para baixo
 let snapshot=null,pending=null,mode="dashboard",syncing=false,lastCheck=0;
 let statusTimer=0,noticeToken=0;
@@ -36,10 +37,12 @@ async function saveSnapshot(value){
 function indicator(message,hold=0){
  clearTimeout(statusTimer);
  const token=++noticeToken;
- STATUS.textContent=message;
- STATUS.classList.toggle("visible",!!message);
+ const state=message==="Sincronizando..."?"loading":message==="Atualizado"?"success":message?"notice":"";
+ STATUS.dataset.mode=state;
+ STATUS_LABEL.textContent=state==="loading"?"":state==="success"?"Sincronizado":message;
+ STATUS.classList.toggle("visible",!!state);
  if(hold>0)statusTimer=setTimeout(()=>{
-  if(token===noticeToken)STATUS.classList.remove("visible");
+  if(token===noticeToken){STATUS.classList.remove("visible");STATUS.dataset.mode="";}
  },hold);
 }
 function isModalOpen(){
@@ -145,7 +148,7 @@ function assemble(fetched){
 }
 async function fetchText(path,sha){
  const url="https://raw.githubusercontent.com/"+REPO+"/"+sha+"/"+path;
- const r=await fetch(url,{cache:"no-store"});
+ const r=await fetch(url,{cache:"no-store",signal:AbortSignal.timeout(15000)});
  if(!r.ok)throw Error("Recurso temporariamente indisponível: "+path);
  return r.text();
 }
@@ -176,7 +179,7 @@ async function check(manual=false){
  syncing=true;lastCheck=Date.now();
  if(manual)indicator("Sincronizando...");
  try{
-  const versionResponse=await fetch("https://api.github.com/repos/"+REPO+"/commits/main",{cache:"no-store"});
+  const versionResponse=await fetch("https://api.github.com/repos/"+REPO+"/commits/main",{cache:"no-store",signal:AbortSignal.timeout(15000)});
   if(!versionResponse.ok)throw Error("Não foi possível verificar a versão");
   const sha=(await versionResponse.json()).sha;
   if(!/^[a-f0-9]{40}$/.test(sha))throw Error("Versão inválida");
