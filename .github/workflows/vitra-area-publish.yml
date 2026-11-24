@@ -1,0 +1,48 @@
+name: VITRA - publicar movimentacoes de colheita
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vitra-area-publish-main
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Obter fonte oficial e script
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /index.html
+            /scripts/vitra-area-sync.mjs
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validar e incorporar movimentacoes
+        run: node scripts/vitra-area-sync.mjs
+
+      - name: Publicar mantendo historico
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "Sem novas movimentacoes para publicar"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "VITRA: sincronizar movimentacoes de colheita autorizadas"
+          git push origin HEAD:main
