@@ -1164,8 +1164,13 @@ function diagnosticV4(){
   if(ean&&eanValid(ean)){
    const catalogVarieties=distinct(matches.filter(x=>x.client===catalogClient(selected)).map(x=>x.variety).filter(Boolean));
    const observedVariety=state.detected?.identity?.variety||"";
-   if(observedVariety&&catalogVarieties.length===1&&observedVariety!==catalogVarieties[0])
-    add("error","Variedade incompatível com o código","Etiqueta: "+nameOf(varieties,observedVariety)+" · referência EAN para o cliente: "+nameOf(varieties,catalogVarieties[0])+".");
+   if(observedVariety&&catalogVarieties.length===1&&observedVariety!==catalogVarieties[0]){
+    const verifiedBarcode=Boolean(state.barcodeBars&&state.barcodePrinted&&state.barcodeBars===state.barcodePrinted&&ean===state.barcodeBars);
+    const strongPrintedVar=state.detected?.varietySource==="Texto ou código impresso"&&!state.ocrConflicts.includes("rastreio");
+    add(verifiedBarcode&&strongPrintedVar?"error":"pending","Variedade associada ao EAN",
+      "A sequência de rastreabilidade indica "+nameOf(varieties,observedVariety)+", enquanto o cadastro do EAN indica "+nameOf(varieties,catalogVarieties[0])+". "+
+      (verifiedBarcode&&strongPrintedVar?"As duas evidências foram lidas; confira a etiqueta e o modelo autorizado.":"O código de barras ou o texto ainda precisam de confirmação independente. Não concluir divergência de variedade por inferência."));
+   }
    const documentedClass=classFromCatalog(),readClass=state.identity.klass||"";
    if(documentedClass&&readClass&&readClass!==documentedClass)
     add(state.ocrConflicts.includes("classificacao")?"pending":"error","Classe incompatível com o EAN","Classe impressa: "+readClass+" · classe autorizada para este EAN e cliente: "+documentedClass+".","DOC.CQ.056 · EAN por cliente");
@@ -1199,7 +1204,7 @@ function diagnosticV4(){
    else add("ok","Rastreabilidade",unit?"Ano, área/válvula, data e variedade conferem com a ordem. A pesagem impressa segue um código válido do manual e não exige identificação de caixa da cumbuca.":"O código impresso confere integralmente com a ordem de produção: "+expected+".");
   }
  }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
- const photoVar=state.detected?.identity?.variety||"",referenceVar=expectedVariety();
+ const photoVar=state.detected?.varietySource==="Texto ou código impresso"?(state.detected?.identity?.variety||""):"",referenceVar=expectedVariety();
  const printedVar=trace?varieties.find(v=>v[2]===trace.variety)?.[0]||"":"";
  if(photoVar&&printedVar&&photoVar!==printedVar)
    add("error","Variedade e sigla","O nome da uva identificado na etiqueta é "+nameOf(varieties,photoVar)+", mas a rastreabilidade termina em "+trace.variety+" ("+nameOf(varieties,printedVar)+").");
@@ -1392,7 +1397,7 @@ function showResult(){
  '<article><small>ETIQUETA DA CUMBUCA</small><strong>EAN '+esc(pair.unit.ean||"pendente")+'</strong><p>'+esc(pair.unit.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.unit.date||"Data pendente")+' · '+esc(nameOf(varieties,pair.unit.variety))+'</p></article></div></section>':
  state.pairRequested?'<section class="vl2-pair-section vl2-pair-warning"><strong>Não foi possível comparar as duas etiquetas</strong><p>O modelo e as informações continuam pendentes. Use imagem mais nítida ou amplie a região.</p></section>':"";
  const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · '+state.ocrPasses+' passagem(ns) de OCR · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
-  photoValue("Modelo",kind?name:"Não identificado")+photoValue("Variedade / produto",initial)+
+  photoValue("Modelo",kind?name:"Não identificado")+photoValue(state.detected?.varietySource==="Código de barras cadastrado"?"Variedade sugerida pelo catálogo":"Variedade / produto",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
