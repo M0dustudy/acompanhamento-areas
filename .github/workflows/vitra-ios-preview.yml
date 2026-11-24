@@ -1,0 +1,104 @@
+name: VITRA iOS - compilacao de teste
+
+on:
+  push:
+    branches:
+      - feature/vitra-ios-preview
+    paths:
+      - "ios-app/**"
+      - "android-app/**"
+      - ".github/workflows/vitra-ios-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator:
+    name: Compilar VITRA para simulador iPhone
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - name: Obter somente o VITRA sem PDFs
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /index.html
+            /visualizador.html
+            /vitra-access.css
+            /vitra-labels-smart.css
+            /vitra-areas.css
+            /vitra-access-config.js
+            /vitra-access.js
+            /vitra-areas.js
+            /vitra-labels-smart.js
+            /imagens/
+            /android-app/
+            /ios-app/
+
+      - name: Configurar Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verificar integridade do codigo e dados
+        run: |
+          node --check android-app/src/app.js
+          node --check android-app/src/pdf-cache.js
+          node --check ios-app/configure.mjs
+          node --check ios-app/icon.mjs
+          node android-app/test-areas.mjs
+
+      - name: Verificar permissao CORS segura do iPhone
+        run: |
+          curl --fail --silent --show-error --retry 2 -D "$RUNNER_TEMP/vitra-cors.txt" -o /dev/null \
+            -X OPTIONS \
+            -H "Origin: capacitor://localhost" \
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: authorization,apikey,content-type" \
+            "https://avzdnzzohryokzyrxnap.supabase.co/functions/v1/vitra-access"
+          grep -qi '^access-control-allow-origin: capacitor://localhost' "$RUNNER_TEMP/vitra-cors.txt" \
+            || { echo "O login do iOS ainda nao esta autorizado; nenhuma versao sera publicada."; exit 1; }
+
+      - name: Preparar recursos compartilhados e app iOS
+        working-directory: android-app
+        run: |
+          npm install --no-audit --no-fund
+          node prepare.mjs
+          node ../ios-app/configure.mjs
+          npx cap add ios
+          npx cap sync ios
+          node ../ios-app/icon.mjs
+          /usr/bin/plutil -lint ios/App/App/Info.plist
+
+      - name: Compilar aplicativo para o simulador iPhone
+        working-directory: android-app
+        run: |
+          xcodebuild -version
+          xcodebuild -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          test -d ios/build/Build/Products/Debug-iphonesimulator/App.app
+
+      - name: Compactar aplicativo e arquivos de teste
+        working-directory: android-app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            ios/build/Build/Products/Debug-iphonesimulator/App.app \
+            "$RUNNER_TEMP/VITRA-iOS-Simulador.zip"
+          cp "$RUNNER_TEMP/VITRA-iOS-Simulador.zip" ../ios-app/VITRA-iOS-Simulador.zip
+
+      - name: Disponibilizar build iOS para simulador
+        uses: actions/upload-artifact@v4
+        with:
+          name: VITRA-iOS-Simulador-Sem-Assinatura
+          path: ios-app/VITRA-iOS-Simulador.zip
+          if-no-files-found: error
+          retention-days: 14
