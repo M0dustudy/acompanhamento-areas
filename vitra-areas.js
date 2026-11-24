@@ -57,7 +57,7 @@ function apply(events){
     note(code,"Colheita iniciada em "+date+".");
   }else if(event.action==="pause"){
     area.lastPauseDate=date;
-    note(code,(event.from_status==="acomp"?"Acompanhamento":"Colheita")+" pausado em "+date+".");
+    note(code,(event.from_status==="acomp"?"Acompanhamento pausado":"Colheita pausada")+" em "+date+".");
   }else if(event.action==="resume"){
     area.lastResumeDate=date;
     if(!area.harvestStartDate){
