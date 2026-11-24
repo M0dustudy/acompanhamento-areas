@@ -1,11 +1,12 @@
 {
   "appId": "br.com.vitra.qualidade.teste",
-  "appName": "VITRA Teste",
+  "appName": "VITRA",
   "webDir": "www",
   "android": {
     "backgroundColor": "#0e3023"
   },
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "hostname": "m0dustudy.github.io"
   }
 }
