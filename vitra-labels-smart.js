@@ -129,6 +129,7 @@ function extract(raw,barcode){
  let klass="";
  if(/\bEXTRA\s*A\b|\bHAPPY\s*TREE\b/.test(n))klass="Happy Tree / Extra A";
  else if(/\bCAMPESITA\b/.test(n))klass="Campesita";
+ else if(/\b(?:CLASSE|CLASSIFICACAO)\s*[:=-]?\s*EXTRA\b/.test(n))klass="Extra";
  else if(/\bSELECIONADA\b/.test(n))klass="Selecionada";
  else if(/\bSABOR\b/.test(n))klass="Sabor";
  else if(/\bEXPORTACAO\b/.test(n))klass="Exportação";
@@ -137,7 +138,7 @@ function extract(raw,barcode){
  const printedWeight=str(raw).match(/\b(?:PESO\s*[:=]?\s*)?(\d{1,2}(?:[,.]\d{1,2})?)\s*(KG|G)\b/i);
  const codeWeights=distinct(group.map(x=>x.weight));
  const weightPhoto=printedWeight?printedWeight[1].replace(".",",")+" "+printedWeight[2].toLowerCase():"";
- const weightCatalog=codeWeights.length===1?codeWeights[0]+" g":"";
+ const weightCatalog=codeWeights.length===1&&codeWeights[0]?codeWeights[0]+" g":"";
  const peso=weightPhoto||weightCatalog;
  const classCode=n.match(/\b(MEI|EX)\s*[-]?\s*(PA|V|P)(50|80)([A-Z]{2,3})(10|20|21)\b/);
  let kind="";
@@ -660,6 +661,51 @@ function discardOCRWorker(worker){
  if(cachedOCRWorker===worker)cachedOCRWorker=null;
  try{worker?.terminate()?.catch?.(()=>{});}catch{}
 }
+// Detectar o suporte da etiqueta para ampliar o texto sem modificar a foto original.
+async function focusLabelCanvas(file,maxSide=3000){
+ const bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
+ try{
+  const w=Math.max(1,Math.round(bmp.width*320/Math.max(bmp.width,bmp.height))),h=Math.max(1,Math.round(bmp.height*320/Math.max(bmp.width,bmp.height)));
+  const thumb=document.createElement("canvas");thumb.width=w;thumb.height=h;
+  const g=thumb.getContext("2d",{willReadFrequently:true});g.drawImage(bmp,0,0,w,h);
+  const pix=g.getImageData(0,0,w,h).data,N=w*h,choices=[];
+  for(const mode of ["color","light"]){
+   const mask=new Uint8Array(N),seen=new Uint8Array(N),queue=new Int32Array(N),stride=w+1,sum=new Int32Array(stride*(h+1));
+   for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){const i=(y*w+x)*4,r=pix[i],v=pix[i+1],b=pix[i+2];
+    const hit=mode==="color"?r>v+15&&v>b+20&&r>130:Math.min(r,v,b)>175&&Math.max(r,v,b)-Math.min(r,v,b)<65;
+    row+=hit?1:0;sum[(y+1)*stride+x+1]=sum[y*stride+x+1]+row;}}
+   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const a=Math.max(0,x-4),b=Math.min(w,x+5),c=Math.max(0,y-4),d=Math.min(h,y+5);
+    const total=sum[d*stride+b]-sum[c*stride+b]-sum[d*stride+a]+sum[c*stride+a];
+    mask[y*w+x]=total>=(b-a)*(d-c)*.42?1:0;
+   }
+   for(let i=0;i<N;i++){if(!mask[i]||seen[i])continue;let head=0,tail=1;queue[0]=i;seen[i]=1;
+    let x0=w,y0=h,x1=0,y1=0;
+    while(head<tail){const k=queue[head++],x=k%w,y=Math.floor(k/w);x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);
+     for(const j of [x?k-1:-1,x<w-1?k+1:-1,y?k-w:-1,y<h-1?k+w:-1])if(j>=0&&mask[j]&&!seen[j]){seen[j]=1;queue[tail++]=j;}
+    }
+    const bw=x1-x0+1,bh=y1-y0+1,area=bw*bh,ratio=bw/bh,fill=tail/area;
+    if(area<N*.055||area>N*.80||ratio<.65||ratio>5.5||fill<.58||bw<w*.25||bh<h*.12)continue;
+    if(mode==="light"&&((x0===0&&x1===w-1&&bh>h*.65)||(y0===0&&y1===h-1)))continue;
+    choices.push({x0,y0,x1,y1,score:area*fill*(mode==="color"?1.8:1)});
+   }
+  }
+  const c=choices.sort((a,b)=>b.score-a.score)[0];if(!c)return null;
+  const px=Math.max(8,(c.x1-c.x0)*.12),py=Math.max(8,(c.y1-c.y0)*.16);
+  const x=Math.max(0,Math.floor((c.x0-px)*bmp.width/w)),y=Math.max(0,Math.floor((c.y0-py)*bmp.height/h));
+  const right=Math.min(bmp.width,Math.ceil((c.x1+1+px)*bmp.width/w)),bottom=Math.min(bmp.height,Math.ceil((c.y1+1+py)*bmp.height/h));
+  const sw=right-x,sh=bottom-y;if(sw*sh>bmp.width*bmp.height*.85)return null;
+  const scale=Math.min(3,maxSide/Math.max(sw,sh)),canvas=document.createElement("canvas");
+  canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
+  const ctx=canvas.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(bmp,x,y,sw,sh,0,0,canvas.width,canvas.height);
+  return canvas;
+ }finally{bmp.close?.();}
+}
+function focusRegion(canvas,x,y,w,h){
+ const out=document.createElement("canvas");out.width=Math.max(1,Math.round(canvas.width*w));out.height=Math.max(1,Math.round(canvas.height*h));
+ const g=out.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,out.width,out.height);
+ g.filter="grayscale(1) contrast(1.2)";g.drawImage(canvas,canvas.width*x,canvas.height*y,canvas.width*w,canvas.height*h,0,0,out.width,out.height);return out;
+}
 function prepareOCRImage(file,maxSide=2300){
  return createImageBitmap(file,{imageOrientation:"from-image"}).then(bitmap=>{
   try{
@@ -898,15 +944,40 @@ async function readPhoto(deep=false){
  let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
  const passages=existingPasses;
  const update=message=>{if(seq===state.sequence&&progress)progress.textContent=message;};
- const readPass=async(canvas,ms)=>!worker||seq!==state.sequence?"":str((await limitWork(worker.recognize(canvas),ms,"Tempo de leitura excedido.")).data?.text||"").trim();
+ const readPass=async(canvas,ms,psm="3")=>{
+  if(!worker||seq!==state.sequence)return "";
+  if(worker.setParameters)await limitWork(worker.setParameters({tessedit_pageseg_mode:psm}),3000,"Configuração de leitura interrompida.");
+  return str((await limitWork(worker.recognize(canvas),ms,"Tempo de leitura excedido.")).data?.text||"").trim();
+ };
  const run=async()=>{
   try{
    update("Inicializando o leitor de texto…");
    await ensureOCR();worker=await getOCRWorker();if(seq!==state.sequence)return;
    if(!passages.length||deep){
     update(deep?"Lendo novamente a fotografia com resolução ampliada…":"Lendo todas as informações da etiqueta…");
-    const canvas=await limitWork(prepareOCRImage(photo,deep?3300:2100),deep?6500:3500,"Falha ao preparar foto.");
-    try{const original=await readPass(canvas,12000);if(original)passages.push(original);}
+    const focus=await limitWork(focusLabelCanvas(photo,deep?3500:2900),4000,"Localização automática interrompida.").catch(()=>null);
+     const canvas=focus||await limitWork(prepareOCRImage(photo,deep?3300:2400),deep?6500:3500,"Falha ao preparar foto.");
+    try{
+      const original=await readPass(canvas,16000,"3");if(original)passages.push(original);
+      if(focus&&seq===state.sequence){
+       const first=norm(original);
+       if(/COMERCIALIZADO|PRODUZIDO|CNPJ|CLASSE\s*:|MEI\s*[-]?\s*PA/.test(first)&&focus.width>focus.height*1.15){
+        for(const x of [0,.49]){
+         if(seq!==state.sequence)break;
+         const col=await readPass(focusRegion(focus,x,0,.51,1),11000,"6");
+         if(col&&/COMERCIALIZADO|PRODUZIDO|CNPJ/.test(norm(col)))passages.push(col);
+        }
+       }else{
+        const top=await readPass(focusRegion(focus,0,0,1,.72),10000,"6");
+        if(top)passages.push(top);
+       }
+       // Preservar a foto inteira como evidência: o recorte é uma tentativa, não uma validação.
+       if(!ocrTraceCandidates(passages.join("\n")).length||!original||deep){
+        const fallback=await limitWork(prepareOCRImage(photo,deep?3300:2400),4500,"Falha ao preparar imagem completa.");
+        const full=await readPass(fallback,12000,"3");if(full)passages.push(full);
+       }
+      }
+     }
     catch(e){failure=e?.message||"A leitura inicial não foi concluída.";discardOCRWorker(worker);worker=null;}
    }
    if(seq!==state.sequence)return;
@@ -982,7 +1053,7 @@ async function readPhoto(deep=false){
    }
   }
  };
- try{await limitWork(run(),deep||state.pairRequested?70000:45000,"Limite de leitura atingido. A foto foi preservada.");}
+ try{await limitWork(run(),deep||state.pairRequested?110000:85000,"Limite de leitura atingido. A foto foi preservada.");}
  catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
@@ -1007,11 +1078,13 @@ async function readPhoto(deep=false){
 
 function clientChooser(){
  const active=state.identity.client;
+ const candidates=distinct((state.detected?.codeClients||[]).map(catalogClient));
+ const quick=!state.clientConfirmed&&candidates.length?'<div class="vl2-trace-review-actions">'+candidates.map(id=>'<button type="button" data-vl2-client="'+esc(id)+'" data-label="'+esc(norm(nameOf(clients,id)))+'">'+esc(nameOf(clients,id))+'</button>').join("")+'</div><small>'+esc(candidates.length>1?"EAN compartilhado: confirme apenas o cliente real.":"Cliente identificado pelo catálogo: confirme a ordem.")+'</small>':"";
  return '<div class="vl2-client-wrap"><div class="vl2-control-label">Cliente <small>seleção obrigatória</small></div>'+
   '<details name="vl2-choice" class="vl2-client-combo" id="vl2-client-combo"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><strong>'+esc(active?nameOf(clients,active):"Pesquisar ou selecionar cliente")+'</strong><em>'+esc(state.clientConfirmed?"Alterar":"Confirmar")+'</em></summary>'+
   '<div class="vl2-client-pop"><div class="vl2-popup-header"><strong>Selecionar cliente</strong><button type="button" data-vl2-close-lookup aria-label="Fechar seleção">✕</button></div><input id="vl2-client-search" type="search" autocomplete="off" aria-label="Pesquisar cliente" placeholder="Digite o nome do cliente…"><div class="vl2-client-options">'+
   sortedClients.map(c=>'<button type="button" data-vl2-client="'+esc(c[0])+'" data-label="'+esc(norm(c[1]))+'">'+esc(c[1])+'</button>').join("")+
-  '</div></div></details><p class="vl2-help">'+(state.clientConfirmed?"Cliente confirmado. Você pode alterá-lo a qualquer momento.":active?"Identificação sugerida pela foto; toque para confirmar.":"Escolha o cliente para cruzar com a etiqueta.")+'</p></div>';
+  '</div></div></details>'+quick+'<p class="vl2-help">'+(state.clientConfirmed?"Cliente confirmado. Você pode alterá-lo a qualquer momento.":active?"Identificação sugerida pela foto; toque para confirmar.":"Escolha o cliente para cruzar com a etiqueta.")+'</p></div>';
 }
 function lookupPicker(items,key,value,placeholder,attribute){
  const ordered=items.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{numeric:true,sensitivity:"base"}));
@@ -1399,6 +1472,10 @@ function showResult(){
  const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · '+state.ocrPasses+' passagem(ns) de OCR · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
   photoValue("Modelo",kind?name:"Não identificado")+photoValue(state.detected?.varietySource==="Código de barras cadastrado"?"Variedade sugerida pelo catálogo":"Variedade / produto",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
+  photoValue("Área / válvula",state.detected?.track?.areaValve)+
+  photoValue("Data codificada",state.detected?.track?state.detected.track.day+"/"+state.detected.track.month+"/20"+state.detected.track.year:"")+
+  photoValue("Método de pesagem",({C:"Contentor",5:"Caixa de 5 kg",8:"Caixa de 8 kg"})[state.detected?.track?.method])+
+  photoValue("Sigla da variedade",state.detected?.track?.variety)+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
  const errors=report.checks.filter(x=>x.status==="error");
