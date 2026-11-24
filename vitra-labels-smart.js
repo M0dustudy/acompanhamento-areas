@@ -1031,8 +1031,17 @@ function traceBuilder(){
  const expected=expectedCode(),observed=state.fields.rastreio||"",box=category()==="box",autoMethod=!state.expected.method&&box?modelMethod():"";
  const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
- return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
-  '<p>Informe o código correto da ordem de produção. O VITRA fará a comparação com o texto reconhecido na fotografia.</p>'+
+ const traceOk=Boolean(observed&&parseTrace(observed)&&!state.ocrConflicts.includes("rastreio"));
+ return '<section class="vl2-trace" aria-label="Conferência da rastreabilidade"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Confira a leitura</span></div>'+
+  '<div class="vl2-trace-found"><small>Reconhecida na fotografia</small><strong>'+esc(observed||"Não identificada")+'</strong></div>'+
+  '<div class="vl2-trace-review"><p>O código lido corresponde ao que está impresso?</p>'+
+  '<div class="vl2-trace-review-actions"><button type="button" data-vl2-trace-check="yes" class="'+(state.traceVisualCheck==="yes"?"is-confirmed":"")+'" '+(!traceOk?'disabled title="Leitura incompleta ou conflitante"':'')+'>✓ Sim, confere</button>'+
+  '<button type="button" data-vl2-trace-check="no" class="'+(state.traceVisualCheck==="no"?"is-correction":"")+'">Não, corrigir</button></div>'+
+  (state.traceVisualCheck==="yes"?'<div class="vl2-trace-accepted">✓ Leitura confirmada visualmente · '+esc(observed)+'</div>':"")+
+  (state.traceVisualCheck==="no"?'<label class="vl2-trace-correct">Código correto que aparece na etiqueta<input data-vl2-field="rastreio" type="text" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="70" value="'+esc(observed||"")+'" placeholder="R-26-0106B-2110-C-VI"></label>':"")+
+  '<small>Esta confirmação visual não substitui a ordem de produção ou a inspeção física.</small></div>'+
+  '<details class="vl2-trace-order"><summary>Comparar com a ordem de produção</summary>'+
+  '<p>Preencha apenas quando for verificar a rastreabilidade contra a referência independente da produção.</p>'+
   '<label class="vl2-quick-trace">Rastreabilidade da ordem<input data-vl2-trace="raw" type="text" inputmode="text" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="70" value="'+esc(state.expected.raw||"")+'" placeholder="R-26-0106B-2110-C-VI"></label>'+
   '<details class="vl2-trace-manual"><summary>Não tem o código completo? Montar por partes</summary>'+
   '<div class="vl2-trace-grid">'+
@@ -1045,7 +1054,7 @@ function traceBuilder(){
   (box?(autoMethod?'<div class="vl2-trace-field vl2-trace-inferred"><span>Pesagem identificada</span><strong>'+(autoMethod==="5"?"5 kg":"8 kg")+' · dois códigos da etiqueta conferem</strong></div>':'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>'):"")+
   '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div></details>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
-  '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
+  '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></details></section>';
 }
 function fact(label,value,source){
  return '<div class="vl2-fact"><small>'+esc(label)+'</small><strong>'+esc(value||"Não identificado")+'</strong>'+(source?'<span>'+esc(source)+'</span>':"")+'</div>';
@@ -1134,6 +1143,10 @@ function diagnosticV4(){
  const scanned=Boolean(state.scanCompleted&&state.photo);
  if(!scanned)return {status:"inicial",ready:false,checks:[],errors:0,pending:0,ok:0,summary:""};
  if(!state.clientConfirmed||!selected)add("pending","Cliente","Confirme o cliente da ordem de produção para cruzar os campos impressos com o modelo aprovado.");
+ if(state.traceVisualCheck==="yes"&&printed&&trace&&!state.ocrConflicts.includes("rastreio"))
+  add("ok","Leitura conferida na fotografia","O operador confirmou visualmente a sequência impressa "+printed+". Isso não comprova a correspondência com a ordem de produção.");
+ if(state.traceVisualCheck==="no")add("pending","Leitura de rastreabilidade corrigida","O código precisou de intervenção humana. A leitura automática não é uma evidência independente.");
+
  if(!expected)add("pending","Rastreabilidade de referência","Informe o código correto da ordem de produção. O VITRA vai comparar com o código impresso, sem copiar um para o outro.");
  if(!kind)add("pending","Tipo de etiqueta","Não foi possível identificar o modelo com segurança. Selecione o tipo em Ajustar leitura.");
  if(kind&&state.detected?.kindConfidence==="low"&&!state.kindConfirmed)add("pending","Modelo sugerido pela forma","O formato da imagem sugere "+nameOf(kinds,kind)+", mas não há dados suficientes para diferenciar cumbuca e caixa com segurança. Confirme o modelo antes de aprovar.");
@@ -1425,6 +1438,19 @@ function showResult(){
  root.querySelectorAll("[data-vl2-close-lookup]").forEach(b=>b.addEventListener("click",()=>{b.closest("details").open=false;}));
  el("vl2-client-search")?.addEventListener("input",e=>{const q=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(q));});
  root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.reviewRequested=false;showResult();}));
+ root.querySelectorAll("[data-vl2-trace-check]").forEach(btn=>btn.addEventListener("click",()=>{
+  const response=btn.dataset.vl2TraceCheck;
+  if(response==="yes"){
+   if(!state.fields.rastreio||!parseTrace(state.fields.rastreio)||state.ocrConflicts.includes("rastreio")){
+    notice("Não há leitura confiável para confirmar. Faça a correção ou outra fotografia.",true);return;
+   }
+   state.traceVisualCheck="yes";
+  }else{
+   state.traceVisualCheck="no";
+  }
+  state.reviewRequested=false;state.reviewed=false;showResult();
+  if(response==="no")el("vl2-results")?.querySelector(".vl2-trace-correct input")?.focus({preventScroll:true});
+ }));
  root.querySelectorAll("[data-vl2-trace]").forEach(inp=>{
   const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
    if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
