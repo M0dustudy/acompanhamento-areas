@@ -1,6 +1,6 @@
 {
-  "appId": "br.com.vitra.qualidade",
-  "appName": "VITRA",
+  "appId": "br.com.vitra.qualidade.teste",
+  "appName": "VITRA Teste",
   "webDir": "www",
   "android": {
     "backgroundColor": "#0e3023"
