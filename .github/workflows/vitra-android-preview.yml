@@ -45,11 +45,9 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Preparar SDK Android
-        uses: android-actions/setup-android@v3
-
       - name: Instalar SDK Android
         run: |
+          # O runner Ubuntu já fornece o SDK e o sdkmanager atualizados.
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
