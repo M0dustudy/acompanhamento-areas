@@ -17,7 +17,7 @@ const state={
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0,ocrRawPassages:[]
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0,ocrRawPassages:[],traceVisualCheck:""
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -48,7 +48,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
- state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;
+ state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -517,7 +517,7 @@ function invalidatePhotoReading(){
  state.detected=null;state.fields={};state.sources={};state.matches=[];state.referenceChecks=[];
  state.referenceProducer=null;state.referenceMerchant=null;
  state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.analysisError="";
- state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;
+ state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;state.traceVisualCheck="";
  state.identity.kind="";state.identity.variety="";state.identity.klass="";
 }
 function fitGalleryImage(){
@@ -565,6 +565,13 @@ async function useFile(file){
  setGalleryPreview(file);showResult();
  notice("Foto recebida. Lendo automaticamente as etiquetas e seus códigos…");
  await analyzeGalleryFull();
+}
+function openDeviceCamera(){
+ const native=el("vl2-native-camera");
+ if(native&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||"")||window.Capacitor?.isNativePlatform?.())){
+  native.click();return;
+ }
+ void beginCamera();
 }
 async function beginCamera(){
  if(!navigator.mediaDevices?.getUserMedia){notice("Câmera integrada indisponível. Use «Escolher foto».",true);return;}
@@ -885,7 +892,7 @@ async function readPhoto(deep=false){
  const existingPasses=deep?(state.ocrRawPassages||[]).slice():[];
  const existingBarcode=deep?state.barcodeBars:"";
  const existingPrinted=deep?state.barcodePrinted:"";
- state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
+ state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;state.traceVisualCheck="";
  state.ocrConflicts=[];state.ocrPasses=0;state.pairedEvidence=null;showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
  let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
@@ -896,9 +903,9 @@ async function readPhoto(deep=false){
   try{
    update("Inicializando o leitor de texto…");
    await ensureOCR();worker=await getOCRWorker();if(seq!==state.sequence)return;
-   if(!passages.length){
-    update("Lendo todas as informações da etiqueta…");
-    const canvas=await limitWork(prepareOCRImage(photo,2100),3500,"Falha ao preparar foto.");
+   if(!passages.length||deep){
+    update(deep?"Lendo novamente a fotografia com resolução ampliada…":"Lendo todas as informações da etiqueta…");
+    const canvas=await limitWork(prepareOCRImage(photo,deep?3300:2100),deep?6500:3500,"Falha ao preparar foto.");
     try{const original=await readPass(canvas,12000);if(original)passages.push(original);}
     catch(e){failure=e?.message||"A leitura inicial não foi concluída.";discardOCRWorker(worker);worker=null;}
    }
@@ -910,7 +917,7 @@ async function readPhoto(deep=false){
    if(worker&&shouldScanOCRBands(passages.join("\n"),deep)){
     const needTrace=!ocrTraceCandidates(passages.join("\n")).length;
     const regions=deep?
-      [{a:0,b:.62,contrast:false,name:"superior"},{a:.38,b:1,contrast:true,name:"inferior"}]:
+      [{a:0,b:.42,contrast:false,name:"superior"},{a:.30,b:.75,contrast:true,name:"central"},{a:.62,b:1,contrast:true,name:"inferior"}]:
       needTrace?[{a:.34,b:1,contrast:true,name:"da rastreabilidade"}]:
       [{a:0,b:.73,contrast:true,name:"dos dados cadastrais"}];
     const bands=regions;
@@ -975,7 +982,7 @@ async function readPhoto(deep=false){
    }
   }
  };
- try{await limitWork(run(),state.pairRequested?56000:45000,"Limite de leitura atingido. A foto foi preservada.");}
+ try{await limitWork(run(),deep||state.pairRequested?70000:45000,"Limite de leitura atingido. A foto foi preservada.");}
  catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
@@ -1024,8 +1031,17 @@ function traceBuilder(){
  const expected=expectedCode(),observed=state.fields.rastreio||"",box=category()==="box",autoMethod=!state.expected.method&&box?modelMethod():"";
  const same=expected&&observed&&codeMatchesReference(expected,observed);
  const status=expected?(observed?(same?"Códigos coincidem":"Rastreabilidade divergente"):"Código digitado; foto não legível"):"Informe os campos da produção";
- return '<section class="vl2-trace" aria-label="Rastreabilidade de referência"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Conferência obrigatória</span></div>'+
-  '<p>Informe o código correto da ordem de produção. O VITRA fará a comparação com o texto reconhecido na fotografia.</p>'+
+ const traceOk=Boolean(observed&&parseTrace(observed)&&!state.ocrConflicts.includes("rastreio"));
+ return '<section class="vl2-trace" aria-label="Conferência da rastreabilidade"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Confira a leitura</span></div>'+
+  '<div class="vl2-trace-found"><small>Reconhecida na fotografia</small><strong>'+esc(observed||"Não identificada")+'</strong></div>'+
+  '<div class="vl2-trace-review"><p>O código lido corresponde ao que está impresso?</p>'+
+  '<div class="vl2-trace-review-actions"><button type="button" data-vl2-trace-check="yes" class="'+(state.traceVisualCheck==="yes"?"is-confirmed":"")+'" '+(!traceOk?'disabled title="Leitura incompleta ou conflitante"':'')+'>✓ Sim, confere</button>'+
+  '<button type="button" data-vl2-trace-check="no" class="'+(state.traceVisualCheck==="no"?"is-correction":"")+'">Não, corrigir</button></div>'+
+  (state.traceVisualCheck==="yes"?'<div class="vl2-trace-accepted">✓ Leitura confirmada visualmente · '+esc(observed)+'</div>':"")+
+  (state.traceVisualCheck==="no"?'<label class="vl2-trace-correct">Código correto que aparece na etiqueta<input data-vl2-field="rastreio" type="text" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="70" value="'+esc(observed||"")+'" placeholder="R-26-0106B-2110-C-VI"></label>':"")+
+  '<small>Esta confirmação visual não substitui a ordem de produção ou a inspeção física.</small></div>'+
+  '<details class="vl2-trace-order"><summary>Comparar com a ordem de produção</summary>'+
+  '<p>Preencha apenas quando for verificar a rastreabilidade contra a referência independente da produção.</p>'+
   '<label class="vl2-quick-trace">Rastreabilidade da ordem<input data-vl2-trace="raw" type="text" inputmode="text" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="70" value="'+esc(state.expected.raw||"")+'" placeholder="R-26-0106B-2110-C-VI"></label>'+
   '<details class="vl2-trace-manual"><summary>Não tem o código completo? Montar por partes</summary>'+
   '<div class="vl2-trace-grid">'+
@@ -1038,7 +1054,7 @@ function traceBuilder(){
   (box?(autoMethod?'<div class="vl2-trace-field vl2-trace-inferred"><span>Pesagem identificada</span><strong>'+(autoMethod==="5"?"5 kg":"8 kg")+' · dois códigos da etiqueta conferem</strong></div>':'<div class="vl2-trace-field"><span>Identificação da caixa / pesagem</span>'+traceOptions([["C","C · Contentor"],["5","5 · Caixa 5 kg"],["8","8 · Caixa 8 kg"]],"method","Código da caixa")+'</div>'):"")+
   '<div class="vl2-trace-field"><span>Variedade</span>'+traceOptions(varietiesCodes,"variety","Sigla")+'</div></div></details>'+
   '<div class="vl2-trace-compare"><div><small>Na fotografia</small><strong>'+esc(observed||"Não identificado")+'</strong></div><div><small>Referência informada</small><strong>'+esc(expected?(box?expected:expected.replace("-*-","-(impresso)-")):"Preenchimento incompleto")+'</strong></div></div>'+
-  '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></section>';
+  '<div class="vl2-reference-hint">Confira os valores corretos da ordem de produção antes da comparação.</div></details></section>';
 }
 function fact(label,value,source){
  return '<div class="vl2-fact"><small>'+esc(label)+'</small><strong>'+esc(value||"Não identificado")+'</strong>'+(source?'<span>'+esc(source)+'</span>':"")+'</div>';
@@ -1127,6 +1143,10 @@ function diagnosticV4(){
  const scanned=Boolean(state.scanCompleted&&state.photo);
  if(!scanned)return {status:"inicial",ready:false,checks:[],errors:0,pending:0,ok:0,summary:""};
  if(!state.clientConfirmed||!selected)add("pending","Cliente","Confirme o cliente da ordem de produção para cruzar os campos impressos com o modelo aprovado.");
+ if(state.traceVisualCheck==="yes"&&printed&&trace&&!state.ocrConflicts.includes("rastreio"))
+  add("ok","Leitura conferida na fotografia","O operador confirmou visualmente a sequência impressa "+printed+". Isso não comprova a correspondência com a ordem de produção.");
+ if(state.traceVisualCheck==="no")add("pending","Leitura de rastreabilidade corrigida","O código precisou de intervenção humana. A leitura automática não é uma evidência independente.");
+
  if(!expected)add("pending","Rastreabilidade de referência","Informe o código correto da ordem de produção. O VITRA vai comparar com o código impresso, sem copiar um para o outro.");
  if(!kind)add("pending","Tipo de etiqueta","Não foi possível identificar o modelo com segurança. Selecione o tipo em Ajustar leitura.");
  if(kind&&state.detected?.kindConfidence==="low"&&!state.kindConfirmed)add("pending","Modelo sugerido pela forma","O formato da imagem sugere "+nameOf(kinds,kind)+", mas não há dados suficientes para diferenciar cumbuca e caixa com segurança. Confirme o modelo antes de aprovar.");
@@ -1144,8 +1164,13 @@ function diagnosticV4(){
   if(ean&&eanValid(ean)){
    const catalogVarieties=distinct(matches.filter(x=>x.client===catalogClient(selected)).map(x=>x.variety).filter(Boolean));
    const observedVariety=state.detected?.identity?.variety||"";
-   if(observedVariety&&catalogVarieties.length===1&&observedVariety!==catalogVarieties[0])
-    add("error","Variedade incompatível com o código","Etiqueta: "+nameOf(varieties,observedVariety)+" · referência EAN para o cliente: "+nameOf(varieties,catalogVarieties[0])+".");
+   if(observedVariety&&catalogVarieties.length===1&&observedVariety!==catalogVarieties[0]){
+    const verifiedBarcode=Boolean(state.barcodeBars&&state.barcodePrinted&&state.barcodeBars===state.barcodePrinted&&ean===state.barcodeBars);
+    const strongPrintedVar=state.detected?.varietySource==="Texto ou código impresso"&&!state.ocrConflicts.includes("rastreio");
+    add(verifiedBarcode&&strongPrintedVar?"error":"pending","Variedade associada ao EAN",
+      "A sequência de rastreabilidade indica "+nameOf(varieties,observedVariety)+", enquanto o cadastro do EAN indica "+nameOf(varieties,catalogVarieties[0])+". "+
+      (verifiedBarcode&&strongPrintedVar?"As duas evidências foram lidas; confira a etiqueta e o modelo autorizado.":"O código de barras ou o texto ainda precisam de confirmação independente. Não concluir divergência de variedade por inferência."));
+   }
    const documentedClass=classFromCatalog(),readClass=state.identity.klass||"";
    if(documentedClass&&readClass&&readClass!==documentedClass)
     add(state.ocrConflicts.includes("classificacao")?"pending":"error","Classe incompatível com o EAN","Classe impressa: "+readClass+" · classe autorizada para este EAN e cliente: "+documentedClass+".","DOC.CQ.056 · EAN por cliente");
@@ -1179,7 +1204,7 @@ function diagnosticV4(){
    else add("ok","Rastreabilidade",unit?"Ano, área/válvula, data e variedade conferem com a ordem. A pesagem impressa segue um código válido do manual e não exige identificação de caixa da cumbuca.":"O código impresso confere integralmente com a ordem de produção: "+expected+".");
   }
  }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
- const photoVar=state.detected?.identity?.variety||"",referenceVar=expectedVariety();
+ const photoVar=state.detected?.varietySource==="Texto ou código impresso"?(state.detected?.identity?.variety||""):"",referenceVar=expectedVariety();
  const printedVar=trace?varieties.find(v=>v[2]===trace.variety)?.[0]||"":"";
  if(photoVar&&printedVar&&photoVar!==printedVar)
    add("error","Variedade e sigla","O nome da uva identificado na etiqueta é "+nameOf(varieties,photoVar)+", mas a rastreabilidade termina em "+trace.variety+" ("+nameOf(varieties,printedVar)+").");
@@ -1372,7 +1397,7 @@ function showResult(){
  '<article><small>ETIQUETA DA CUMBUCA</small><strong>EAN '+esc(pair.unit.ean||"pendente")+'</strong><p>'+esc(pair.unit.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.unit.date||"Data pendente")+' · '+esc(nameOf(varieties,pair.unit.variety))+'</p></article></div></section>':
  state.pairRequested?'<section class="vl2-pair-section vl2-pair-warning"><strong>Não foi possível comparar as duas etiquetas</strong><p>O modelo e as informações continuam pendentes. Use imagem mais nítida ou amplie a região.</p></section>':"";
  const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · '+state.ocrPasses+' passagem(ns) de OCR · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
-  photoValue("Modelo",kind?name:"Não identificado")+photoValue("Variedade / produto",initial)+
+  photoValue("Modelo",kind?name:"Não identificado")+photoValue(state.detected?.varietySource==="Código de barras cadastrado"?"Variedade sugerida pelo catálogo":"Variedade / produto",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
   '</div></section>';
@@ -1418,6 +1443,19 @@ function showResult(){
  root.querySelectorAll("[data-vl2-close-lookup]").forEach(b=>b.addEventListener("click",()=>{b.closest("details").open=false;}));
  el("vl2-client-search")?.addEventListener("input",e=>{const q=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(q));});
  root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.reviewRequested=false;showResult();}));
+ root.querySelectorAll("[data-vl2-trace-check]").forEach(btn=>btn.addEventListener("click",()=>{
+  const response=btn.dataset.vl2TraceCheck;
+  if(response==="yes"){
+   if(!state.fields.rastreio||!parseTrace(state.fields.rastreio)||state.ocrConflicts.includes("rastreio")){
+    notice("Não há leitura confiável para confirmar. Faça a correção ou outra fotografia.",true);return;
+   }
+   state.traceVisualCheck="yes";
+  }else{
+   state.traceVisualCheck="no";
+  }
+  state.reviewRequested=false;state.reviewed=false;showResult();
+  if(response==="no")el("vl2-results")?.querySelector(".vl2-trace-correct input")?.focus({preventScroll:true});
+ }));
  root.querySelectorAll("[data-vl2-trace]").forEach(inp=>{
   const update=e=>{const key=e.target.dataset.vl2Trace;let value=e.target.value;
    if(key==="area"||key==="valve")value=norm(value).replace(/[^A-Z0-9_./]/g,"").slice(0,key==="area"?20:16);
@@ -1706,7 +1744,7 @@ function mount(adapter){
   '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>A foto pode conter caixa e cumbuca juntas. O recorte é opcional.</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
   '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
-  '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Abrir câmera traseira</button><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
+  '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Fotografar etiqueta</button><input id="vl2-native-camera" type="file" accept="image/*" capture="environment" hidden aria-label="Tirar foto da etiqueta"><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
   '<button id="vl2-capture" type="button" class="vl2-apply" hidden>Capturar somente a área marcada</button><button id="vl2-capture-full" type="button" class="vl2-apply vl2-capture-duo" hidden>Capturar foto inteira · caixa + cumbuca</button>'+
   '<div id="vl2-gallery-tools" class="vl2-gallery-tools" hidden><button id="vl2-rotate-left" type="button">↶ Girar</button><button id="vl2-rotate-right" type="button">Girar ↷</button><button id="vl2-crop-toggle" type="button">Recortar uma etiqueta</button></div>'+
   '<button id="vl2-analyze-full" type="button" class="vl2-apply" hidden>Analisar foto inteira</button>'+
@@ -1718,7 +1756,8 @@ function mount(adapter){
   (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">A conferência digital compara informações reconhecidas com o manual e os padrões cadastrados. Um campo ilegível ou sem referência confiável permanece pendente. A liberação física continua sob responsabilidade da equipe autorizada.</p></section>';
  el("vl2-back")?.addEventListener("click",()=>{releasePhoto();ctx.back();});
- el("vl2-open-camera")?.addEventListener("click",beginCamera);
+ el("vl2-open-camera")?.addEventListener("click",openDeviceCamera);
+ el("vl2-native-camera")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
  el("vl2-gallery")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
  el("vl2-capture")?.addEventListener("click",captureCamera);
  el("vl2-capture-full")?.addEventListener("click",captureCameraFull);
