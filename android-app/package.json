@@ -8,11 +8,11 @@
     "android:sync": "node prepare.mjs && npx cap sync android"
   },
   "dependencies": {
-    "@capacitor/core": "8.0.0",
-    "@capacitor/android": "8.0.0",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/android": "8.6.2",
     "pdfjs-dist": "4.10.38"
   },
   "devDependencies": {
-    "@capacitor/cli": "8.0.0"
+    "@capacitor/cli": "8.6.2"
   }
 }
