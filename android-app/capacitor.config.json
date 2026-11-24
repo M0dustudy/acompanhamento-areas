@@ -1,0 +1,11 @@
+{
+  "appId": "br.com.vitra.qualidade",
+  "appName": "VITRA",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#0e3023"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
