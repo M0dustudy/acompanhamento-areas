@@ -38,6 +38,8 @@ try{
    window.__labelSmoke.showResult();
   });
   if(await page.locator('.vl2-pair-grid article').count()!==2)throw Error('Duas etiquetas não exibidas lado a lado/empilhadas.');
+  // A referência independente permanece acessível sem ocupar a tela inicial.
+  await page.locator('.vl2-trace-order > summary').click();
   const referenceInput=page.locator('[data-vl2-trace="raw"]');
   if(await referenceInput.count()!==1)throw Error('Rastreabilidade de referência em campo único não encontrada.');
   await referenceInput.fill('R-26-0106B-2110-C-VI');
