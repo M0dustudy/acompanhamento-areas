@@ -1,0 +1,37 @@
+name: VITRA - auditoria isolada de etiquetas
+on:
+  push:
+    branches:
+      - feature/vitra-etiquetas-leitura-revisao-20261124
+    paths:
+      - "vitra-labels-smart.js"
+      - "vitra-labels-smart.css"
+      - "scripts/testar-ocr-etiquetas.mjs"
+      - ".github/workflows/vitra-etiquetas-revisao.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  auditar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Obter código e testes, sem relatórios PDF
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /vitra-labels-smart.js
+            /vitra-labels-smart.css
+            /scripts/testar-ocr-etiquetas.mjs
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verificar sintaxe
+        run: |
+          node --check vitra-labels-smart.js
+          node --check scripts/testar-ocr-etiquetas.mjs
+      - name: Testar reconhecimento e estados da conferência
+        run: node scripts/testar-ocr-etiquetas.mjs
