@@ -8,5 +8,10 @@
   "server": {
     "androidScheme": "https",
     "hostname": "m0dustudy.github.io"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css"
+    }
   }
 }
