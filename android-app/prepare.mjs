@@ -11,8 +11,8 @@ const write=(name,content)=>writeFileSync(join(target,name),content,"utf8");
 const copy=name=>cpSync(join(root,name),join(target,name),{recursive:true,force:true});
 
 for(const name of [
- "vitra-access.css","vitra-labels-smart.css","vitra-access-config.js",
- "vitra-access.js","vitra-labels-smart.js"
+ "vitra-access.css","vitra-labels-smart.css","vitra-areas.css","vitra-access-config.js",
+ "vitra-access.js","vitra-areas.js","vitra-labels-smart.js"
 ])copy(name);
 copy("imagens"); // Fotos das variedades, sem incluir PDFs ou relatórios.
 const dashboard=read("index.html").replace(/<script\b[^>]*src="\.\/vitra-auto-update\.js[^"]*"[^>]*><\/script>/i,"");
