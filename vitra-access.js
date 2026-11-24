@@ -189,6 +189,7 @@
     document.documentElement.classList.toggle("va-no-titulation",!window.VITRA_MODULE_ALLOWED("titulation"));
     document.documentElement.classList.toggle("va-no-reception",!window.VITRA_MODULE_ALLOWED("reception"));
     applyModuleVisibility();
+    window.dispatchEvent(new CustomEvent("vitra:authenticated",{detail:{role:me?.role||"member"}}));
   }
   const moduleKeys={acomp:"field",colh:"harvest",pausa:"paused",fim:"finished","external-reception":"reception",stock:"stock",recep:"reception",titul:"titulation",estoque:"stock"};
   function applyModuleVisibility(){
@@ -211,6 +212,7 @@
     removeManagement();
     if (typeof window.showHome === "function") window.showHome();
     loginPage();
+    window.dispatchEvent(new Event("vitra:logout"));
   }
   async function checkSession() {
     if (!session || checkInProgress || !READY) return;

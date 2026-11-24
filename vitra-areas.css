@@ -1,0 +1,42 @@
+.va-area-card{display:flex!important;flex-direction:column;gap:5px;text-align:left;justify-content:center;padding:12px!important;min-height:91px;border:1px solid #cfe3d5!important;background:linear-gradient(145deg,#eff8f2,#fff)!important;color:#205439!important;border-radius:14px}
+.va-area-card .va-area-symbol{display:grid;place-items:center;border-radius:10px;background:#dcefe3;color:#275f43;font-size:19px;font-weight:700;width:31px;height:31px}
+.va-area-card b{font-size:12px;letter-spacing:.02em}
+.va-area-card small{font-size:10px;color:#547665}
+.va-area-backdrop{position:fixed;z-index:2147483200;inset:0;background:#061a12aa;display:grid;align-items:center;justify-items:center;padding:14px}
+.va-area-modal{width:min(100%,465px);max-height:calc(100dvh - 28px);overflow:auto;background:#fff;color:#183324;border-radius:20px;padding:20px;box-shadow:0 30px 100px #0004;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif}
+.va-area-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.va-area-top h2{font-size:19px;line-height:1.25;margin:0}
+.va-area-close{border:0;background:#f0f4f1;border-radius:50%;min-width:34px;height:34px;font-size:22px;color:#385242}
+.va-area-intro{color:#627368;font-size:12px;line-height:1.55;margin:8px 0 15px}
+.va-area-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px;background:#edf3ef;padding:4px;border-radius:13px;margin-bottom:18px}
+.va-area-switch button{font-size:12px;border:0;border-radius:10px;background:transparent;color:#4b6152;padding:11px 6px;font-weight:700;line-height:1.25}
+.va-area-switch button[aria-pressed=true]{background:#216847;color:#fff;box-shadow:0 2px 7px #21684725}
+.va-area-field{display:block;font-size:12px;font-weight:750;color:#3a5342;margin-top:13px}
+.va-area-field select,.va-area-field input{display:block;margin-top:7px;width:100%;min-height:46px;border:1px solid #cbdcd0;border-radius:10px;background:#fff;color:#173d2b;font-size:15px;padding:10px 12px}
+.va-area-summary{margin:17px 0;background:#f4f8f5;padding:13px;border:1px solid #e0ece3;border-radius:12px;font-size:12px;line-height:1.6;color:#365342}
+.va-area-summary strong{display:block;font-size:14px;color:#1f5135;margin-bottom:3px}
+.va-area-save{display:block;width:100%;border:0;border-radius:11px;background:#216847;color:white;font-size:14px;font-weight:750;min-height:48px}
+.va-area-save:disabled{opacity:.6}
+.va-area-feedback{min-height:17px;margin:10px 0 0;font-size:12px;color:#8c4630}
+.va-area-feedback[data-ok=true]{color:#216847}
+
+
+/* Ação contextual discreta no cartão, sem novos blocos no painel. */
+.va-area-manage{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;
+ max-width:100%;padding:7px 11px!important;margin-top:9px!important;
+ background:#ecf5ed!important;border:1px solid #c9dfcf!important;
+ border-radius:9px!important;color:#235640!important;font-size:11px!important;
+ font-weight:750!important;line-height:1.25!important;cursor:pointer}
+.va-area-manage:focus-visible{outline:2px solid #246c49;outline-offset:2px}
+.va-area-manage:hover{background:#daecdf!important}
+.va-area-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+ border:0;margin:0 0 12px;padding:0;min-width:0}
+.va-area-options legend{font-size:12px;font-weight:750;color:#365341;padding:0 0 8px}
+.va-area-option{position:relative;min-width:0}
+.va-area-option input{position:absolute;opacity:0;inset:0;width:100%;height:100%;cursor:pointer}
+.va-area-option span{display:flex;align-items:center;justify-content:center;text-align:center;
+ min-height:46px;padding:9px;border:1px solid #d3e2d7;background:#f4f8f5;
+ color:#365543;border-radius:11px;font-size:12px;font-weight:700}
+.va-area-option input:checked+span{background:#236947;border-color:#236947;color:white}
+.va-area-option input:focus-visible+span{outline:2px solid #236947;outline-offset:2px}
+@media(max-width:390px){.va-area-options{grid-template-columns:1fr}}

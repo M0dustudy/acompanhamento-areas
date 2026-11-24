@@ -77,11 +77,19 @@ assert(source.includes('data-vl2-trace="raw"'));
 assert(source.includes('class="vl2-trace-manual"'));
 assert(source.includes('class="vl2-trace-grid"'));
 assert(source.includes("vl2-concise-result"));
-assert(source.includes('readPass(canvas,12000)'));
-assert(source.includes('await limitWork(run(),state.pairRequested?56000:45000'));
+assert(source.includes('readPass(canvas,16000,"3")'),"A leitura principal deve ter limite explícito e segmentação automática.");
+assert(source.includes('focusLabelCanvas(photo,deep?3500:2900)'),"A região da etiqueta deve ser ampliada automaticamente.");
+assert(source.includes('await limitWork(run(),deep||state.pairRequested?110000:85000'),"O processamento total deve continuar limitado.");
 assert(source.includes('function interpretPairedText('));
 assert(source.includes('"qr_code"'));
 assert(source.includes('vl2-capture-full'));
+assert(source.includes('id="vl2-native-camera"'),"A câmera móvel precisa ter fallback nativo.");
+assert(source.includes('capture="environment"'),"O seletor deve solicitar a câmera traseira.");
+assert(source.includes('deep?3300:2400'),"A análise ampliada precisa reprocessar a foto inteira.");
+assert(source.includes('data-vl2-trace-check="yes"'),"Confirmação visual necessária.");
+assert(source.includes('data-vl2-trace-check="no"'),"Correção sob demanda necessária.");
+assert(source.includes('state.detected?.printedNameVariety'),"O nome impresso deve ser independente do catálogo e da sigla.");
+
 assert(source.includes('Caixa × cumbuca · rastreabilidade'));
 assert(source.includes('state.pairedEvidence'));
 assert.equal(t.extract("UVA VITORIA\nR-26-109A5-1611-5-VI","7898366001754").identity.variety,"vitoria");
@@ -101,6 +109,25 @@ for (const client of ["docemel","trielo"]) {
  assert(!diagnosis.checks.some(x=>x.title==="EAN incompatível com o cliente"&&x.status==="error"),"EAN compartilhado não é erro.");
 }
 
+// EAN identificado como mista no catálogo, mas a rastreabilidade VI informa Vitória:
+ // sem leitura independente das barras não pode gerar reprovação por espécie.
+t.state.barcodeBars="";
+t.state.barcodePrinted="";
+t.state.ocrConflicts=[];
+t.state.clientConfirmed=true;
+t.state.identity={client:"expofrut",kind:"cumbuca500",variety:"vitoria",klass:""};
+t.state.fields={barcode:"7898923868165",rastreio:"R-26-0106B-2110-5-VI"};
+t.state.detected={identity:{variety:"vitoria",kind:"cumbuca500"},varietySource:"Texto ou código impresso",kindConfidence:"high"};
+t.state.photo={};t.state.scanCompleted=true;
+const ambiguous=t.diagnosticV4();
+assert(ambiguous.checks.some(x=>x.title==="Variedade associada ao EAN"&&x.status==="pending"),"EAN não confirmado exige pendência em vez de reprovação.");
+assert(!ambiguous.checks.some(x=>x.title==="Variedade associada ao EAN"&&x.status==="error"),"Não afirmar uva mista por inferência.");
+t.state.traceVisualCheck="yes";
+const confirmed=t.diagnosticV4();
+assert(confirmed.checks.some(x=>x.title==="Leitura conferida na fotografia"&&x.status==="ok"));
+assert.notEqual(confirmed.status,"aprovado","Confirmação visual isolada não substitui a ordem de produção.");
+t.state.traceVisualCheck="";
+
 // Simulações não fotográficas do fluxo de alto volume:
 // uma passagem no caso completo; somente uma passagem complementar no caso incompleto.
 let readings=[],calls=0;
@@ -118,4 +145,26 @@ readings=["PRODUZIDO POR FAZENDA TESTE\nCNPJ: 12345678000190","R-26-109A5-1611-5
 await t.readPhoto();
 assert.equal(calls,2,"A leitura parcial deve tentar uma única região complementar");
 assert.equal(t.state.fields.rastreio,"R-26-109A5-1611-5-VI");
-console.log("Testes de OCR, interface, variedade, alerta e fluxo rápido: OK.");
+// Alta resolução repete a leitura completa em 3300 px e cruza regiões ampliadas.
+t.state.photo={type:"image/jpeg"};t.state.ocrRawPassages=[fullRead];t.state.barcodeBars="";
+readings=[fullRead,fullRead,fullRead,fullRead];calls=0;
+await t.readPhoto(true);
+assert(calls>=2,"Alta resolução não pode reutilizar só o texto da primeira análise.");
+assert(t.state.ocrPasses>=2,"Alta resolução deve registrar passagens adicionais.");
+// Regressões observadas nas duas amostras de 24/11: classe explícita e data discrepante.
+const orange="UVA BRS VITÓRIA\nEmb:19/11/2026\nRastreabilidade:\nR-26-000V4-1411-5-VI\n7898366001754";
+const orangeRead=t.extract(orange,"7898366001754");
+assert.equal(orangeRead.track.areaValve,"000V4");
+assert.equal(orangeRead.fields.peso,"");
+assert.equal(orangeRead.codeClients.length,2);
+Object.assign(t.state,{photo:{},scanCompleted:true,clientConfirmed:false,text:orange,fields:orangeRead.fields,detected:orangeRead,identity:{...orangeRead.identity,client:""},barcodeBars:"7898366001754",barcodePrinted:"7898366001754",ocrConflicts:[],expected:{raw:"",area:"",valve:"",year:"26",day:"",month:"",method:"",variety:"",klass:""}});
+const orangeDiag=t.diagnosticV4();
+assert(orangeDiag.checks.some(x=>x.title==="Data divergente"&&x.status==="error"),"A divergência interna aparece sem redigitar a ordem.");
+assert(orangeDiag.checks.some(x=>x.title==="EAN cadastrado"&&x.status==="ok"));
+assert.equal(orangeDiag.status,"reprovado");
+assert(!orangeDiag.referenceComplete);
+const box=t.extract("UVAS SELECIONADAS\nBRS VITÓRIA\nMEI-PA50VI20\nCLASSE: Extra\nPESO: 5,00 KG\nR-26-0106B-2110-C-VI","");
+assert.equal(box.identity.klass,"Extra","A classe impressa não pode ser substituída pelo título Uvas selecionadas.");
+assert.equal(box.track.areaValve,"0106B");
+assert.equal(box.boxModel.package,"20");
+console.log("Testes de OCR, câmera, rastreabilidade visual, alta resolução e EAN ambíguo: OK.");
