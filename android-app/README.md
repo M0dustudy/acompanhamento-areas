@@ -31,3 +31,14 @@ cd android
 O APK será gerado em `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Os arquivos de estoque **não** são incluídos no APK. Há arquivos públicos do site no APK, como já ocorre no repositório; o aplicativo não deve ser usado como barreira de confidencialidade dos dados embutidos.
+
+## Atualização de interface (24/11/2026)
+
+- Aplicativo denominado **VITRA**, mantendo identificador de pacote para futuras atualizações assinadas.
+- Sem barra superior duplicada nem botão Atualizar; puxar a tela no topo confere novas versões.
+- Sem mensagens brancas persistentes; indicador discreto apenas durante sincronização.
+- Verificação automática a cada 90 segundos quando em primeiro plano e ao retomar o uso.
+- Controle de áreas somente pelo administrador, diretamente em cada cartão: iniciar, pausar, retomar e finalizar.
+- Mostrar apenas datas realmente documentadas, preservando os valores históricos originais.
+- PDF consultado pela primeira vez é salvo no armazenamento privado do aplicativo; aberturas seguintes usam a cópia local.
+- Versões de teste com assinaturas diferentes podem exigir desinstalação. Atualizações futuras dependem de assinatura Android permanente.
