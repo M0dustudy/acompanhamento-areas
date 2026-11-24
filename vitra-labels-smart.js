@@ -189,7 +189,7 @@ function extract(raw,barcode){
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
   fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||(!companySection?ggnNumber:""),ggnComercial,gln:glnProdutor,glnComercial,ieProdutor:ieOf(producedSection),ieComercial:ieOf(companySection),emailProdutor:emailOf(producedSection),emailComercial:emailOf(companySection),siteProdutor:siteOf(producedSection),siteComercial:siteOf(companySection),cepProdutor:cepOf(producedSection),cepComercial:cepOf(companySection),produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
-  producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high",varietySource
+  producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high",printedNameVariety:wordVar.length===1?wordVar[0][0]:"",varietySource
  };
 }
 function canonicalCoordinates(value){
@@ -665,6 +665,7 @@ function discardOCRWorker(worker){
 async function focusLabelCanvas(file,maxSide=3000){
  const bmp=await createImageBitmap(file,{imageOrientation:"from-image"});
  try{
+  state.photoAspect=bmp.width/bmp.height;
   const w=Math.max(1,Math.round(bmp.width*320/Math.max(bmp.width,bmp.height))),h=Math.max(1,Math.round(bmp.height*320/Math.max(bmp.width,bmp.height)));
   const thumb=document.createElement("canvas");thumb.width=w;thumb.height=h;
   const g=thumb.getContext("2d",{willReadFrequently:true});g.drawImage(bmp,0,0,w,h);
@@ -972,7 +973,7 @@ async function readPhoto(deep=false){
         if(top)passages.push(top);
        }
        // Preservar a foto inteira como evidência: o recorte é uma tentativa, não uma validação.
-       if(!ocrTraceCandidates(passages.join("\n")).length||!original||deep){
+       if(!ocrTraceCandidates(passages.join("\n")).length||!original||deep||state.pairRequested){
         const fallback=await limitWork(prepareOCRImage(photo,deep?3300:2400),4500,"Falha ao preparar imagem completa.");
         const full=await readPass(fallback,12000,"3");if(full)passages.push(full);
        }
@@ -1250,7 +1251,8 @@ function diagnosticV4(){
    else if(documentedClass&&readClass)
     add("ok","Classe e EAN","A classe impressa "+readClass+" confere com o catálogo do código.");
    if(selected?.startsWith("cia-"))add("pending","Padrão regional da CIA PA","O manual apresenta as unidades SP, RJ, PE e CE, mas o catálogo disponível não especifica a autorização do código por filial.");
-   if(!matches.length)add("pending","EAN sem padrão aprovado","EAN-13 "+ean+" válido, mas não localizado no catálogo de clientes ou produtores autorizados.");
+   if(matches.length&&!state.clientConfirmed)add("ok","EAN cadastrado","EAN-13 "+ean+" consta no catálogo para "+ownerNames.join(" / ")+". A confirmação do destinatário real é independente.","DOC.CQ.056 · códigos por cliente");
+    if(!matches.length)add("pending","EAN sem padrão aprovado","EAN-13 "+ean+" válido, mas não localizado no catálogo de clientes ou produtores autorizados.");
    else if(selected&&state.clientConfirmed&&!owners.includes(catalogClient(selected))){
     add("error","EAN incompatível com o cliente","EAN-13 "+ean+" consta para "+ownerNames.join(", ")+", não para "+display+". Verifique se existe autorização expressa para uso do EAN da fazenda.");
    }else if(selected&&state.clientConfirmed){
@@ -1277,7 +1279,7 @@ function diagnosticV4(){
    else add("ok","Rastreabilidade",unit?"Ano, área/válvula, data e variedade conferem com a ordem. A pesagem impressa segue um código válido do manual e não exige identificação de caixa da cumbuca.":"O código impresso confere integralmente com a ordem de produção: "+expected+".");
   }
  }else add("pending","Código impresso não legível","A rastreabilidade de referência foi informada, mas a câmera não conseguiu ler a sequência impressa na etiqueta. São duas fontes diferentes; sem a leitura da foto, não é possível confirmar que coincidem.");
- const photoVar=state.detected?.varietySource==="Texto ou código impresso"?(state.detected?.identity?.variety||""):"",referenceVar=expectedVariety();
+ const photoVar=state.detected?.printedNameVariety||"",referenceVar=expectedVariety();
  const printedVar=trace?varieties.find(v=>v[2]===trace.variety)?.[0]||"":"";
  if(photoVar&&printedVar&&photoVar!==printedVar)
    add("error","Variedade e sigla","O nome da uva identificado na etiqueta é "+nameOf(varieties,photoVar)+", mas a rastreabilidade termina em "+trace.variety+" ("+nameOf(varieties,printedVar)+").");
@@ -1424,7 +1426,7 @@ function diagnosticV4(){
   if(state.sources[k]==="Corrigido manualmente")add("pending","Identificador ajustado","O campo "+k+" foi alterado manualmente. Uma nova leitura da foto é necessária para aprovação automática.");
  const critical=checks.filter(x=>x.status==="error"),pending=checks.filter(x=>x.status==="pending");
  const ready=Boolean(state.photo&&state.scanCompleted&&state.clientConfirmed&&expected&&kind&&(!box||effectiveClass()));
- const status=!ready?"coleta":critical.length?"reprovado":pending.length?"pendente":"aprovado";
+ const status=critical.length?"reprovado":!ready?"coleta":pending.length?"pendente":"aprovado";
  const summary=status==="coleta"?"Confirme as referências necessárias da ordem de produção"+(box&&!classFromCatalog()?", incluindo a classificação da caixa.":".")+" Só então será possível concluir a análise.":
  status==="reprovado"?"Foram identificadas "+critical.length+" divergência(s) entre a etiqueta e as referências consultadas.":
  status==="pendente"?"A imagem ou o cadastro não permitem concluir a conferência com segurança. Revise os itens pendentes.":
@@ -1497,7 +1499,10 @@ function showResult(){
  const item=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
  let outcome="";
  if(!state.reviewRequested){
-  outcome='<section class="vl2-decision-prompt"><div class="vl2-reading-head"><div><strong>Conferência da etiqueta</strong><small>O parecer depende das confirmações acima.</small></div></div><p>'+esc(report.ready?"As referências estão preenchidas. Compare agora com a foto.":"Complete as referências da ordem de produção para habilitar a conferência.")+'</p><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?"disabled":"")+'>Conferir dados da etiqueta</button></section>';
+  outcome='<section class="vl2-outcome"><section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Conferência automática</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
+   (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência nos campos verificados.</p>')+
+   (passed.length?'<details class="vl2-passed"><summary>Ver '+passed.length+' itens conferidos</summary><div class="vl2-check-list">'+passed.map(item).join("")+'</div></details>':"")+'</section></section>'+
+   (report.ready?'<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate">Concluir conferência</button></section>':'<p class="vl2-not-ready">A conferência automática já está disponível. Para aprovar e registrar, confirme apenas as referências independentes da produção que faltam.</p>');
  }else{
   const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
   outcome='<section class="vl2-outcome" id="vl2-outcome">'+
@@ -1817,7 +1822,7 @@ function mount(adapter){
  releasePhoto();resetScan();
  const p=el("panel");if(!p)return;
  p.innerHTML='<section class="vl2" aria-label="Conferência de etiquetas">'+
-  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2><p>Fotografe o rótulo, informe os dados da ordem de produção e confira o resultado antes de salvar.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
+  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2><p>Fotografe a etiqueta. O VITRA compara os dados automaticamente e solicita apenas as referências que faltam para aprovar.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
   '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>A foto pode conter caixa e cumbuca juntas. O recorte é opcional.</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
   '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
