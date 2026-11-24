@@ -14,6 +14,19 @@ const today=()=>{
  return p.year+"-"+p.month+"-"+p.day;
 };
 const groupOf=code=>Object.keys(groups).find(key=>groups[key].includes(code));
+function updateCounters(){
+ // Os seis indicadores da tela inicial são criados uma vez e precisam refletir os movimentos.
+ for(const [key,areas] of Object.entries(groups)){
+   const count=String(areas.length);
+   document.querySelectorAll('#vitraKpis .vitra-kpi[data-section="'+key+'"] strong').forEach(el=>{
+     if(el.textContent!==count)el.textContent=count;
+   });
+   document.querySelectorAll('#cards [data-main="'+key+'"] .n').forEach(el=>{
+     if(el.textContent!==count)el.textContent=count;
+   });
+ }
+}
+
 function note(area,text){
  A[area].note=(String(A[area].note||"").includes(text)?A[area].note:(String(A[area].note||"")+" "+text).trim());
 }
@@ -57,13 +70,8 @@ function apply(events){
   }
   applied.add(event.id);
  }
- if(changed){
-   for(const [key,values] of Object.entries(groups)){
-    const card=document.querySelector('#cards [data-main="'+key+'"] .n');
-    if(card)card.textContent=String(values.length);
-   }
-   if(typeof render==="function"&&typeof st!=="undefined"&&st)render();
- }
+ updateCounters();
+ if(changed&&typeof render==="function"&&typeof st!=="undefined"&&st)render();
 }
 async function request(action,payload={}){
  const session=JSON.parse(sessionStorage.getItem("vitra_access_session_v1")||"null");
