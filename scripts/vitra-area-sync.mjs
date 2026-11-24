@@ -24,27 +24,32 @@ const state=area=>Object.keys(groups).find(key=>groups[key].includes(area));
 for(const e of payload.events){
  if(!Number.isSafeInteger(e.id)||e.id<=marker)continue;
  if(e.id<=0||!/^\d{3}[AB]$/.test(e.area)||!areas[e.area]||
-   !["start","finish"].includes(e.action)||!/^\d{4}-\d{2}-\d{2}$/.test(e.effective_date)||
-   !["acomp","pausa","colh"].includes(e.from_status)||!["colh","fim"].includes(e.to_status))
+   !["start","pause","resume","finish"].includes(e.action)||!/^\d{4}-\d{2}-\d{2}$/.test(e.effective_date)||
+   !["acomp","pausa","colh"].includes(e.from_status)||!["colh","pausa","fim"].includes(e.to_status))
    throw Error("Evento inválido: "+e.id);
- if((e.action==="start"&&e.to_status!=="colh")||(e.action==="finish"&&e.to_status!=="fim"))
-   throw Error("Transição inconsistente no evento "+e.id);
+ const allowed=(e.action==="start"&&e.from_status==="acomp"&&e.to_status==="colh")||
+   (e.action==="pause"&&["acomp","colh"].includes(e.from_status)&&e.to_status==="pausa")||
+   (e.action==="resume"&&e.from_status==="pausa"&&e.to_status==="colh")||
+   (e.action==="finish"&&e.from_status==="colh"&&e.to_status==="fim");
+ if(!allowed)throw Error("Transição inconsistente no evento "+e.id);
  const current=state(e.area);
  if(current!==e.from_status&&current!==e.to_status)
    throw Error("Conflito da área "+e.area+": GitHub="+current+" evento="+e.from_status+"→"+e.to_status);
  const field=areas[e.area],date=toBr(e.effective_date);
+ const putNote=annotation=>{if(!String(field.note||"").includes(annotation))field.note=(String(field.note||"")+" "+annotation).trim()};
  if(e.action==="start"){
-   if(field.harvestStartDate&&field.harvestStartDate!==date)
-     throw Error("Data de início divergente, área "+e.area);
-   field.harvestStartDate=date;
-   const annotation="Colheita iniciada em "+date+".";
-   if(!String(field.note||"").includes(annotation))field.note=(String(field.note||"")+" "+annotation).trim();
- }else{
-   if(field.finalizedDate&&field.finalizedDate!==date)
-     throw Error("Data de finalização divergente, área "+e.area);
-   field.finalizedDate=date;
-   const annotation="Colheita finalizada em "+date+".";
-   if(!String(field.note||"").includes(annotation))field.note=(String(field.note||"")+" "+annotation).trim();
+   if(field.harvestStartDate&&field.harvestStartDate!==date)throw Error("Data de início divergente, área "+e.area);
+   field.harvestStartDate=date;putNote("Colheita iniciada em "+date+".");
+ }else if(e.action==="pause"){
+   field.lastPauseDate=date;
+   putNote((e.from_status==="acomp"?"Acompanhamento pausado":"Colheita pausada")+" em "+date+".");
+ }else if(e.action==="resume"){
+   field.lastResumeDate=date;
+   if(!field.harvestStartDate){field.harvestStartDate=date;putNote("Colheita iniciada em "+date+".");}
+   else putNote("Colheita retomada em "+date+".");
+ }else if(e.action==="finish"){
+   if(field.finalizedDate&&field.finalizedDate!==date)throw Error("Data de finalização divergente, área "+e.area);
+   field.finalizedDate=date;putNote("Colheita finalizada em "+date+".");
  }
  if(current===e.from_status){
    groups[current]=groups[current].filter(x=>x!==e.area);
