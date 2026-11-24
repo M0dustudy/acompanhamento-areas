@@ -42,6 +42,15 @@ function apply(events){
   if(event.action==="start"){
     if(!area.harvestStartDate){area.harvestStartDate=date;changed=true}
     note(code,"Colheita iniciada em "+date+".");
+  }else if(event.action==="pause"){
+    area.lastPauseDate=date;
+    note(code,(event.from_status==="acomp"?"Acompanhamento":"Colheita")+" pausado em "+date+".");
+  }else if(event.action==="resume"){
+    area.lastResumeDate=date;
+    if(!area.harvestStartDate){
+      area.harvestStartDate=date;
+      note(code,"Colheita iniciada em "+date+".");
+    }else note(code,"Colheita retomada em "+date+".");
   }else if(event.action==="finish"){
     if(!area.finalizedDate){area.finalizedDate=date;changed=true}
     note(code,"Colheita finalizada em "+date+".");
@@ -53,7 +62,7 @@ function apply(events){
     const card=document.querySelector('#cards [data-main="'+key+'"] .n');
     if(card)card.textContent=String(values.length);
    }
-   if(typeof showHome==="function")showHome();
+   if(typeof render==="function"&&typeof st!=="undefined"&&st)render();
  }
 }
 async function request(action,payload={}){
@@ -77,84 +86,77 @@ async function refresh(){
  }catch(e){console.warn("VITRA: sincronização de áreas",e.message);return false}
 }
 function remove(){q("#va-area-admin-card")?.remove();q("#va-area-modal")?.remove()}
-function showAdmin(){
- if(role!=="master"||q("#va-area-admin-card"))return;
- const cards=q("#cards");if(!cards)return;
- const button=document.createElement("button");
- button.id="va-area-admin-card";button.type="button";button.className="card va-area-card";
- button.dataset.main="area-movements";
- button.innerHTML='<span class="va-area-symbol">↗</span><b>MOVIMENTAR ÁREAS</b><small>Iniciar ou finalizar a colheita</small>';
- button.addEventListener("click",openModal);
- cards.appendChild(button);
-}
-function openModal(){
- if(role!=="master")return;
+function showAdmin(){window.VITRA_IS_MASTER=role==="master";}
+function openModal(areaCode){
+ if(role!=="master"||!/^\d{3}[AB]$/.test(String(areaCode||""))||!A[areaCode])return;
+ const current=groupOf(areaCode);
+ const options={
+   acomp:[{op:"start",label:"Iniciar colheita",to:"Em colheita"},{op:"pause",label:"Pausar área",to:"Pausada"}],
+   colh:[{op:"pause",label:"Pausar colheita",to:"Pausada"},{op:"finish",label:"Finalizar colheita",to:"Finalizada"}],
+   pausa:[{op:"resume",label:"Retomar colheita",to:"Em colheita"}]
+ }[current]||[];
+ if(!options.length)return;
  q("#va-area-modal")?.remove();
  const wrap=document.createElement("div");
  wrap.id="va-area-modal";wrap.className="va-area-backdrop";
+ const area=A[areaCode];
  wrap.innerHTML='<section class="va-area-modal" role="dialog" aria-modal="true" aria-labelledby="va-area-title">'+
- '<div class="va-area-top"><h2 id="va-area-title">Movimentar áreas</h2><button type="button" class="va-area-close" aria-label="Fechar">×</button></div>'+
- '<p class="va-area-intro">Escolha uma área e confira a data. As avaliações e documentos originais serão preservados.</p>'+
- '<div class="va-area-switch"><button type="button" data-op="start" aria-pressed="false">Iniciar colheita</button><button type="button" data-op="finish" aria-pressed="true">Finalizar colheita</button></div>'+
- '<form id="va-area-form"><label class="va-area-field">Área<select name="area" required></select></label>'+
- '<label class="va-area-field">Data do movimento<input type="date" name="date" required></label>'+
- '<div class="va-area-summary" role="status"></div><button class="va-area-save" type="submit">Confirmar</button><p class="va-area-feedback" role="status"></p></form></section>';
+ '<div class="va-area-top"><h2 id="va-area-title">'+esc(areaCode)+' · '+esc(area.v||"Área")+'</h2><button type="button" class="va-area-close" aria-label="Fechar">×</button></div>'+
+ '<p class="va-area-intro">Situação atual: <strong>'+esc({acomp:"Acompanhamento",colh:"Em colheita",pausa:"Pausada"}[current])+'</strong></p>'+
+ '<form id="va-area-form"><fieldset class="va-area-options"><legend>Alterar para</legend>'+
+ options.map((choice,i)=>'<label class="va-area-option"><input type="radio" name="operation" value="'+choice.op+'" '+(i===0?"checked":"")+'><span>'+esc(choice.label)+'</span></label>').join("")+'</fieldset>'+
+ '<label class="va-area-field">Data da movimentação<input type="date" name="date" required></label>'+
+ '<div class="va-area-summary" role="status"></div><button class="va-area-save" type="submit">Confirmar movimentação</button><p class="va-area-feedback" role="status" aria-live="polite"></p></form></section>';
  document.body.appendChild(wrap);
  const close=()=>wrap.remove();
- wrap.addEventListener("click",e=>{if(e.target===wrap)close()});
+ wrap.addEventListener("click",event=>{if(event.target===wrap)close()});
  q(".va-area-close",wrap).addEventListener("click",close);
- const form=q("#va-area-form",wrap),select=q('select[name="area"]',form),date=q('input[name="date"]',form);
+ const form=q("#va-area-form",wrap),date=q('input[name="date"]',form);
  const summary=q(".va-area-summary",form),save=q(".va-area-save",form),feedback=q(".va-area-feedback",form);
- let op="finish",requestId=null;
+ let requestId=null;
  date.value=today();date.max=today();
- function update(keep=true){
-  feedback.textContent="";feedback.dataset.ok="false";
-  const allowed=op==="start"?[...groups.acomp,...groups.pausa]:[...groups.colh];
-  allowed.sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));
-  const previous=keep?select.value:"";
-  select.replaceChildren();
-  for(const id of allowed)select.add(new Option(id+" · "+String(A[id]?.v||"Variedade não identificada"),id));
-  if(previous&&allowed.includes(previous))select.value=previous;
-  const area=A[select.value],id=select.value;
-  save.disabled=busy||!id;
-  save.textContent=op==="start"?"Confirmar início da colheita":"Confirmar finalização";
-  if(!id){summary.textContent="Não há áreas disponíveis para esta operação.";return}
-  summary.innerHTML="<strong>"+esc(id)+" · "+esc(area.v)+"</strong>"+
-    (op==="start"?"Início":"Finalização")+" em "+esc(pt(date.value))+". "+
-    (op==="finish"&&area.harvestStartDate?"Data de início preservada: "+esc(area.harvestStartDate)+". ":"")+
-    "Os resultados, registros e relatórios anteriores permanecerão intactos.";
+ const currentChoice=()=>options.find(x=>x.op===q('input[name="operation"]:checked',form)?.value)||options[0];
+ function update(){
+   requestId=null;
+   const choice=currentChoice();
+   save.disabled=busy;save.textContent="Confirmar: "+choice.label.toLowerCase();
+   const earlier=area.harvestStartDate&&["finish","pause"].includes(choice.op)?
+     "<br>Início da colheita preservado: "+esc(area.harvestStartDate)+".":"";
+   summary.innerHTML="<strong>"+esc(areaCode)+" → "+esc(choice.to)+"</strong>Data: "+esc(pt(date.value))+"."+earlier;
+   feedback.textContent="";feedback.dataset.ok="false";
  }
- wrap.querySelectorAll("[data-op]").forEach(button=>button.addEventListener("click",()=>{
-   op=button.dataset.op;requestId=null;
-   wrap.querySelectorAll("[data-op]").forEach(b=>b.setAttribute("aria-pressed",String(b===button)));
-   update(false);
- }));
- select.addEventListener("change",()=>{requestId=null;update(true)});
- date.addEventListener("change",()=>{requestId=null;update(true)});
- form.addEventListener("submit",async e=>{
-   e.preventDefault();if(busy||!select.value)return;
-   busy=true;save.disabled=true;feedback.textContent="Registrando movimentação…";
+ form.querySelectorAll('input[name="operation"]').forEach(el=>el.addEventListener("change",update));
+ date.addEventListener("input",update);
+ form.addEventListener("submit",async event=>{
+   event.preventDefault();if(busy||!date.value)return;
+   const choice=currentChoice();
+   busy=true;save.disabled=true;feedback.textContent="Registrando...";
    if(!requestId)requestId=crypto.randomUUID();
    try{
-    await request("change",{area:select.value,operation:op,date:date.value,request_id:requestId});
-    const synced=await refresh();
-    if(synced)update(false);
-    feedback.dataset.ok="true";
-    feedback.textContent=synced?"Registrado. A publicação no GitHub ocorre na sincronização automática.":"Registrado no servidor; consulte novamente quando houver conexão.";
-    requestId=null;save.disabled=!synced;
-   }catch(error){feedback.dataset.ok="false";feedback.textContent=error.message;save.disabled=false}
-   finally{busy=false}
+     await request("change",{area:areaCode,operation:choice.op,date:date.value,request_id:requestId});
+     const ok=await refresh();
+     if(!ok){
+       feedback.textContent="Registrado no servidor. A atualização visual será aplicada na próxima sincronização.";
+       feedback.dataset.ok="true";
+       save.disabled=true;
+     }else{
+       close();
+     }
+   }catch(error){
+     feedback.dataset.ok="false";feedback.textContent=error.message;
+     save.disabled=false;
+   }finally{busy=false}
  });
  update();
 }
 window.addEventListener("vitra:authenticated",e=>{
  role=e.detail?.role||null;
- if(role==="master")showAdmin();else remove();
+ if(role==="master")showAdmin();else{window.VITRA_IS_MASTER=false;remove();}
  try{const cache=JSON.parse(localStorage.getItem(CACHE)||"[]");if(Array.isArray(cache))apply(cache)}catch{}
  refresh();
 });
-window.addEventListener("vitra:logout",()=>{role=null;remove()});
+window.addEventListener("vitra:logout",()=>{role=null;window.VITRA_IS_MASTER=false;remove()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&role)refresh()});
 setInterval(()=>{if(role&&!document.hidden)refresh()},120000);
-window.VitraAreas={refresh};
+window.VitraAreas={refresh,open:openModal};
 })();
