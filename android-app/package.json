@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "prepare:web": "node prepare.mjs",
-    "android:sync": "node prepare.mjs && npx cap sync android"
+    "android:sync": "node prepare.mjs && npx cap sync android",
+    "ios:prepare": "node prepare.mjs && node ../ios-app/configure.mjs && npx cap sync ios"
   },
   "dependencies": {
     "@capacitor/core": "8.6.2",
     "@capacitor/android": "8.6.2",
-    "pdfjs-dist": "4.10.38"
+    "pdfjs-dist": "4.10.38",
+    "@capacitor/ios": "8.6.2"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.2"
