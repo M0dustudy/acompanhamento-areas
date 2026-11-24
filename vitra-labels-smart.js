@@ -17,7 +17,7 @@ const state={
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
- entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0,ocrRawPassages:[]
+ entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0,ocrRawPassages:[],traceVisualCheck:""
 };
 let ctx=null,cameraStream=null;
 const el=id=>document.getElementById(id);
@@ -48,7 +48,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
- state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;
+ state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";
 }
 function validCnpj(raw){
  const n=digits(raw);if(n.length!==14||/^(\d)\1+$/.test(n))return false;
@@ -517,7 +517,7 @@ function invalidatePhotoReading(){
  state.detected=null;state.fields={};state.sources={};state.matches=[];state.referenceChecks=[];
  state.referenceProducer=null;state.referenceMerchant=null;
  state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.analysisError="";
- state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;
+ state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;state.traceVisualCheck="";
  state.identity.kind="";state.identity.variety="";state.identity.klass="";
 }
 function fitGalleryImage(){
@@ -565,6 +565,13 @@ async function useFile(file){
  setGalleryPreview(file);showResult();
  notice("Foto recebida. Lendo automaticamente as etiquetas e seus códigos…");
  await analyzeGalleryFull();
+}
+function openDeviceCamera(){
+ const native=el("vl2-native-camera");
+ if(native&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||"")||window.Capacitor?.isNativePlatform?.())){
+  native.click();return;
+ }
+ void beginCamera();
 }
 async function beginCamera(){
  if(!navigator.mediaDevices?.getUserMedia){notice("Câmera integrada indisponível. Use «Escolher foto».",true);return;}
@@ -885,7 +892,7 @@ async function readPhoto(deep=false){
  const existingPasses=deep?(state.ocrRawPassages||[]).slice():[];
  const existingBarcode=deep?state.barcodeBars:"";
  const existingPrinted=deep?state.barcodePrinted:"";
- state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;
+ state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;state.traceVisualCheck="";
  state.ocrConflicts=[];state.ocrPasses=0;state.pairedEvidence=null;showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
  let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
@@ -896,9 +903,9 @@ async function readPhoto(deep=false){
   try{
    update("Inicializando o leitor de texto…");
    await ensureOCR();worker=await getOCRWorker();if(seq!==state.sequence)return;
-   if(!passages.length){
-    update("Lendo todas as informações da etiqueta…");
-    const canvas=await limitWork(prepareOCRImage(photo,2100),3500,"Falha ao preparar foto.");
+   if(!passages.length||deep){
+    update(deep?"Lendo novamente a fotografia com resolução ampliada…":"Lendo todas as informações da etiqueta…");
+    const canvas=await limitWork(prepareOCRImage(photo,deep?3300:2100),deep?6500:3500,"Falha ao preparar foto.");
     try{const original=await readPass(canvas,12000);if(original)passages.push(original);}
     catch(e){failure=e?.message||"A leitura inicial não foi concluída.";discardOCRWorker(worker);worker=null;}
    }
@@ -910,7 +917,7 @@ async function readPhoto(deep=false){
    if(worker&&shouldScanOCRBands(passages.join("\n"),deep)){
     const needTrace=!ocrTraceCandidates(passages.join("\n")).length;
     const regions=deep?
-      [{a:0,b:.62,contrast:false,name:"superior"},{a:.38,b:1,contrast:true,name:"inferior"}]:
+      [{a:0,b:.42,contrast:false,name:"superior"},{a:.30,b:.75,contrast:true,name:"central"},{a:.62,b:1,contrast:true,name:"inferior"}]:
       needTrace?[{a:.34,b:1,contrast:true,name:"da rastreabilidade"}]:
       [{a:0,b:.73,contrast:true,name:"dos dados cadastrais"}];
     const bands=regions;
@@ -975,7 +982,7 @@ async function readPhoto(deep=false){
    }
   }
  };
- try{await limitWork(run(),state.pairRequested?56000:45000,"Limite de leitura atingido. A foto foi preservada.");}
+ try{await limitWork(run(),deep||state.pairRequested?70000:45000,"Limite de leitura atingido. A foto foi preservada.");}
  catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
@@ -1706,7 +1713,7 @@ function mount(adapter){
   '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>A foto pode conter caixa e cumbuca juntas. O recorte é opcional.</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
   '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
-  '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Abrir câmera traseira</button><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
+  '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Fotografar etiqueta</button><input id="vl2-native-camera" type="file" accept="image/*" capture="environment" hidden aria-label="Tirar foto da etiqueta"><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
   '<button id="vl2-capture" type="button" class="vl2-apply" hidden>Capturar somente a área marcada</button><button id="vl2-capture-full" type="button" class="vl2-apply vl2-capture-duo" hidden>Capturar foto inteira · caixa + cumbuca</button>'+
   '<div id="vl2-gallery-tools" class="vl2-gallery-tools" hidden><button id="vl2-rotate-left" type="button">↶ Girar</button><button id="vl2-rotate-right" type="button">Girar ↷</button><button id="vl2-crop-toggle" type="button">Recortar uma etiqueta</button></div>'+
   '<button id="vl2-analyze-full" type="button" class="vl2-apply" hidden>Analisar foto inteira</button>'+
@@ -1718,7 +1725,8 @@ function mount(adapter){
   (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">A conferência digital compara informações reconhecidas com o manual e os padrões cadastrados. Um campo ilegível ou sem referência confiável permanece pendente. A liberação física continua sob responsabilidade da equipe autorizada.</p></section>';
  el("vl2-back")?.addEventListener("click",()=>{releasePhoto();ctx.back();});
- el("vl2-open-camera")?.addEventListener("click",beginCamera);
+ el("vl2-open-camera")?.addEventListener("click",openDeviceCamera);
+ el("vl2-native-camera")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
  el("vl2-gallery")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
  el("vl2-capture")?.addEventListener("click",captureCamera);
  el("vl2-capture-full")?.addEventListener("click",captureCameraFull);
