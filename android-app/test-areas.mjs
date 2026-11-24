@@ -9,7 +9,8 @@ const area=JSON.parse(html.match(/const A=(\{.*?\});\n\/\/ Data original de colh
 const stock=JSON.parse(html.match(/const stockData=(\[.*?\]);\n/s)[1]);
 assert.equal(stock.length,481);
 assert.equal(Object.keys(area).length,34);
-assert.equal(new Set(Object.values(original).flat()).size,34);
+assert.equal(new Set(Object.values(original).flat()).size,35);
+assert.deepEqual(Object.values(original).flat().filter(code=>!area[code]),["301B"],"Não inventar dados para a área 301B sem cadastro original");
 assert.ok(html.includes('window.VITRA_IS_MASTER===true&&st!=="fim"'));
 const events=[
  {id:10001,area:"304A",action:"pause",from_status:"colh",to_status:"pausa",effective_date:"2026-11-24"},
@@ -61,7 +62,7 @@ assert.equal(master.counters.colh.textContent,"2");
 assert.equal(master.counters.pausa.textContent,"1");
 assert.equal(master.A["304A"].lastResumeDate,"24/11/2026");
 assert.equal(master.A["304A"].harvestStartDate,area["304A"].harvestStartDate);
-assert.equal(new Set(Object.values(master.groups).flat()).size,34);
+assert.equal(new Set(Object.values(master.groups).flat()).size,35);
 const viewer=fixture("member");
 viewer.notify([]);
 assert.equal(viewer.context.window.VITRA_IS_MASTER,false,"Controle não deve aparecer para outros usuários");
