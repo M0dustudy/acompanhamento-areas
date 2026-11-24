@@ -13,7 +13,7 @@ const producers=[];
 const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{sensitivity:"base"}));
 const state={
  photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,codeEvidence:[],pairedEvidence:null,pairRequested:false,
- identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
+ identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,clientFromCatalog:false,
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
@@ -46,7 +46,7 @@ function releasePhoto(){
 function resetScan(){
  state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;state.codeEvidence=[];state.pairedEvidence=null;state.pairRequested=false;
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
- state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
+ state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;state.clientFromCatalog=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
  state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";
 }
@@ -784,8 +784,15 @@ async function printedEANNearBarcode(file,worker){
   canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);
   const g=canvas.getContext("2d");g.fillStyle="white";g.fillRect(0,0,canvas.width,canvas.height);
   g.filter="grayscale(1) contrast(1.55)";g.drawImage(bmp,left,top,width,height,0,0,canvas.width,canvas.height);
-  const data=await limitWork(worker.recognize(canvas),7200,"A leitura dos números foi interrompida");
-  return getEAN(data.data?.text||"");
+  // Isolar a linha de algarismos da imagem original, sem usar o EAN decodificado como texto.
+  const line=document.createElement("canvas");line.width=canvas.width;line.height=Math.max(1,Math.round(canvas.height*.53));
+  line.getContext("2d").drawImage(canvas,0,canvas.height-line.height,line.width,line.height,0,0,line.width,line.height);
+  try{
+   await worker.setParameters({tessedit_pageseg_mode:"7",tessedit_char_whitelist:"0123456789 "});
+   const read=await limitWork(worker.recognize(line),8000,"Leitura de dígitos interrompida");
+   const num=getEAN(read.data?.text||"");if(num)return num;
+  }catch{}finally{await worker.setParameters({tessedit_pageseg_mode:"6",tessedit_char_whitelist:""});}
+  const data=await limitWork(worker.recognize(canvas),7200,"A leitura dos números foi interrompida");return getEAN(data.data?.text||"");
  }catch{return "";}finally{bmp?.close?.();}
 }
 function rotateBitmapCanvas(source,angle,maxDim=3000){
@@ -961,7 +968,7 @@ async function readPhoto(deep=false){
     const focus=await limitWork(focusLabelCanvas(photo,deep?4200:3600),4000,"Localização automática interrompida.").catch(()=>null);
      const canvas=focus||await limitWork(prepareOCRImage(photo,deep?4200:3200),deep?6500:3500,"Falha ao preparar foto.");
     try{
-      const original=await readPass(canvas,16000,focus?"6":"3");if(original)passages.push(original);
+      const original=await readPass(canvas,16000,"3");if(original)passages.push(original);
       if(focus&&seq===state.sequence){
        const first=norm(original);
        if(/COMERCIALIZADO|PRODUZIDO|CNPJ|CLASSE\s*:|MEI\s*[-]?\s*PA/.test(first)&&focus.width>focus.height*1.15){
@@ -1068,7 +1075,14 @@ async function readPhoto(deep=false){
     state.text=recognized;state.barcode=barcode||data.fields.barcode;
     state.barcodeBars=barcode;state.barcodePrinted=printedNumber||getEAN(recognized);
     state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
-    if(!state.clientConfirmed)state.identity.client=data.detectedClient;
+    if(!state.clientConfirmed||state.clientFromCatalog){
+     state.identity.client=data.detectedClient;state.clientFromCatalog=false;state.clientConfirmed=false;
+     const eligible=distinct((data.codeClients||[]).map(catalogClient));
+     const printedClients=distinct((data.wordClients||[]).map(catalogClient));
+     if(barcode&&eanValid(barcode)&&eligible.length===1&&eligible[0]!=="cia"&&catalogClient(data.detectedClient)===eligible[0]&&printedClients.every(x=>x===eligible[0])&&!state.pairedEvidence?.detected){
+      state.identity.client=eligible[0];state.clientConfirmed=true;state.clientFromCatalog=true;
+     }
+    }
     state.identity.kind=data.identity.kind;state.identity.variety=data.identity.variety;state.identity.klass=data.identity.klass;
     state.analysisError=failure||(!recognized?"Não foi possível reconhecer texto nesta fotografia com segurança.":"");
     state.ocrFailed=!!state.analysisError;state.scanCompleted=true;state.issues=[];
@@ -1089,7 +1103,7 @@ function clientChooser(){
   '<details name="vl2-choice" class="vl2-client-combo" id="vl2-client-combo"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><strong>'+esc(active?nameOf(clients,active):"Pesquisar ou selecionar cliente")+'</strong><em>'+esc(state.clientConfirmed?"Alterar":"Confirmar")+'</em></summary>'+
   '<div class="vl2-client-pop"><div class="vl2-popup-header"><strong>Selecionar cliente</strong><button type="button" data-vl2-close-lookup aria-label="Fechar seleção">✕</button></div><input id="vl2-client-search" type="search" autocomplete="off" aria-label="Pesquisar cliente" placeholder="Digite o nome do cliente…"><div class="vl2-client-options">'+
   sortedClients.map(c=>'<button type="button" data-vl2-client="'+esc(c[0])+'" data-label="'+esc(norm(c[1]))+'">'+esc(c[1])+'</button>').join("")+
-  '</div></div></details>'+'<p class="vl2-help">'+(state.clientConfirmed?"Cliente confirmado.":active?"Confirme o cliente sugerido.":"Selecione o cliente.")+'</p></div>';
+  '</div></div></details>'+'<p class="vl2-help">'+(state.clientFromCatalog?"Cliente único no catálogo; confirme com a ordem ao salvar.":state.clientConfirmed?"Cliente confirmado.":active?"Confirme o cliente sugerido.":"Selecione o cliente.")+'</p></div>';
 }
 function lookupPicker(items,key,value,placeholder,attribute){
  const ordered=items.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{numeric:true,sensitivity:"base"}));
@@ -1265,7 +1279,7 @@ function diagnosticV4(){
     // A marca impressa, quando realmente lida, é evidência independente do EAN.
     const marcas=distinct((state.detected?.wordClients||[]).map(catalogClient).filter(Boolean));
     if(marcas.length===1&&selected&&state.clientConfirmed){
-      if(marcas[0]===catalogClient(selected))add("ok","Marca e cliente da ordem","Marca "+display+" reconhecida na foto e correspondente à ordem.");
+      if(marcas[0]===catalogClient(selected))add("ok","Marca e cliente","Marca "+display+" reconhecida na foto e correspondente "+(state.clientFromCatalog?"ao catálogo.":"à ordem."));
       else add("error","Marca divergente do cliente","Marca da fotografia: "+nameOf(clients,marcas[0])+" · cliente da ordem: "+display+". A divergência é da marca, não do compartilhamento de EAN.");
     }else if(marcas.length>1)add("pending","Marcas diferentes na foto","Há mais de uma marca identificada; confira as etiquetas antes da conclusão.");
    }
@@ -1507,14 +1521,14 @@ function showResult(){
   outcome='<section class="vl2-outcome"><section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Conferência automática</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
    (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência nos campos verificados.</p>')+
    (passed.length?'<details class="vl2-passed"><summary>Ver '+passed.length+' itens conferidos</summary><div class="vl2-check-list">'+passed.map(item).join("")+'</div></details>':"")+'</section></section>'+
-   (report.ready?'<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate">Concluir conferência</button></section>':'<p class="vl2-not-ready">A conferência automática já está disponível. Para aprovar e registrar, confirme apenas as referências independentes da produção que faltam.</p>');
+   '<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?'disabled':'')+'>Concluir conferência</button></section>';
  }else{
   const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
   outcome='<section class="vl2-outcome" id="vl2-outcome">'+
   '<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>'+esc(issues.length?"Itens para corrigir ou confirmar":"Itens conferidos")+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
   (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência encontrada nos dados que puderam ser verificados.</p>')+
   (passed.length?'<div class="vl2-confirmed-area"><div class="vl2-confirmed-head"><strong>'+passed.length+' itens conferidos</strong><small>Confirmados com a referência disponível</small></div><div class="vl2-check-list">'+passed.slice(0,10).map(item).join("")+'</div>'+(passed.length>10?'<details class="vl2-passed"><summary>Ver outros '+(passed.length-10)+' itens conferidos</summary><div class="vl2-check-list">'+passed.slice(10).map(item).join("")+'</div></details>':"")+'</div>':"")+'</section></section>';
-  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a aplicação física e o modelo da etiqueta com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
+  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi o cliente, o modelo e a aplicação física com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
   else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
  }
  const deepRetry=state.photo&&state.scanCompleted?'<div class="vl2-read-actions"><button type="button" id="vl2-deep-read" class="vl2-retry-deep">Reexaminar foto em alta resolução</button><button type="button" id="vl2-pair-read" class="vl2-retry-deep">Comparar caixa e cumbuca da foto</button></div>':"";
@@ -1529,7 +1543,7 @@ function showResult(){
  }));
  root.querySelectorAll("[data-vl2-close-lookup]").forEach(b=>b.addEventListener("click",()=>{b.closest("details").open=false;}));
  el("vl2-client-search")?.addEventListener("input",e=>{const q=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(q));});
- root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.reviewRequested=false;showResult();}));
+ root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.clientFromCatalog=false;state.reviewRequested=false;showResult();}));
  root.querySelectorAll("[data-vl2-trace-check]").forEach(btn=>btn.addEventListener("click",()=>{
   const response=btn.dataset.vl2TraceCheck;
   if(response==="yes"){
@@ -1577,7 +1591,7 @@ function showResult(){
  el("vl2-retry-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto().finally(()=>{state.processing=false;});});
  el("vl2-deep-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto(true).finally(()=>{state.processing=false;});});
  el("vl2-pair-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.pairRequested=true;state.processing=true;readPhoto(true).finally(()=>{state.processing=false;});});
- el("vl2-evaluate")?.addEventListener("click",()=>{state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
+ el("vl2-evaluate")?.addEventListener("click",()=>{if(!diagnosticV4().ready)return;state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
  el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
  el("vl2-save")?.addEventListener("click",saveReview);
@@ -1744,7 +1758,7 @@ async function saveReview(){
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
  const visualEvidence=await collectVisualEvidence(state.photo,state.text);
- const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,
+ const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,clientSource:state.clientFromCatalog?"catalogo_ean_unico_confirmado_no_encerramento":"ordem_informada",
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
