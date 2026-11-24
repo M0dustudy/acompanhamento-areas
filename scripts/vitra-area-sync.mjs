@@ -42,7 +42,7 @@ for(const e of payload.events){
    field.harvestStartDate=date;putNote("Colheita iniciada em "+date+".");
  }else if(e.action==="pause"){
    field.lastPauseDate=date;
-   putNote((e.from_status==="acomp"?"Acompanhamento":"Colheita")+" pausado em "+date+".");
+   putNote((e.from_status==="acomp"?"Acompanhamento pausado":"Colheita pausada")+" em "+date+".");
  }else if(e.action==="resume"){
    field.lastResumeDate=date;
    if(!field.harvestStartDate){field.harvestStartDate=date;putNote("Colheita iniciada em "+date+".");}
