@@ -121,8 +121,15 @@
    if(cssFound.size!==CSS.length||scriptFound.size!==JS.length)
      throw new Error("O formato do site mudou. Mantendo os dados anteriores.");
    const closer="</scr"+"ipt>";
-   const inline=JS.map(name=>'<script data-vitra-mobile="'+name+'">'+
-     fetched[name].replace(/<\/script/gi,"<\\/script")+closer).join("\n");
+   const inline=JS.map(name=>{
+     let source=fetched[name];
+     if(name==="vitra-access.js"){
+       const start='} catch (err) {\\n      session = null; me = null; remember();'.replace(/\\n/g,"\n");
+       if(!source.includes(start))throw new Error("Fluxo de autenticação incompatível");
+       source=source.replace(start,'} catch (err) {\n      if (!navigator.onLine) return;\n      session = null; me = null; remember();');
+     }
+     return '<script data-vitra-mobile="'+name+'">'+source.replace(/<\/script/gi,"<\\/script")+closer;
+   }).join("\n");
    html=html.replace(/<head>/i,'<head><base href="'+location.origin+'/">');
    if(!html.includes("</body>"))throw new Error("Página principal incompleta.");
    return html.replace(/<\/body>/i,inline+"</body>");
