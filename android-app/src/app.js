@@ -1,191 +1,222 @@
-/* VITRA Android - shell local, snapshots integrais e sincronização segura. */
-(() => {
- "use strict";
- const REPO="M0dustudy/acompanhamento-areas";
- const BASE_SHA="0ff8a2fc0baa404651b289ccb568a70ed0d00e46";
- const ROOT="https://raw.githubusercontent.com/"+REPO+"/main/";
- const CSS=["vitra-access.css","vitra-labels-smart.css","vitra-areas.css"];
- const JS=["vitra-access-config.js","vitra-access.js","vitra-areas.js","vitra-labels-smart.js"];
- const FILES=["index.html",...CSS,...JS];
- const frame=document.querySelector("#view");
- const back=document.querySelector("#back");
- const syncBtn=document.querySelector("#sync");
- const status=document.querySelector("#connection");
- const toast=document.querySelector("#toast");
- const toastMessage=document.querySelector("#toastMessage");
- const apply=document.querySelector("#apply");
- let snapshot=null, nextSnapshot=null, mode="dashboard", syncing=false, lastCheck=0;
- const dbPromise=new Promise((resolve,reject)=>{
-   const req=indexedDB.open("vitra-mobile-snapshot-v1",1);
-   req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains("app"))req.result.createObjectStore("app")};
-   req.onerror=()=>reject(req.error);
-   req.onsuccess=()=>resolve(req.result);
+/* VITRA Android: painel original, atualização discreta e consulta offline. */
+(()=>{
+"use strict";
+const REPO="M0dustudy/acompanhamento-areas";
+const BASE_SHA="0ff8a2fc0baa404651b289ccb568a70ed0d00e46";
+const CSS=["vitra-access.css","vitra-labels-smart.css","vitra-areas.css"];
+const JS=["vitra-access-config.js","vitra-access.js","vitra-areas.js","vitra-labels-smart.js"];
+const FILES=["index.html",...CSS,...JS];
+const FRAME=document.querySelector("#view");
+const STATUS=document.querySelector("#sync-status");
+const POLL_MS=90000; // a cada 90 segundos, e imediatamente ao puxar para baixo
+let snapshot=null,pending=null,mode="dashboard",syncing=false,lastCheck=0;
+let statusTimer=0,noticeToken=0;
+const dbPromise=new Promise((resolve,reject)=>{
+ const req=indexedDB.open("vitra-mobile-snapshot-v1",1);
+ req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains("app"))req.result.createObjectStore("app")};
+ req.onsuccess=()=>resolve(req.result);
+ req.onerror=()=>reject(req.error);
+});
+async function getSaved(){
+ const db=await dbPromise;
+ return new Promise((resolve,reject)=>{
+  const req=db.transaction("app","readonly").objectStore("app").get("latest");
+  req.onsuccess=()=>resolve(req.result||null);
+  req.onerror=()=>reject(req.error);
  });
- async function dbGet(key){
-   const db=await dbPromise;
-   return await new Promise((res,rej)=>{
-     const request=db.transaction("app","readonly").objectStore("app").get(key);
-     request.onsuccess=()=>res(request.result||null);
-     request.onerror=()=>rej(request.error);
-   });
- }
- async function dbSet(key,value){
-   const db=await dbPromise;
-   return await new Promise((res,rej)=>{
-     const tx=db.transaction("app","readwrite");
-     tx.objectStore("app").put(value,key);
-     tx.oncomplete=res;
-     tx.onerror=()=>rej(tx.error);
-     tx.onabort=()=>rej(tx.error);
-   });
- }
- function connected(){return navigator.onLine}
- function updateStatus(label){
-   status.textContent=label||(connected()?"Conectado":"Sem internet");
- }
- function notify(message,canApply){
-   toastMessage.textContent=message;
-   apply.style.display=canApply?"inline-block":"none";
-   toast.dataset.show="true";
- }
- function dismiss(){toast.dataset.show="false"}
- function setDocMode(value){mode=value;back.style.display=value==="pdf"?"block":"none";}
- function mountDashboard(){
-   dismiss();setDocMode("dashboard");
-   if(snapshot?.html){
-     frame.removeAttribute("src");
-     frame.srcdoc=snapshot.html;
-   }else{
-     frame.removeAttribute("srcdoc");
-     frame.src="./dashboard.html";
-   }
- }
- function openPdf(href){
-   const url=new URL(href,location.href);
-   if(url.origin!==location.origin || !url.pathname.endsWith("/visualizador.html"))return;
-   dismiss();setDocMode("pdf");
-   frame.removeAttribute("srcdoc");
-   frame.src="./visualizador.html"+url.search;
- }
- function installNavigation(){
-   try{
-     const doc=frame.contentDocument;
-     if(!doc)return;
-     doc.addEventListener("click",event=>{
-       const anchor=event.target.closest?.("a[href]");
-       if(!anchor)return;
-       const url=new URL(anchor.href,location.href);
-       if(url.origin!==location.origin)return;
-       if(url.pathname.endsWith("/visualizador.html")){
-         event.preventDefault();openPdf(url.href);
-       }else if(mode==="pdf" && (url.pathname==="/" || url.pathname.endsWith("/index.html") || url.pathname.endsWith("/dashboard.html"))){
-         event.preventDefault();mountDashboard();
-       }
-     },true);
-     if(mode!=="dashboard")return;
-     let touchY=null;
-     doc.addEventListener("touchstart",e=>{
-       touchY=null;
-       if(e.touches.length!==1 || e.target.closest?.("input,textarea,select,[contenteditable=true]"))return;
-       const y=doc.scrollingElement?.scrollTop||0;
-       if(y<5)touchY=e.touches[0].clientY;
-     },{passive:true});
-     doc.addEventListener("touchend",e=>{
-       if(touchY===null || !e.changedTouches.length)return;
-       const diff=e.changedTouches[0].clientY-touchY;
-       touchY=null;
-       if(diff>125)check(true);
-     },{passive:true});
-   }catch(e){console.warn("VITRA: navegação interna indisponível",e)}
- }
- frame.addEventListener("load",installNavigation);
- back.addEventListener("click",mountDashboard);
- apply.addEventListener("click",()=>{
-   if(nextSnapshot){snapshot=nextSnapshot;nextSnapshot=null;mountDashboard()}
+}
+async function saveSnapshot(value){
+ const db=await dbPromise;
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction("app","readwrite");
+  tx.objectStore("app").put(value,"latest");
+  tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
  });
- function assemble(fetched){
-   let html=fetched["index.html"];
-   const scriptFound=new Set(),cssFound=new Set();
-   html=html.replace(/<link\b[^>]*rel="stylesheet"[^>]*href="\.\/([^"?]+)(?:\?[^"]*)?"[^>]*>/gi,(all,name)=>{
-     if(!CSS.includes(name))return all;
-     cssFound.add(name);
-     const contents=fetched[name].replace(/<\/style/gi,"<\\/style");
-     return '<style data-vitra-mobile="'+name+'">'+contents+"</style>";
-   });
-   html=html.replace(/<script\b[^>]*src="\.\/([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>/gi,(all,name)=>{
-     if(name==="vitra-auto-update.js")return "";
-     if(!JS.includes(name))return all;
-     scriptFound.add(name);
-     return "";
-   });
-   if(cssFound.size!==CSS.length||scriptFound.size!==JS.length)
-     throw new Error("O formato do site mudou. Mantendo os dados anteriores.");
-   const closer="</scr"+"ipt>";
-   const inline=JS.map(name=>{
-     let source=fetched[name];
-     if(name==="vitra-access.js"){
-       const start='} catch (err) {\\n      session = null; me = null; remember();'.replace(/\\n/g,"\n");
-       if(!source.includes(start))throw new Error("Fluxo de autenticação incompatível");
-       source=source.replace(start,'} catch (err) {\n      if (!navigator.onLine) return;\n      session = null; me = null; remember();');
-     }
-     return '<script data-vitra-mobile="'+name+'">'+source.replace(/<\/script/gi,"<\\/script")+closer;
-   }).join("\n");
-   html=html.replace(/<head>/i,'<head><base href="'+location.origin+'/">');
-   if(!html.includes("</body>"))throw new Error("Página principal incompleta.");
-   return html.replace(/<\/body>/i,inline+"</body>");
+}
+function indicator(message,hold=0){
+ clearTimeout(statusTimer);
+ const token=++noticeToken;
+ STATUS.textContent=message;
+ STATUS.classList.toggle("visible",!!message);
+ if(hold>0)statusTimer=setTimeout(()=>{
+  if(token===noticeToken)STATUS.classList.remove("visible");
+ },hold);
+}
+function isModalOpen(){
+ try{return !!FRAME.contentDocument?.querySelector("#va-area-modal,#va-management-modal")}catch{return false}
+}
+function canApplyAutomatically(){
+ if(mode!=="dashboard"||isModalOpen())return false;
+ try{
+  const doc=FRAME.contentDocument;
+  if(!doc)return false;
+  if(doc.querySelector("input:focus,textarea:focus,select:focus,[contenteditable=true]:focus"))return false;
+  if(doc.querySelector("#panel .workspace-title,#panel .stockpanel,#panel .vl-module"))return false;
+  return true;
+ }catch{return false}
+}
+function navigateDashboard(){
+ mode="dashboard";
+ if(pending){snapshot=pending;pending=null}
+ if(snapshot?.html){
+  FRAME.removeAttribute("src");
+  FRAME.srcdoc=snapshot.html;
+ }else{
+  FRAME.removeAttribute("srcdoc");
+  FRAME.src="./dashboard.html";
  }
- async function fetchText(path){
-   const response=await fetch(ROOT+path+"?t="+Date.now(),{cache:"no-store"});
-   if(!response.ok)throw new Error("Não foi possível receber "+path);
-   return response.text();
+}
+function openPdf(href){
+ const url=new URL(href,location.href);
+ if(url.origin!==location.origin||!url.pathname.endsWith("/visualizador.html"))return;
+ mode="pdf";
+ FRAME.removeAttribute("srcdoc");
+ FRAME.src="./visualizador.html"+url.search;
+}
+function atTop(element,doc){
+ let node=element;
+ while(node&&node!==doc.body&&node!==doc.documentElement){
+  if(node.scrollHeight>node.clientHeight+6&&node.scrollTop>5)return false;
+  node=node.parentElement;
  }
- async function check(manual=false){
-   if(syncing)return;
-   if(!connected()){
-     updateStatus("Sem internet");
-     if(manual)notify("Sem conexão. As avaliações previamente disponíveis e PDFs já abertos continuam no aparelho.",false);
-     return;
-   }
-   syncing=true;lastCheck=Date.now();syncBtn.disabled=true;
-   updateStatus("Sincronizando…");
-   try{
-     const response=await fetch("https://api.github.com/repos/"+REPO+"/commits/main",{cache:"no-store"});
-     if(!response.ok)throw new Error("Verificação da versão indisponível");
-     const version=(await response.json()).sha;
-     if(!/^[a-f0-9]{40}$/.test(version))throw new Error("Resposta inválida do repositório");
-     const current=snapshot?.sha||BASE_SHA;
-     if(version===current){
-       updateStatus("Atualizado");
-       if(manual)notify("As avaliações já estão na versão mais recente disponível.",false);
-       return;
-     }
-     const pairs=await Promise.all(FILES.map(async name=>[name,await fetchText(name)]));
-     const data=Object.fromEntries(pairs);
-     const html=assemble(data);
-     // Apenas após receber e validar todos os recursos atualizamos o snapshot.
-     const candidate={sha:version,html,at:new Date().toISOString()};
-     await dbSet("latest",candidate);
-     nextSnapshot=candidate;
-     updateStatus("Nova versão");
-     notify("Novos dados do VITRA foram guardados no celular. Abra a atualização quando for conveniente.",true);
-   }catch(error){
-     console.warn("VITRA: sincronização",error);
-     updateStatus("Dados locais");
-     if(manual)notify("Não foi possível sincronizar agora. Os registros locais foram preservados.",false);
-   }finally{syncing=false;syncBtn.disabled=false}
- }
- syncBtn.addEventListener("click",()=>{check(true);try{frame.contentWindow?.VitraAreas?.refresh?.()}catch{}});
- window.addEventListener("online",()=>check(false));
- window.addEventListener("offline",()=>updateStatus("Sem internet"));
- document.addEventListener("visibilitychange",()=>{
-   if(!document.hidden && Date.now()-lastCheck>120000)check(false);
+ return (doc.scrollingElement?.scrollTop||0)<5;
+}
+function installFrameHandlers(){
+ const doc=FRAME.contentDocument;
+ if(!doc)return;
+ doc.addEventListener("click",event=>{
+  const a=event.target.closest?.("a[href]");
+  if(!a)return;
+  let url;try{url=new URL(a.href,location.href)}catch{return}
+  if(url.origin!==location.origin)return;
+  if(url.pathname.endsWith("/visualizador.html")){
+   event.preventDefault();openPdf(url.href);
+  }else if(mode==="pdf"&&["/","/index.html","/dashboard.html"].includes(url.pathname)){
+   event.preventDefault();navigateDashboard();
+  }
+ },true);
+ if(mode!=="dashboard")return;
+ let touchStart=null;
+ doc.addEventListener("touchstart",event=>{
+  touchStart=null;
+  if(event.touches.length!==1)return;
+  const target=event.target;
+  if(target.closest?.("input,textarea,select,[contenteditable=true],.va-area-modal"))return;
+  if(atTop(target,doc))touchStart={x:event.touches[0].clientX,y:event.touches[0].clientY};
+ },{passive:true});
+ doc.addEventListener("touchend",event=>{
+  if(!touchStart||event.changedTouches.length!==1)return;
+  const dx=event.changedTouches[0].clientX-touchStart.x;
+  const dy=event.changedTouches[0].clientY-touchStart.y;
+  touchStart=null;
+  if(dy>115&&Math.abs(dx)<75)check(true);
+ },{passive:true});
+ if(pending&&canApplyAutomatically())applyPending(false);
+}
+FRAME.addEventListener("load",installFrameHandlers);
+function assemble(fetched){
+ let html=fetched["index.html"];
+ const cssFound=new Set(),jsFound=new Set();
+ html=html.replace(/<link\b[^>]*rel="stylesheet"[^>]*href="\.\/([^"?]+)(?:\?[^"]*)?"[^>]*>/gi,(tag,name)=>{
+  if(!CSS.includes(name))return tag;
+  cssFound.add(name);
+  return '<style data-vitra-mobile="'+name+'">'+fetched[name].replace(/<\/style/gi,"<\\/style")+"</style>";
  });
- setInterval(()=>{if(!document.hidden&&Date.now()-lastCheck>120000)check(false)},30000);
- dbGet("latest").then(saved=>{
-   if(saved?.html && /^[a-f0-9]{40}$/.test(saved.sha)){
-     snapshot=saved;mountDashboard();
-   }
- }).catch(error=>console.warn("VITRA: armazenamento",error)).finally(()=>{
-   updateStatus();if(connected())check(false);
+ html=html.replace(/<script\b[^>]*src="\.\/([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>/gi,(tag,name)=>{
+  if(name==="vitra-auto-update.js")return "";
+  if(!JS.includes(name))return tag;
+  jsFound.add(name);
+  return "";
  });
+ if(cssFound.size!==CSS.length||jsFound.size!==JS.length)throw Error("Recursos do site não correspondem à versão atual. Dados anteriores mantidos.");
+ const close="</scr"+"ipt>";
+ const inline=JS.map(name=>{
+  let source=fetched[name];
+  if(name==="vitra-access.js"){
+   const target="} catch (err) {\n      session = null; me = null; remember();";
+   if(!source.includes(target))throw Error("Autenticação alterada; conferir antes de atualizar.");
+   source=source.replace(target,"} catch (err) {\n      if (!navigator.onLine) return;\n      session = null; me = null; remember();");
+  }
+  return '<script data-vitra-mobile="'+name+'">'+source.replace(/<\/script/gi,"<\\/script")+close;
+ }).join("\n");
+ html=html.replace(/<head>/i,'<head><base href="'+location.origin+'/">');
+ if(!html.includes("</body>"))throw Error("Página VITRA incompleta");
+ return html.replace(/<\/body>/i,inline+"</body>");
+}
+async function fetchText(path,sha){
+ const url="https://raw.githubusercontent.com/"+REPO+"/"+sha+"/"+path;
+ const r=await fetch(url,{cache:"no-store"});
+ if(!r.ok)throw Error("Recurso temporariamente indisponível: "+path);
+ return r.text();
+}
+async function applyPending(manual){
+ if(!pending||mode!=="dashboard"||isModalOpen())return false;
+ snapshot=pending;pending=null;
+ const target=snapshot.html;
+ await new Promise(resolve=>{
+  let finished=false;
+  const done=()=>{if(finished)return;finished=true;FRAME.removeEventListener("load",done);resolve()};
+  FRAME.addEventListener("load",done);
+  FRAME.removeAttribute("src");
+  FRAME.srcdoc=target;
+  setTimeout(done,8000);
+ });
+ if(manual)indicator("Atualizado",1050);
+ return true;
+}
+async function refreshAreaEvents(){
+ try{await FRAME.contentWindow?.VitraAreas?.refresh?.()}catch{}
+}
+async function check(manual=false){
+ if(syncing)return;
+ if(!navigator.onLine){
+  if(manual)indicator("Sem internet",1000);
+  return;
+ }
+ syncing=true;lastCheck=Date.now();
+ if(manual)indicator("Sincronizando...");
+ try{
+  const versionResponse=await fetch("https://api.github.com/repos/"+REPO+"/commits/main",{cache:"no-store"});
+  if(!versionResponse.ok)throw Error("Não foi possível verificar a versão");
+  const sha=(await versionResponse.json()).sha;
+  if(!/^[a-f0-9]{40}$/.test(sha))throw Error("Versão inválida");
+  await refreshAreaEvents();
+  const current=pending?.sha||snapshot?.sha||BASE_SHA;
+  if(sha!==current){
+   const fetched=Object.fromEntries(await Promise.all(FILES.map(async name=>[name,await fetchText(name,sha)])));
+   const newHtml=assemble(fetched);
+   // O snapshot anterior só é substituído depois de validar todos os arquivos.
+   const candidate={sha,html:newHtml,at:new Date().toISOString()};
+   await saveSnapshot(candidate);
+   pending=candidate;
+   if(manual||canApplyAutomatically()){
+    const applied=await applyPending(manual);
+    if(!applied&&manual)indicator("",0);
+   }else if(manual)indicator("",0);
+  }else if(manual){
+   if(pending)await applyPending(true);
+   else indicator("",0); // não anunciar "atualizado" sem mudanças reais
+  }
+ }catch(error){
+  console.warn("VITRA: sincronização sem perda de histórico",error);
+  if(manual)indicator("Não foi possível sincronizar",1250);
+ }finally{syncing=false}
+}
+window.addEventListener("online",()=>{if(Date.now()-lastCheck>30000)check(false)});
+document.addEventListener("visibilitychange",()=>{
+ if(!document.hidden){
+  if(pending&&canApplyAutomatically())applyPending(false);
+  if(Date.now()-lastCheck>45000)check(false);
+ }
+});
+setInterval(()=>{
+ if(!document.hidden&&Date.now()-lastCheck>=POLL_MS)check(false);
+},15000);
+getSaved().then(saved=>{
+ if(saved?.html&&/^[a-f0-9]{40}$/.test(saved.sha)){
+  snapshot=saved;navigateDashboard();
+ }
+}).catch(error=>console.warn("VITRA: dados locais preservados",error)).finally(()=>{
+ if(navigator.onLine)check(false);
+});
 })();
