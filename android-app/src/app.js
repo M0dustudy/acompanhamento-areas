@@ -4,8 +4,8 @@
  const REPO="M0dustudy/acompanhamento-areas";
  const BASE_SHA="0ff8a2fc0baa404651b289ccb568a70ed0d00e46";
  const ROOT="https://raw.githubusercontent.com/"+REPO+"/main/";
- const CSS=["vitra-access.css","vitra-labels-smart.css"];
- const JS=["vitra-access-config.js","vitra-access.js","vitra-labels-smart.js"];
+ const CSS=["vitra-access.css","vitra-labels-smart.css","vitra-areas.css"];
+ const JS=["vitra-access-config.js","vitra-access.js","vitra-areas.js","vitra-labels-smart.js"];
  const FILES=["index.html",...CSS,...JS];
  const frame=document.querySelector("#view");
  const back=document.querySelector("#back");
@@ -174,7 +174,7 @@
      if(manual)notify("Não foi possível sincronizar agora. Os registros locais foram preservados.",false);
    }finally{syncing=false;syncBtn.disabled=false}
  }
- syncBtn.addEventListener("click",()=>check(true));
+ syncBtn.addEventListener("click",()=>{check(true);try{frame.contentWindow?.VitraAreas?.refresh?.()}catch{}});
  window.addEventListener("online",()=>check(false));
  window.addEventListener("offline",()=>updateStatus("Sem internet"));
  document.addEventListener("visibilitychange",()=>{
