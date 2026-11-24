@@ -18,8 +18,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Clonar repositório
+      - name: Clonar apenas o código e os recursos do aplicativo
         uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /index.html
+            /visualizador.html
+            /vitra-access.css
+            /vitra-labels-smart.css
+            /vitra-access-config.js
+            /vitra-access.js
+            /vitra-labels-smart.js
+            /imagens/
+            /android-app/
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
