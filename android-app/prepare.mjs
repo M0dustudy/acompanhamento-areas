@@ -15,7 +15,15 @@ for(const name of [
  "vitra-access.js","vitra-labels-smart.js"
 ])copy(name);
 copy("imagens"); // Fotos das variedades, sem incluir PDFs ou relatórios.
-write("dashboard.html",read("index.html"));
+const dashboard=read("index.html").replace(/<script\b[^>]*src="\.\/vitra-auto-update\.js[^"]*"[^>]*><\/script>/i,"");
+write("dashboard.html",dashboard);
+// Durante uma perda de conexão, não expulsar o usuário já autenticado.
+const accessPath=join(target,"vitra-access.js");
+let access=readFileSync(accessPath,"utf8");
+const expired='} catch (err) {\n      session = null; me = null; remember();';
+if(!access.includes(expired))throw new Error("Fluxo de login foi alterado; revisar adaptação offline");
+access=access.replace(expired,'} catch (err) {\n      if (!navigator.onLine) return;\n      session = null; me = null; remember();');
+writeFileSync(accessPath,access,"utf8");
 let viewer=read("visualizador.html");
 function replaceOnce(original, replacement,description){
  if(viewer.split(original).length!==2)throw new Error("Visualizador mudou: "+description);
