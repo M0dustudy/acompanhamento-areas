@@ -617,3 +617,23 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
 .vl2-confirmed-area .vl2-check-ok{border-color:#c8e4d1;background:#fff}
 .vl2-confirmed-area .vl2-check-ok>span{background:#d8efdf;color:#17643a;border-radius:50%}
 .vl2-confirmed-area .vl2-passed{margin-top:10px}
+
+/* Auditoria de rastreabilidade — confirmação visual sem entrada repetitiva. */
+.vl2 .vl2-trace-found{display:grid;gap:5px;padding:12px 14px;border:1px solid #dde9df;border-radius:12px;background:#f4f8f5;overflow-wrap:anywhere}
+.vl2 .vl2-trace-found small{font-size:11px;color:#5d7665;font-weight:700}
+.vl2 .vl2-trace-found strong{font-size:clamp(13px,3.6vw,17px);letter-spacing:.015em;color:#184d32;line-height:1.4}
+.vl2 .vl2-trace-review{padding:11px 0 4px;display:grid;gap:10px}
+.vl2 .vl2-trace-review p{font-size:13px;font-weight:750;color:#294d36;margin:0}
+.vl2 .vl2-trace-review-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vl2 .vl2-trace-review-actions button{border:1px solid #cddfd2;border-radius:12px;background:#fff;color:#24523b;min-height:46px;font-size:12px;font-weight:750;padding:8px}
+.vl2 .vl2-trace-review-actions button.is-confirmed{background:#206c45;border-color:#206c45;color:#fff;-webkit-text-fill-color:#fff}
+.vl2 .vl2-trace-review-actions button.is-correction{background:#fff6ec;border-color:#e3bb91;color:#855023}
+.vl2 .vl2-trace-review-actions button:disabled{opacity:.45;cursor:not-allowed}
+.vl2 .vl2-trace-accepted{padding:9px 12px;border-radius:10px;background:#e5f4ea;border:1px solid #b8dbc3;color:#1b633c;font-size:12px;font-weight:750;overflow-wrap:anywhere}
+.vl2 .vl2-trace-review>small{font-size:11px;color:#677a6e;line-height:1.45}
+.vl2 .vl2-trace-correct{display:grid;gap:7px;font-size:12px;font-weight:700;color:#395b43}
+.vl2 .vl2-trace-correct input{width:100%;min-height:43px;padding:9px 11px;border:1px solid #cddfd2;background:#fff;border-radius:9px;font-size:14px;color:#223b2d}
+.vl2 .vl2-trace-order{margin-top:8px;padding:9px 0;border-top:1px solid #e2eae5}
+.vl2 .vl2-trace-order summary{cursor:pointer;font-size:12px;font-weight:750;color:#315b40;list-style-position:inside}
+.vl2 .vl2-trace-order>p{font-size:11px;color:#63786b;line-height:1.5}
+@media(max-width:360px){.vl2 .vl2-trace-review-actions{grid-template-columns:1fr}}
