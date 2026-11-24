@@ -149,6 +149,12 @@ function openModal(areaCode){
  });
  update();
 }
+document.addEventListener("click",event=>{
+ const btn=event.target.closest?.(".va-area-manage[data-vitra-area]");
+ if(!btn)return;
+ event.preventDefault();
+ openModal(btn.dataset.vitraArea);
+});
 window.addEventListener("vitra:authenticated",e=>{
  role=e.detail?.role||null;
  if(role==="master")showAdmin();else{window.VITRA_IS_MASTER=false;remove();}
