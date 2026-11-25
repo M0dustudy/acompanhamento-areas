@@ -20,7 +20,7 @@ const state={
  entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0,ocrRawPassages:[],traceVisualCheck:""
 };
 let ctx=null,cameraStream=null;
-let localAIEnabled=false,localAIWorker=null,localAIBusy=false;
+let localAIEnabled=Boolean(globalThis.navigator?.gpu&&typeof Worker!=="undefined"),localAIWorker=null,localAIBusy=false;
 function localVisualRead(photo,update){
  if(!navigator.gpu||typeof Worker==="undefined")return Promise.reject(Error("IA local indisponível neste navegador."));
  if(localAIBusy)return Promise.reject(Error("IA local ocupada."));
@@ -943,6 +943,8 @@ function shouldScanOCRBands(raw,deep=false){
  if(deep)return true;
  const text=norm(raw);if(text.length<18)return true;
  const scanned=extract(raw,""),f=scanned.fields;
+ const sig=varieties.find(v=>v[2]===scanned.track?.variety)?.[0];
+ if(sig&&scanned.printedNameVariety&&sig!==scanned.printedNameVariety)return true;
  if(!f.rastreio||(!scanned.identity.variety&&!f.produto))return true;
  if(/\bCNPJ\b/.test(text)&&!f.cnpj&&!f.cnpjComercial)return true;
  if(/\bGGN\b/.test(text)&&!f.ggn&&!f.ggnComercial)return true;
@@ -1007,7 +1009,7 @@ async function readPhoto(deep=false){
         if(!getEAN(passages.join("\n"))){const bottom=await readPass(focusRegion(focus,0,.62,1,.38),9000,"6");if(bottom)passages.push(bottom);}
        }
        // Preservar a foto inteira como evidência: o recorte é uma tentativa, não uma validação.
-       if(!ocrTraceCandidates(passages.join("\n")).length||!original||deep||state.pairRequested){
+       if(!ocrTraceCandidates(passages.join("\n")).length||!original||deep||state.pairRequested||shouldScanOCRBands(original)){
         const fallback=await limitWork(prepareOCRImage(photo,deep?4200:3200),4500,"Falha ao preparar imagem completa.");
         const full=await readPass(fallback,12000,"3");if(full)passages.push(full);
        }
@@ -1032,7 +1034,7 @@ async function readPhoto(deep=false){
      update("Ampliando e verificando a região "+band.name+"…");
      try{
       const canvas=await limitWork(prepareOCRBand(photo,band.a,band.b,band.contrast),3500,"Falha ao ampliar a região.");
-      const recognizedBand=await readPass(canvas,8500);
+      const recognizedBand=await readPass(canvas,10500,"6");
       if(recognizedBand)passages.push(recognizedBand);
      }catch(e){
       if(!passages.length)failure=failure||"A leitura da região não foi concluída.";
@@ -1042,7 +1044,7 @@ async function readPhoto(deep=false){
    }
    if(seq!==state.sequence)return;
    recognized=mergeOCRPassages(passages);
-   if(worker&&deep&&(!ocrTraceCandidates(recognized).length||passages.length<2)){
+   if(worker&&(deep||shouldScanOCRBands(recognized))&&(!ocrTraceCandidates(recognized).length||passages.length<2)){
     update("Realçando pequenos caracteres e a linha de rastreabilidade…");
     const improved=await limitWork(enhanceForOCR(photo),3500,"Falha no contraste.").catch(()=>null);
     if(improved){
@@ -1053,8 +1055,8 @@ async function readPhoto(deep=false){
   }catch(e){failure=e?.message||"Reconhecimento não concluído.";}
   if(seq!==state.sequence)return;
   // Modelo visual complementar: nunca substitui a decodificação independente das barras.
-  const looksPaired=state.pairRequested||/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN)\b/.test(norm(mergeOCRPassages(passages)));
-  if(localAIEnabled&&ctx?.isMaster?.()&&!looksPaired&&seq===state.sequence){
+  // A presença de dados institucionais não indica duas etiquetas. A IA também examina caixas.
+  if(localAIEnabled&&globalThis.navigator?.gpu&&!state.pairRequested&&seq===state.sequence){
    try{
     update("Preparando IA visual local (primeiro uso pode baixar o modelo)…");
     const focus=await limitWork(focusLabelCanvas(photo,1800),4000,"Recorte indisponível").catch(()=>null);
@@ -1477,7 +1479,7 @@ function diagnosticV4(){
  if(/\bQR\s*(?:CODE|CODIGO)?\b/.test(norm(state.text))&&!(state.codeEvidence||[]).some(x=>/qr/.test(x.format)))
   add("pending","QR Code não decodificado","A foto menciona um QR Code, mas a câmera não conseguiu recuperar seu conteúdo.");
  if(state.ocrConflicts.length)add("pending","Leituras diferentes na fotografia","O reconhecimento encontrou valores conflitantes para: "+state.ocrConflicts.join(", ")+". É necessário conferir a foto antes de aprovar.");
- if(state.ocrFailed||!state.text)add("pending","Qualidade da leitura","Alguns caracteres não foram reconhecidos. Melhore a iluminação, aproxime a câmera ou revise a imagem.");
+ if(state.ocrFailed||!state.text)add("pending","Leitura incompleta","O processamento não terminou integralmente. Reexamine a mesma foto; não é possível atribuir a falha à iluminação sem evidência.");
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
   if(state.sources[k]==="Corrigido manualmente")add("pending","Identificador ajustado","O campo "+k+" foi alterado manualmente. Uma nova leitura da foto é necessária para aprovação automática.");
  const critical=checks.filter(x=>x.status==="error"),pending=checks.filter(x=>x.status==="pending");
@@ -1488,6 +1490,37 @@ function diagnosticV4(){
  status==="pendente"?"A imagem ou o cadastro não permitem concluir a conferência com segurança. Revise os itens pendentes.":
  "Os identificadores lidos coincidem com as referências disponíveis. O resultado digital está apto para confirmação e registro.";
  return {status,summary,checks,errors:critical.length,pending:pending.length,ok:checks.filter(x=>x.status==="ok").length,ready,referenceComplete:ready&&status==="aprovado"};
+}
+function visualLabel(report){
+ const f=state.fields||{},d=state.detected||{},box=category()==="box",unit=category()==="unit";
+ const checks=report.checks||[],used=new Set();
+ const groups=[
+  ["Variedade",d.printedNameVariety?nameOf(varieties,d.printedNameVariety):f.produto,/variedade|sigla/i],
+  ["Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i],
+  ["Data de embalagem",d.printedDate,/data(?!.*cadastr)/i],
+  ["Modelo / peso", [d.boxModel?.code,d.weightPhoto].filter(Boolean).join(" · "),/modelo|peso|embalagem|cor indicada|cor da caixa|tipo de etiqueta/i],
+  ...(box?[["Classificação",d.identity?.klass,/classifica|classe|padrão do cliente/i],["Produtor",f.produtor||f.cnpj,[/produtor|produzido/i]],["Comercializador",f.comercializado||f.cnpjComercial,[/comerciante|comercializador|comercializado|comercial/i]]]:[]),
+  ...(unit?[["EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo/i]]:[]),
+  ["Cliente da ordem",state.clientConfirmed?nameOf(clients,state.identity.client):"",/^cliente$|marca|cliente da ordem/i]
+ ];
+ const card=(title,value,rows)=>{
+  const status=rows.some(x=>x.status==="error")?"error":rows.some(x=>x.status==="pending")?"pending":rows.length?"ok":"neutral";
+  const label={error:"Divergência",pending:"A confirmar",ok:"Conferido",neutral:"Sem parecer"}[status];
+  const detail=rows.map(x=>'<div class="vl3-detail"><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':'')+'</div>').join("");
+  const head='<span class="vl3-field-name">'+esc(title)+'</span><span class="vl3-mark vl3-'+status+'" aria-label="'+label+'">'+({error:"!",pending:"?",ok:"✓",neutral:"–"}[status])+'</span><strong>'+esc(value||"Não confirmado")+'</strong>';
+  return rows.length?'<details class="vl3-field vl3-'+status+'"><summary>'+head+'</summary>'+detail+'</details>':'<div class="vl3-field vl3-'+status+'">'+head+'</div>';
+ };
+ let tiles="";
+ for(const [title,value,patterns] of groups){
+  const rx=Array.isArray(patterns)?patterns[0]:patterns;
+  const rows=checks.filter((x,i)=>!used.has(i)&&rx.test(x.title)&&(used.add(i),true));
+  if(value||rows.length)tiles+=card(title,value,rows);
+ }
+ const rest=checks.filter((x,i)=>!used.has(i));
+ if(rest.length)tiles+=card("Outras verificações","",rest);
+ const status=report.errors?"error":report.status==="aprovado"?"ok":"pending";
+ const title=status==="error"?"REPROVADA":status==="ok"?"APTA PARA CONFIRMAÇÃO":"PENDENTE";
+ return '<div class="vl3-verdict vl3-'+status+'" role="status"><div><small>RESULTADO DIGITAL</small><strong>'+title+'</strong></div><span>'+report.errors+' erro(s) · '+report.pending+' pendência(s)</span></div><section class="vl3-label" aria-label="Reconstrução da etiqueta"><header><small>ETIQUETA RECONSTRUÍDA</small><b>'+esc(box?"Caixa":unit?"Cumbuca / cinta":"Modelo a confirmar")+'</b></header><div class="vl3-fields">'+tiles+'</div><footer>Toque em um campo para consultar a comparação.</footer></section>';
 }
 function showResult(){
  const root=el("vl2-results");if(!root)return;
@@ -1551,21 +1584,11 @@ function showResult(){
  const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados a confirmar</strong></div></div>'+clientChooser()+traceBuilder()+
  (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>O código não possui uma classe única cadastrada. Informe a classificação correta da produção.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
- const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
- const issues=visual.filter(x=>x.status!=="ok"),passed=visual.filter(x=>x.status==="ok");
- const item=x=>'<div class="vl2-check-item vl2-check-'+x.status+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>';
  let outcome="";
  if(!state.reviewRequested){
-  outcome='<section class="vl2-outcome"><section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Conferência automática</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
-   (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência nos campos verificados.</p>')+
-   (passed.length?'<details class="vl2-passed"><summary>Ver '+passed.length+' itens conferidos</summary><div class="vl2-check-list">'+passed.map(item).join("")+'</div></details>':"")+'</section></section>'+
-   '<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?'disabled':'')+'>Concluir conferência</button></section>';
+  outcome='<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?'disabled':'')+'>Concluir conferência</button></section>';
  }else{
-  const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
-  outcome='<section class="vl2-outcome" id="vl2-outcome">'+
-  '<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>'+esc(issues.length?"Itens para corrigir ou confirmar":"Itens conferidos")+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
-  (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência encontrada nos dados que puderam ser verificados.</p>')+
-  (passed.length?'<div class="vl2-confirmed-area"><div class="vl2-confirmed-head"><strong>'+passed.length+' itens conferidos</strong><small>Confirmados com a referência disponível</small></div><div class="vl2-check-list">'+passed.slice(0,10).map(item).join("")+'</div>'+(passed.length>10?'<details class="vl2-passed"><summary>Ver outros '+(passed.length-10)+' itens conferidos</summary><div class="vl2-check-list">'+passed.slice(10).map(item).join("")+'</div></details>':"")+'</div>':"")+'</section></section>';
+  outcome='<section class="vl2-outcome" id="vl2-outcome"></section>';
   if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi o cliente, o modelo e a aplicação física com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
   else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
  }
@@ -1574,8 +1597,7 @@ function showResult(){
  '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
  const sampleOption=state.sampleSaved?'<p class="vl2-hint">Amostra registrada como pendente no histórico, sem aprovação.</p>':
   !state.saved&&report.status!=="aprovado"?'<details class="vl2-refine vl2-sample"><summary>Modelo diferente? Guardar foto para ampliar o catálogo</summary><p class="vl2-refine-hint">Registra a foto para estudo, sem aprovação nem criação automática de regras.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>':"";
- root.innerHTML=retry+'<div class="vl2-compact-status vl2-summary-'+(errors.length?"error":checkDone?"ok":"pending")+'"><strong>'+esc(head)+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências · '+report.ok+' conferidos</small></div>'+pairView+reading+reference+outcome+'<details class="vl2-details-root"><summary>Outras opções de leitura</summary>'+deepRetry+sampleOption+'</details>'+
- '<details class="vl2-details-root"><summary>Dados técnicos reconhecidos (somente consulta)</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
+ root.innerHTML='<div id="vl3-visual">'+visualLabel(report)+'</div>'+pairView+'<details class="vl2-details-root vl3-order"'+(!report.ready?' open':'')+'><summary>Referências da produção'+(!report.ready?' · confirmar':'')+'</summary>'+reference+'</details>'+outcome+'<details class="vl2-details-root"><summary>Leitura e auditoria</summary>'+retry+reading+deepRetry+sampleOption+'<div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
  }));
@@ -1609,7 +1631,7 @@ function showResult(){
      el("vl2-recheck")?.addEventListener("click",()=>{if(!diagnosticV4().ready)return;state.reviewRequested=true;showResult();});
     }
    }
-   const action=el("vl2-evaluate");if(action)action.disabled=!diagnosticV4().ready;
+   const next=diagnosticV4(),action=el("vl2-evaluate");if(action)action.disabled=!next.ready;const view=el("vl3-visual");if(view)view.innerHTML=visualLabel(next);
   };
   inp.addEventListener("input",update);inp.addEventListener("change",update);
  });
@@ -1879,8 +1901,8 @@ function mount(adapter){
  releasePhoto();resetScan();
  const p=el("panel");if(!p)return;
  p.innerHTML='<section class="vl2" aria-label="Conferência de etiquetas">'+
-  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2><p>Fotografe, confira e valide.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
-  '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>Caixa ou cumbuca · recorte opcional</p></div></div>'+
+  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
+  '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>Caixa e cumbuca</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
   '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
   '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Fotografar etiqueta</button><input id="vl2-native-camera" type="file" accept="image/*" capture="environment" hidden aria-label="Tirar foto da etiqueta"><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
@@ -1888,16 +1910,16 @@ function mount(adapter){
   '<div id="vl2-gallery-tools" class="vl2-gallery-tools" hidden><button id="vl2-rotate-left" type="button">↶ Girar</button><button id="vl2-rotate-right" type="button">Girar ↷</button><button id="vl2-crop-toggle" type="button">Recortar uma etiqueta</button></div>'+
   '<button id="vl2-analyze-full" type="button" class="vl2-apply" hidden>Analisar foto inteira</button>'+
   '<button id="vl2-apply-crop" type="button" class="vl2-apply" hidden>Aplicar recorte e analisar</button>'+
-  (ctx.isMaster?.()?'<label class="vl2-ai-opt" style="display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px"><input id="vl2-local-ai" type="checkbox" '+(localAIEnabled?'checked':'')+'> IA visual local (experimental · grátis)</label><small class="vl2-help">Primeiro uso: download via Wi-Fi recomendado. Requer WebGPU. Análise local, sem envio de fotos ao provedor de IA.</small>':'')+
+  (ctx.isMaster?.()?'<label class="vl2-ai-opt" style="display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px"><input id="vl2-local-ai" type="checkbox" '+(localAIEnabled?'checked':'')+'> IA visual local</label><small class="vl2-help">Processamento no dispositivo · sem cobrança por análise.</small>':'')+
   '<div id="vl2-progress" class="vl2-progress" hidden>Reconhecendo dados…</div><div id="vl2-notice" class="vl2-notice" hidden></div>'+
-  '<p class="vl2-photo-foot">Use uma foto nítida. Dados ilegíveis não são aprovados automaticamente.</p></section>'+
-  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>Confira as divergências e confirme o necessário.</p></div></div><div id="vl2-results"></div></section></div>'+
-  '<section class="vl2-recent"><div class="vl2-history-head"><h3>Histórico de conferências</h3><small>Fotografias, resultados e responsáveis</small></div><div id="vl2-history">Carregando histórico…</div>'+
-  (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
-  '<p class="vl2-foot">A conferência digital compara informações reconhecidas com o manual e os padrões cadastrados. Um campo ilegível ou sem referência confiável permanece pendente. A liberação física continua sob responsabilidade da equipe autorizada.</p></section>';
+  '</section>'+
+  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>Toque nos campos para conferir.</p></div></div><div id="vl2-results"></div></section></div>'+
+  '<details class="vl2-recent vl3-history"><summary>Histórico de conferências</summary><div id="vl2-history">Carregando histórico…</div>'+
+  (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+ '</details><div id="vl2-dialog-host"></div>'+
+  '<p class="vl2-foot">Liberação física sujeita à confirmação da equipe autorizada.</p></section>';
  el("vl2-local-ai")?.addEventListener("change",e=>{
   if(state.processing){e.target.checked=localAIEnabled;return;}
-  localAIEnabled=e.target.checked&&!!ctx.isMaster?.();
+  localAIEnabled=e.target.checked&&Boolean(globalThis.navigator?.gpu&&typeof Worker!=="undefined");
   if(localAIEnabled&&state.photo){state.processing=true;readPhoto().finally(()=>{state.processing=false;});}
  });
  el("vl2-back")?.addEventListener("click",()=>{state.sequence++;releasePhoto();ctx.back();});
