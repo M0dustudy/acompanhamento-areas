@@ -20,6 +20,29 @@ const state={
  entities:[],refsLoaded:false,catalogLoaded:false,diag:null,detailId:null,photoAspect:0,scanCompleted:false,ocrFailed:false,reviewRequested:false,kindConfirmed:false,analysisError:"",barcodeRegion:null,ocrConflicts:[],ocrPasses:0,ocrRawPassages:[],traceVisualCheck:""
 };
 let ctx=null,cameraStream=null;
+let localAIEnabled=false,localAIWorker=null,localAIBusy=false;
+function localVisualRead(photo,update){
+ if(!navigator.gpu||typeof Worker==="undefined")return Promise.reject(Error("IA local indisponível neste navegador."));
+ if(localAIBusy)return Promise.reject(Error("IA local ocupada."));
+ localAIBusy=true;
+ return new Promise((resolve,reject)=>{
+  let timer;
+  const cleanup=(reset)=>{clearTimeout(timer);localAIBusy=false;if(localAIWorker){localAIWorker.onmessage=null;localAIWorker.onerror=null;if(reset){localAIWorker.terminate();localAIWorker=null;}}};
+  const fail=msg=>{cleanup(true);reject(Error(msg));};
+  try{
+   localAIWorker??=new Worker(new URL("vitra-label-ai-worker.js?v=20261125local1",document.baseURI),{type:"module"});
+   localAIWorker.onmessage=({data})=>{
+    if(data.type==="progress")update("Preparando IA local · "+Math.max(0,Math.min(100,data.progress||0))+"% do arquivo");
+    if(data.type==="reading")update("IA local interpretando a fotografia…");
+    if(data.type==="result"){cleanup(false);resolve(String(data.text||""));}
+    if(data.type==="error")fail(data.message||"IA local indisponível.");
+   };
+   localAIWorker.onerror=()=>fail("Não foi possível iniciar a IA local.");
+   timer=setTimeout(()=>fail("Tempo limite da IA local atingido."),240000);
+   localAIWorker.postMessage({photo});
+  }catch(e){fail(e.message);}
+ });
+}
 const el=id=>document.getElementById(id);
 const str=v=>String(v==null?"":v);
 const esc=v=>str(v).replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s]));
@@ -949,9 +972,9 @@ async function readPhoto(deep=false){
  const existingBarcode=deep?state.barcodeBars:"";
  const existingPrinted=deep?state.barcodePrinted:"";
  state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;state.traceVisualCheck="";
- state.ocrConflicts=[];state.ocrPasses=0;state.pairedEvidence=null;showResult();
+ state.ocrConflicts=[];state.ocrPasses=0;state.pairedEvidence=null;state.aiUsed=false;state.aiText="";state.aiError="";showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
- let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="";
+ let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="",printedConflict=false;
  const passages=existingPasses;
  const update=message=>{if(seq===state.sequence&&progress)progress.textContent=message;};
  const readPass=async(canvas,ms,psm="3")=>{
@@ -1029,7 +1052,22 @@ async function readPhoto(deep=false){
    }
   }catch(e){failure=e?.message||"Reconhecimento não concluído.";}
   if(seq!==state.sequence)return;
+  // Modelo visual complementar: nunca substitui a decodificação independente das barras.
+  const looksPaired=state.pairRequested||/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN)\b/.test(norm(mergeOCRPassages(passages)));
+  if(localAIEnabled&&ctx?.isMaster?.()&&!looksPaired&&seq===state.sequence){
+   try{
+    update("Preparando IA visual local (primeiro uso pode baixar o modelo)…");
+    const focus=await limitWork(focusLabelCanvas(photo,1800),4000,"Recorte indisponível").catch(()=>null);
+    const input=focus?await new Promise(resolve=>focus.toBlob(b=>resolve(b||photo),"image/jpeg",.98)):photo;
+    const visual=await localVisualRead(input,update);
+    if(seq!==state.sequence)return;
+    if(visual.trim()){state.aiUsed=true;state.aiText=visual;passages.push(visual);recognized=mergeOCRPassages(passages);}
+   }catch(e){if(seq===state.sequence)state.aiError=String(e.message||"IA local indisponível.");}
+  }
+  if(seq!==state.sequence)return;
   state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;state.ocrRawPassages=passages.slice();
+  const printedCandidates=distinct(passages.map(getEAN).filter(Boolean));
+  printedConflict=printedCandidates.length>1;
   const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
   update("Lendo códigos de barras e QR Code…");barcode=barcode||await limitWork(scanBarcode(photo,seq),9200,"Leitura dos códigos interrompida.").catch(()=>"");
   if(seq!==state.sequence)return;
@@ -1065,7 +1103,7 @@ async function readPhoto(deep=false){
    }
   }
  };
- try{await limitWork(run(),deep||state.pairRequested?135000:110000,"Limite de leitura atingido. A foto foi preservada.");}
+ try{await limitWork(run(),localAIEnabled?390000:deep||state.pairRequested?135000:110000,"Limite de leitura atingido. A foto foi preservada.");}
  catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
@@ -1073,7 +1111,7 @@ async function readPhoto(deep=false){
     const codeForLabel=state.pairedEvidence?.detected?"":barcode;
     const data=supplementExtractedFields(extract(recognized,codeForLabel),passages,codeForLabel);
     state.text=recognized;state.barcode=barcode||data.fields.barcode;
-    state.barcodeBars=barcode;state.barcodePrinted=printedNumber||getEAN(recognized);
+    state.barcodeBars=barcode;state.barcodePrinted=printedConflict?"":printedNumber||getEAN(recognized);
     state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
     if(!state.clientConfirmed||state.clientFromCatalog){
      state.identity.client=data.detectedClient;state.clientFromCatalog=false;state.clientConfirmed=false;
@@ -1088,7 +1126,7 @@ async function readPhoto(deep=false){
     state.ocrFailed=!!state.analysisError;state.scanCompleted=true;state.issues=[];
     showResult();
     if(el("vl2-results")&&window.innerWidth<1000)el("vl2-results").scrollIntoView({behavior:"smooth",block:"start"});
-    notice(state.analysisError?"Leitura parcial. Confira os campos pendentes.":"Leitura concluída.",!!state.analysisError);
+    notice(state.analysisError?"Leitura parcial. Confira os campos pendentes.":state.aiUsed?"Leitura visual local concluída.":state.aiError?"IA local indisponível; leitura convencional utilizada.":"Leitura concluída.",!!state.analysisError);
    }catch(e){state.analysisError=e?.message||"Erro ao interpretar a etiqueta.";state.scanCompleted=false;showResult();notice(state.analysisError,true);}
   }
   if(progress)progress.hidden=true;
@@ -1490,7 +1528,7 @@ function showResult(){
  '<div class="vl2-pair-grid"><article><small>ETIQUETA DA CAIXA</small><strong>'+esc(pair.box.model||"Modelo ainda não lido")+'</strong><p>'+esc(pair.box.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.box.klass||"Classe pendente")+' · '+esc(nameOf(varieties,pair.box.variety))+'</p></article>'+
  '<article><small>ETIQUETA DA CUMBUCA</small><strong>EAN '+esc(pair.unit.ean||"pendente")+'</strong><p>'+esc(pair.unit.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.unit.date||"Data pendente")+' · '+esc(nameOf(varieties,pair.unit.variety))+'</p></article></div></section>':
  state.pairRequested?'<section class="vl2-pair-section vl2-pair-warning"><strong>Não foi possível comparar as duas etiquetas</strong><p>O modelo e as informações continuam pendentes. Use imagem mais nítida ou amplie a região.</p></section>':"";
- const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>Identificação preliminar · '+state.ocrPasses+' passagem(ns) de OCR · ainda não é um parecer</small></div></div><div class="vl2-reading-facts">'+
+ const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>'+(state.aiUsed?'IA visual local + leitura convencional':state.aiError?'Leitura convencional · IA local indisponível':'Leitura convencional')+' · confira as pendências</small></div></div><div class="vl2-reading-facts">'+
   photoValue("Modelo",kind?name:"Não identificado")+photoValue(state.detected?.varietySource==="Código de barras cadastrado"?"Variedade sugerida pelo catálogo":"Variedade / produto",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Área / válvula",state.detected?.track?.areaValve)+
@@ -1737,7 +1775,7 @@ async function saveSample(){
    label_class:state.identity.klass||"",packaging:state.identity.kind?nameOf(kinds,state.identity.kind):"",
    review_status:"pendente",detected_text:state.text.slice(0,12000),
    fields:{...state.fields,barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,
-    visualEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},sampleRecord:true,sources:state.sources},
+    visualEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts,visualAI:state.aiUsed===true,visualModel:state.aiUsed?"Florence-2-base-ft":null,visualText:state.aiUsed?state.aiText.slice(0,4000):null},sampleRecord:true,sources:state.sources},
    checklist:findings.map(x=>["pendente",x.title,x.detail]),
    notes:"Amostra fotográfica para estudo de modelos; conferência não aprovada."
   };
@@ -1758,7 +1796,7 @@ async function saveReview(){
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
  const visualEvidence=await collectVisualEvidence(state.photo,state.text);
- const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,clientSource:state.clientFromCatalog?"catalogo_ean_unico_confirmado_no_encerramento":"ordem_informada",
+ const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts,visualAI:state.aiUsed===true,visualModel:state.aiUsed?"Florence-2-base-ft":null,visualText:state.aiUsed?state.aiText.slice(0,4000):null},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,clientSource:state.clientFromCatalog?"catalogo_ean_unico_confirmado_no_encerramento":"ordem_informada",
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
@@ -1850,13 +1888,19 @@ function mount(adapter){
   '<div id="vl2-gallery-tools" class="vl2-gallery-tools" hidden><button id="vl2-rotate-left" type="button">↶ Girar</button><button id="vl2-rotate-right" type="button">Girar ↷</button><button id="vl2-crop-toggle" type="button">Recortar uma etiqueta</button></div>'+
   '<button id="vl2-analyze-full" type="button" class="vl2-apply" hidden>Analisar foto inteira</button>'+
   '<button id="vl2-apply-crop" type="button" class="vl2-apply" hidden>Aplicar recorte e analisar</button>'+
+  (ctx.isMaster?.()?'<label class="vl2-ai-opt" style="display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px"><input id="vl2-local-ai" type="checkbox" '+(localAIEnabled?'checked':'')+'> IA visual local (experimental · grátis)</label><small class="vl2-help">Primeiro uso baixa o modelo; prefira Wi-Fi. Requer WebGPU. As fotos não são enviadas ao provedor de IA.</small>':'')+
   '<div id="vl2-progress" class="vl2-progress" hidden>Reconhecendo dados…</div><div id="vl2-notice" class="vl2-notice" hidden></div>'+
   '<p class="vl2-photo-foot">O VITRA analisa a foto inteira ou a área selecionada. Iluminação, foco e tamanho das letras influenciam a leitura; dados ilegíveis nunca são aprovados automaticamente.</p></section>'+
   '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>As referências são solicitadas depois que a fotografia for analisada.</p></div></div><div id="vl2-results"></div></section></div>'+
   '<section class="vl2-recent"><div class="vl2-history-head"><h3>Histórico de conferências</h3><small>Fotografias, resultados e responsáveis</small></div><div id="vl2-history">Carregando histórico…</div>'+
   (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">A conferência digital compara informações reconhecidas com o manual e os padrões cadastrados. Um campo ilegível ou sem referência confiável permanece pendente. A liberação física continua sob responsabilidade da equipe autorizada.</p></section>';
- el("vl2-back")?.addEventListener("click",()=>{releasePhoto();ctx.back();});
+ el("vl2-local-ai")?.addEventListener("change",e=>{
+  if(state.processing){e.target.checked=localAIEnabled;return;}
+  localAIEnabled=e.target.checked&&!!ctx.isMaster?.();
+  if(localAIEnabled&&state.photo){state.processing=true;readPhoto().finally(()=>{state.processing=false;});}
+ });
+ el("vl2-back")?.addEventListener("click",()=>{state.sequence++;releasePhoto();ctx.back();});
  el("vl2-image")?.addEventListener("click",()=>{if(state.scanCompleted&&!state.cropActive)el("vl2-stage")?.classList.toggle("vl2-photo-expanded");});
  el("vl2-open-camera")?.addEventListener("click",openDeviceCamera);
  el("vl2-native-camera")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
