@@ -39,7 +39,7 @@ try{
   });
   if(await page.locator('.vl2-pair-grid article').count()!==2)throw Error('Duas etiquetas não exibidas lado a lado/empilhadas.');
   // A referência independente permanece acessível sem ocupar a tela inicial.
-  await page.locator('.vl2-trace-order > summary').click();
+  if(!await page.locator('.vl2-trace-order').evaluate(d=>d.open))await page.locator('.vl2-trace-order > summary').click();
   const referenceInput=page.locator('[data-vl2-trace="raw"]');
   if(await referenceInput.count()!==1)throw Error('Rastreabilidade de referência em campo único não encontrada.');
   await referenceInput.fill('R-26-0106B-2110-C-VI');
@@ -47,7 +47,9 @@ try{
    throw Error('Campo de referência não preservou o código informado pelo operador.');
 
   const evidence=await page.evaluate(()=>({errors:window.__labelSmoke.state.diag?.checks?.filter(x=>x.status==='error').length||0,summary:window.__labelSmoke.state.diag?.summary||''}));
-  if(!evidence.errors||!await page.locator('.vl2-summary-error').count())throw Error('A divergência do par precisa aparecer em vermelho na prévia.');
+  if(!evidence.errors||!await page.locator('.vl3-verdict.vl3-error').count())throw Error('A divergência do par precisa aparecer em vermelho na prévia.');
+  if(!await page.locator('.vl3-label').isVisible())throw Error('Etiqueta visual ausente.');
+  if(await page.locator('.vl3-field[open]').count())throw Error('Detalhes técnicos devem iniciar recolhidos.');
   const result=await page.locator('#vl2-results').innerText();
   if(!result.includes('R-28-000V4-1411-5-VI')||!result.includes('R-26-0106B-2110-C-VI'))throw Error('Identificadores das duas etiquetas ausentes.');
   const measured=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,vw:window.innerWidth}));
