@@ -1528,7 +1528,7 @@ function showResult(){
  '<div class="vl2-pair-grid"><article><small>ETIQUETA DA CAIXA</small><strong>'+esc(pair.box.model||"Modelo ainda não lido")+'</strong><p>'+esc(pair.box.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.box.klass||"Classe pendente")+' · '+esc(nameOf(varieties,pair.box.variety))+'</p></article>'+
  '<article><small>ETIQUETA DA CUMBUCA</small><strong>EAN '+esc(pair.unit.ean||"pendente")+'</strong><p>'+esc(pair.unit.trace||"Rastreabilidade pendente")+'</p><p>'+esc(pair.unit.date||"Data pendente")+' · '+esc(nameOf(varieties,pair.unit.variety))+'</p></article></div></section>':
  state.pairRequested?'<section class="vl2-pair-section vl2-pair-warning"><strong>Não foi possível comparar as duas etiquetas</strong><p>O modelo e as informações continuam pendentes. Use imagem mais nítida ou amplie a região.</p></section>':"";
- const reading='<section class="vl2-photo-reading"><div class="vl2-reading-head"><div><strong>Leitura da fotografia</strong><small>'+(state.aiUsed?'IA visual local + leitura convencional':state.aiError?'Leitura convencional · IA local indisponível':'Leitura convencional')+' · confira as pendências</small></div></div><div class="vl2-reading-facts">'+
+ const reading='<details class="vl2-photo-reading vl2-reading-disclosure"><summary class="vl2-reading-head"><div><strong>Dados lidos na fotografia</strong><small>'+(state.aiUsed?'IA visual local + leitura convencional':state.aiError?'Leitura convencional · IA local indisponível':'Leitura convencional')+'</small></div></summary><div class="vl2-reading-facts">'+
   photoValue("Modelo",kind?name:"Não identificado")+photoValue(state.detected?.varietySource==="Código de barras cadastrado"?"Variedade sugerida pelo catálogo":"Variedade / produto",initial)+
   photoValue("Rastreabilidade na fotografia",f.rastreio||"Não lida")+
   photoValue("Área / válvula",state.detected?.track?.areaValve)+
@@ -1536,7 +1536,7 @@ function showResult(){
   photoValue("Método de pesagem",({C:"Contentor",5:"Caixa de 5 kg",8:"Caixa de 8 kg"})[state.detected?.track?.method])+
   photoValue("Sigla da variedade",state.detected?.track?.variety)+
   photoValue("Data impressa na etiqueta",state.detected?.printedDate)+evidence+
-  '</div></section>';
+  '</div></details>';
  const errors=report.checks.filter(x=>x.status==="error");
  const pendings=report.checks.filter(x=>x.status==="pending");
  const checkDone=report.ready&&report.status==="aprovado";
@@ -1879,8 +1879,8 @@ function mount(adapter){
  releasePhoto();resetScan();
  const p=el("panel");if(!p)return;
  p.innerHTML='<section class="vl2" aria-label="Conferência de etiquetas">'+
-  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2><p>Fotografe a etiqueta. O VITRA compara os dados automaticamente e solicita apenas as referências que faltam para aprovar.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
-  '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>A foto pode conter caixa e cumbuca juntas. O recorte é opcional.</p></div></div>'+
+  '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2><p>Fotografe, confira e valide.</p></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
+  '<div class="vl2-grid"><section class="vl2-capture"><div class="vl2-section-title"><span>01</span><div><h3>Fotografia da etiqueta</h3><p>Caixa ou cumbuca · recorte opcional</p></div></div>'+
   '<div class="vl2-photo" id="vl2-stage"><div class="vl2-photo-empty" id="vl2-empty"><strong>Enquadre a etiqueta</strong><small>Use a câmera traseira ou escolha uma foto salva.</small></div><video id="vl2-video" autoplay playsinline muted hidden></video><img id="vl2-image" alt="Etiqueta recortada" hidden><div id="vl2-frame" class="vl2-frame" hidden><span>DESLIZE PARA POSICIONAR</span><i class="vl2-resize-grip" aria-hidden="true"></i></div></div>'+
   '<div id="vl2-crop-tools" class="vl2-crop-tools" hidden><div><button id="vl2-square" type="button">Quadrado</button><button id="vl2-rectangle" class="active" type="button">Horizontal</button><button id="vl2-portrait" type="button">Vertical</button></div><button id="vl2-center" type="button" class="vl2-center-btn">Centralizar quadro</button><label>Tamanho<input id="vl2-zoom" type="range" min="35" max="98" value="85"></label></div>'+
   '<div class="vl2-actions"><button id="vl2-open-camera" type="button" class="vl2-snap">Fotografar etiqueta</button><input id="vl2-native-camera" type="file" accept="image/*" capture="environment" hidden aria-label="Tirar foto da etiqueta"><label class="vl2-gallery">Escolher foto<input id="vl2-gallery" type="file" accept="image/jpeg,image/png,image/webp"></label></div>'+
@@ -1888,10 +1888,10 @@ function mount(adapter){
   '<div id="vl2-gallery-tools" class="vl2-gallery-tools" hidden><button id="vl2-rotate-left" type="button">↶ Girar</button><button id="vl2-rotate-right" type="button">Girar ↷</button><button id="vl2-crop-toggle" type="button">Recortar uma etiqueta</button></div>'+
   '<button id="vl2-analyze-full" type="button" class="vl2-apply" hidden>Analisar foto inteira</button>'+
   '<button id="vl2-apply-crop" type="button" class="vl2-apply" hidden>Aplicar recorte e analisar</button>'+
-  (ctx.isMaster?.()?'<label class="vl2-ai-opt" style="display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px"><input id="vl2-local-ai" type="checkbox" '+(localAIEnabled?'checked':'')+'> IA visual local (experimental · grátis)</label><small class="vl2-help">Primeiro uso baixa o modelo; prefira Wi-Fi. Requer WebGPU. As fotos não são enviadas ao provedor de IA.</small>':'')+
+  (ctx.isMaster?.()?'<label class="vl2-ai-opt" style="display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px"><input id="vl2-local-ai" type="checkbox" '+(localAIEnabled?'checked':'')+'> IA visual local (experimental · grátis)</label><small class="vl2-help">Primeiro uso: download via Wi-Fi recomendado. Requer WebGPU. Análise local, sem envio de fotos ao provedor de IA.</small>':'')+
   '<div id="vl2-progress" class="vl2-progress" hidden>Reconhecendo dados…</div><div id="vl2-notice" class="vl2-notice" hidden></div>'+
-  '<p class="vl2-photo-foot">O VITRA analisa a foto inteira ou a área selecionada. Iluminação, foco e tamanho das letras influenciam a leitura; dados ilegíveis nunca são aprovados automaticamente.</p></section>'+
-  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>As referências são solicitadas depois que a fotografia for analisada.</p></div></div><div id="vl2-results"></div></section></div>'+
+  '<p class="vl2-photo-foot">Use uma foto nítida. Dados ilegíveis não são aprovados automaticamente.</p></section>'+
+  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>Confira as divergências e confirme o necessário.</p></div></div><div id="vl2-results"></div></section></div>'+
   '<section class="vl2-recent"><div class="vl2-history-head"><h3>Histórico de conferências</h3><small>Fotografias, resultados e responsáveis</small></div><div id="vl2-history">Carregando histórico…</div>'+
   (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">A conferência digital compara informações reconhecidas com o manual e os padrões cadastrados. Um campo ilegível ou sem referência confiável permanece pendente. A liberação física continua sob responsabilidade da equipe autorizada.</p></section>';
