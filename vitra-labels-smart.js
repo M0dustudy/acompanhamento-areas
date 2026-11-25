@@ -30,11 +30,11 @@ function localVisualRead(photo,update){
   const cleanup=(reset)=>{clearTimeout(timer);localAIBusy=false;if(localAIWorker){localAIWorker.onmessage=null;localAIWorker.onerror=null;if(reset){localAIWorker.terminate();localAIWorker=null;}}};
   const fail=msg=>{cleanup(true);reject(Error(msg));};
   try{
-   localAIWorker??=new Worker(new URL("vitra-label-ai-worker.js?v=20261125local1",document.baseURI),{type:"module"});
+   localAIWorker??=new Worker(new URL("vitra-label-ai-worker.js?v=20261125regional2",document.baseURI),{type:"module"});
    localAIWorker.onmessage=({data})=>{
     if(data.type==="progress")update("Preparando IA local · "+Math.max(0,Math.min(100,data.progress||0))+"% do arquivo");
     if(data.type==="reading")update("IA local interpretando a fotografia…");
-    if(data.type==="result"){cleanup(false);resolve(String(data.text||""));}
+    if(data.type==="result"){cleanup(false);resolve(Array.isArray(data.passages)?data.passages.filter(x=>typeof x==="string"&&x.trim()):[String(data.text||"")].filter(Boolean));}
     if(data.type==="error")fail(data.message||"IA local indisponível.");
    };
    localAIWorker.onerror=()=>fail("Não foi possível iniciar a IA local.");
@@ -1063,7 +1063,7 @@ async function readPhoto(deep=false){
     const input=focus?await new Promise(resolve=>focus.toBlob(b=>resolve(b||photo),"image/jpeg",.98)):photo;
     const visual=await localVisualRead(input,update);
     if(seq!==state.sequence)return;
-    if(visual.trim()){state.aiUsed=true;state.aiText=visual;passages.push(visual);recognized=mergeOCRPassages(passages);}
+    if(visual.length){state.aiUsed=true;state.aiText=visual.join("\n");passages.push(...visual);recognized=mergeOCRPassages(passages);}
    }catch(e){if(seq===state.sequence)state.aiError=String(e.message||"IA local indisponível.");}
   }
   if(seq!==state.sequence)return;
@@ -1495,11 +1495,11 @@ function visualLabel(report){
  const f=state.fields||{},d=state.detected||{},box=category()==="box",unit=category()==="unit";
  const checks=report.checks||[],used=new Set();
  const groups=[
-  ["Variedade",d.printedNameVariety?nameOf(varieties,d.printedNameVariety):f.produto,/variedade|sigla/i],
+  ["Variedade",d.printedNameVariety?nameOf(varieties,d.printedNameVariety):d.track?.variety?d.track.variety+" (sigla impressa)":"",/variedade|sigla/i],
   ["Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i],
   ["Data de embalagem",d.printedDate,/data(?!.*cadastr)/i],
   ["Modelo / peso", [d.boxModel?.code,d.weightPhoto].filter(Boolean).join(" · "),/modelo|peso|embalagem|cor indicada|cor da caixa|tipo de etiqueta/i],
-  ...(box?[["Classificação",d.identity?.klass,/classifica|classe|padrão do cliente/i],["Produtor",f.produtor||f.cnpj,[/produtor|produzido/i]],["Comercializador",f.comercializado||f.cnpjComercial,[/comerciante|comercializador|comercializado|comercial/i]]]:[]),
+  ...(box?[["Classificação",d.identity?.klass,/classifica|classe|padrão do cliente/i],["Produtor",f.cnpj||f.produtor,[/produtor|produzido/i]],["Comercializador",f.cnpjComercial||f.comercializado,[/comerciante|comercializador|comercializado|comercial/i]]]:[]),
   ...(unit?[["EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo/i]]:[]),
   ["Cliente da ordem",state.clientConfirmed?nameOf(clients,state.identity.client):"",/^cliente$|marca|cliente da ordem/i]
  ];
@@ -1507,7 +1507,8 @@ function visualLabel(report){
   const status=rows.some(x=>x.status==="error")?"error":rows.some(x=>x.status==="pending")?"pending":rows.length?"ok":"neutral";
   const label={error:"Divergência",pending:"A confirmar",ok:"Conferido",neutral:"Sem parecer"}[status];
   const detail=rows.map(x=>'<div class="vl3-detail"><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':'')+'</div>').join("");
-  const head='<span class="vl3-field-name">'+esc(title)+'</span><span class="vl3-mark vl3-'+status+'" aria-label="'+label+'">'+({error:"!",pending:"?",ok:"✓",neutral:"–"}[status])+'</span><strong>'+esc(value||"Não confirmado")+'</strong>';
+  const warning=rows.find(x=>x.status==="error");
+  const head='<span class="vl3-field-name">'+esc(title)+'</span><span class="vl3-mark vl3-'+status+'" aria-label="'+label+'">'+({error:"!",pending:"?",ok:"✓",neutral:"–"}[status])+'</span><strong>'+esc(value||"Não confirmado")+'</strong>'+(warning?'<small class="vl3-warning">'+esc(warning.title)+'</small>':"");
   return rows.length?'<details class="vl3-field vl3-'+status+'"><summary>'+head+'</summary>'+detail+'</details>':'<div class="vl3-field vl3-'+status+'">'+head+'</div>';
  };
  let tiles="";
@@ -1631,7 +1632,7 @@ function showResult(){
      el("vl2-recheck")?.addEventListener("click",()=>{if(!diagnosticV4().ready)return;state.reviewRequested=true;showResult();});
     }
    }
-   const next=diagnosticV4(),action=el("vl2-evaluate");if(action)action.disabled=!next.ready;const view=el("vl3-visual");if(view)view.innerHTML=visualLabel(next);
+   const next=diagnosticV4(),action=el("vl2-evaluate");state.diag=next;if(action)action.disabled=!next.ready;const view=el("vl3-visual");if(view)view.innerHTML=visualLabel(next);
   };
   inp.addEventListener("input",update);inp.addEventListener("change",update);
  });
