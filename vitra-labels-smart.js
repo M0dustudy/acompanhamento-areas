@@ -13,7 +13,7 @@ const producers=[];
 const sortedClients=clients.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{sensitivity:"base"}));
 const state={
  photo:null,url:null,sourceFile:null,sourceUrl:null,text:"",barcode:"",barcodeBars:"",barcodePrinted:"",detected:null,codeEvidence:[],pairedEvidence:null,pairRequested:false,
- identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,
+ identity:{client:"",kind:"",variety:"",klass:""},clientConfirmed:false,clientFromCatalog:false,
  expected:{raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""},
  fields:{},sources:{},issues:[],matches:[],history:[],notes:"",reviewed:false,saved:false,sampleSaved:false,sampleSaving:false,
  mode:"empty",crop:{cx:.5,cy:.5,scale:.85,ratio:1.5},processing:false,sequence:0,cropActive:false,imageAngle:0,
@@ -46,7 +46,7 @@ function releasePhoto(){
 function resetScan(){
  state.sequence++;state.photo=null;state.text="";state.barcode="";state.barcodeBars="";state.barcodePrinted="";state.detected=null;state.codeEvidence=[];state.pairedEvidence=null;state.pairRequested=false;
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
- state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;
+ state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;state.clientFromCatalog=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
  state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";
 }
@@ -96,7 +96,9 @@ function codeMatchesReference(reference,printed){
  return !!(ref&&code&&ref[1]===code.year&&ref[2]===code.areaValve&&ref[3]===code.day+code.month&&ref[4]===code.variety);
 }
 function expectedVariety(){
- return varieties.find(x=>x[2]===state.expected.variety)?.[0]||"";
+ const raw=parseTrace(state.expected.raw||"");
+ const code=raw?.variety||state.expected.variety;
+ return code?varieties.find(x=>x[2]===code)?.[0]||"":"";
 }
 function getEAN(raw){
  const plain=str(raw).replace(/(?:GGN|GLN|GLOBALGAP|GLOBAL G A P)\s*:?\s*(\d[\d\s-]{11,20})/gi," ");
@@ -469,7 +471,7 @@ function positionMode(mode){
  if(frame)frame.hidden=mode==="crop"?!state.cropActive:mode!=="camera";
  if(cropping)cropping.hidden=mode==="crop"?!state.cropActive:mode!=="camera";
  if(el("vl2-gallery-tools"))el("vl2-gallery-tools").hidden=!(["crop","ready"].includes(mode)&&!!state.sourceFile);
- if(el("vl2-analyze-full"))el("vl2-analyze-full").hidden=!(["crop","ready"].includes(mode)&&!!state.sourceFile);
+ if(el("vl2-analyze-full"))el("vl2-analyze-full").hidden=mode!=="crop"||!state.sourceFile;
  if(el("vl2-capture"))el("vl2-capture").hidden=mode!=="camera";
  if(el("vl2-capture-full"))el("vl2-capture-full").hidden=mode!=="camera";
  if(el("vl2-apply-crop"))el("vl2-apply-crop").hidden=mode!=="crop"||!state.cropActive;
@@ -486,7 +488,7 @@ function photoFromCanvas(canvas){
  return new Promise((resolve,reject)=>canvas.toBlob(blob=>{
   if(!blob)return reject(Error("Não foi possível recortar a imagem."));
   resolve(new File([blob],"etiqueta-"+Date.now()+".jpg",{type:"image/jpeg"}));
- },"image/jpeg",.93));
+ },"image/jpeg",.98));
 }
 function cropCanvas(image,iw,ih){
  const frame=frameBounds();if(!frame)throw Error("Área de enquadramento indisponível.");
@@ -494,7 +496,7 @@ function cropCanvas(image,iw,ih){
  const offsetX=(frame.sw-iw*scale)/2,offsetY=(frame.sh-ih*scale)/2;
  const sx=Math.max(0,(frame.x-offsetX)/scale),sy=Math.max(0,(frame.y-offsetY)/scale);
  const width=Math.max(1,Math.min(iw-sx,frame.w/scale)),height=Math.max(1,Math.min(ih-sy,frame.h/scale));
- const out=document.createElement("canvas"),factor=Math.min(1,2200/width);
+ const out=document.createElement("canvas"),factor=Math.min(1,3600/Math.max(width,height));
  out.width=Math.max(1,Math.round(width*factor));out.height=Math.max(1,Math.round(height*factor));
  out.getContext("2d").drawImage(image,sx,sy,width,height,0,0,out.width,out.height);
  return out;
@@ -578,7 +580,7 @@ async function beginCamera(){
  if(!navigator.mediaDevices?.getUserMedia){notice("Câmera integrada indisponível. Use «Escolher foto».",true);return;}
  stopCamera();releasePhoto();resetScan();
  try{
-  cameraStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"},width:{ideal:1920},height:{ideal:1440}}});
+  cameraStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"},width:{ideal:4032},height:{ideal:3024}}});
  }catch{
   try{
    const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");
@@ -696,7 +698,7 @@ async function focusLabelCanvas(file,maxSide=3000){
   const x=Math.max(0,Math.floor((c.x0-px)*bmp.width/w)),y=Math.max(0,Math.floor((c.y0-py)*bmp.height/h));
   const right=Math.min(bmp.width,Math.ceil((c.x1+1+px)*bmp.width/w)),bottom=Math.min(bmp.height,Math.ceil((c.y1+1+py)*bmp.height/h));
   const sw=right-x,sh=bottom-y;if(sw*sh>bmp.width*bmp.height*.85)return null;
-  const scale=Math.min(3,maxSide/Math.max(sw,sh)),canvas=document.createElement("canvas");
+  const scale=Math.min(4,maxSide/Math.max(sw,sh)),canvas=document.createElement("canvas");
   canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
   const ctx=canvas.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(bmp,x,y,sw,sh,0,0,canvas.width,canvas.height);
   return canvas;
@@ -782,8 +784,15 @@ async function printedEANNearBarcode(file,worker){
   canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);
   const g=canvas.getContext("2d");g.fillStyle="white";g.fillRect(0,0,canvas.width,canvas.height);
   g.filter="grayscale(1) contrast(1.55)";g.drawImage(bmp,left,top,width,height,0,0,canvas.width,canvas.height);
-  const data=await limitWork(worker.recognize(canvas),7200,"A leitura dos números foi interrompida");
-  return getEAN(data.data?.text||"");
+  // Isolar a linha de algarismos da imagem original, sem usar o EAN decodificado como texto.
+  const line=document.createElement("canvas");line.width=canvas.width;line.height=Math.max(1,Math.round(canvas.height*.53));
+  line.getContext("2d").drawImage(canvas,0,canvas.height-line.height,line.width,line.height,0,0,line.width,line.height);
+  try{
+   await worker.setParameters({tessedit_pageseg_mode:"7",tessedit_char_whitelist:"0123456789 "});
+   const read=await limitWork(worker.recognize(line),8000,"Leitura de dígitos interrompida");
+   const num=getEAN(read.data?.text||"");if(num)return num;
+  }catch{}finally{await worker.setParameters({tessedit_pageseg_mode:"6",tessedit_char_whitelist:""});}
+  const data=await limitWork(worker.recognize(canvas),7200,"A leitura dos números foi interrompida");return getEAN(data.data?.text||"");
  }catch{return "";}finally{bmp?.close?.();}
 }
 function rotateBitmapCanvas(source,angle,maxDim=3000){
@@ -956,8 +965,8 @@ async function readPhoto(deep=false){
    await ensureOCR();worker=await getOCRWorker();if(seq!==state.sequence)return;
    if(!passages.length||deep){
     update(deep?"Lendo novamente a fotografia com resolução ampliada…":"Lendo todas as informações da etiqueta…");
-    const focus=await limitWork(focusLabelCanvas(photo,deep?3500:2900),4000,"Localização automática interrompida.").catch(()=>null);
-     const canvas=focus||await limitWork(prepareOCRImage(photo,deep?3300:2400),deep?6500:3500,"Falha ao preparar foto.");
+    const focus=await limitWork(focusLabelCanvas(photo,deep?4200:3600),4000,"Localização automática interrompida.").catch(()=>null);
+     const canvas=focus||await limitWork(prepareOCRImage(photo,deep?4200:3200),deep?6500:3500,"Falha ao preparar foto.");
     try{
       const original=await readPass(canvas,16000,"3");if(original)passages.push(original);
       if(focus&&seq===state.sequence){
@@ -971,10 +980,12 @@ async function readPhoto(deep=false){
        }else{
         const top=await readPass(focusRegion(focus,0,0,1,.72),10000,"6");
         if(top)passages.push(top);
+        if(!ocrTraceCandidates(passages.join("\n")).length){const mid=await readPass(focusRegion(focus,0,.20,1,.47),10000,"6");if(mid)passages.push(mid);}
+        if(!getEAN(passages.join("\n"))){const bottom=await readPass(focusRegion(focus,0,.62,1,.38),9000,"6");if(bottom)passages.push(bottom);}
        }
        // Preservar a foto inteira como evidência: o recorte é uma tentativa, não uma validação.
        if(!ocrTraceCandidates(passages.join("\n")).length||!original||deep||state.pairRequested){
-        const fallback=await limitWork(prepareOCRImage(photo,deep?3300:2400),4500,"Falha ao preparar imagem completa.");
+        const fallback=await limitWork(prepareOCRImage(photo,deep?4200:3200),4500,"Falha ao preparar imagem completa.");
         const full=await readPass(fallback,12000,"3");if(full)passages.push(full);
        }
       }
@@ -1054,7 +1065,7 @@ async function readPhoto(deep=false){
    }
   }
  };
- try{await limitWork(run(),deep||state.pairRequested?110000:85000,"Limite de leitura atingido. A foto foi preservada.");}
+ try{await limitWork(run(),deep||state.pairRequested?135000:110000,"Limite de leitura atingido. A foto foi preservada.");}
  catch(e){failure=e?.message||"Leitura interrompida.";if(worker)discardOCRWorker(worker);}
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
@@ -1064,13 +1075,20 @@ async function readPhoto(deep=false){
     state.text=recognized;state.barcode=barcode||data.fields.barcode;
     state.barcodeBars=barcode;state.barcodePrinted=printedNumber||getEAN(recognized);
     state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
-    if(!state.clientConfirmed)state.identity.client=data.detectedClient;
+    if(!state.clientConfirmed||state.clientFromCatalog){
+     state.identity.client=data.detectedClient;state.clientFromCatalog=false;state.clientConfirmed=false;
+     const eligible=distinct((data.codeClients||[]).map(catalogClient));
+     const printedClients=distinct((data.wordClients||[]).map(catalogClient));
+     if(barcode&&eanValid(barcode)&&eligible.length===1&&eligible[0]!=="cia"&&catalogClient(data.detectedClient)===eligible[0]&&printedClients.every(x=>x===eligible[0])&&!state.pairedEvidence?.detected){
+      state.identity.client=eligible[0];state.clientConfirmed=true;state.clientFromCatalog=true;
+     }
+    }
     state.identity.kind=data.identity.kind;state.identity.variety=data.identity.variety;state.identity.klass=data.identity.klass;
     state.analysisError=failure||(!recognized?"Não foi possível reconhecer texto nesta fotografia com segurança.":"");
     state.ocrFailed=!!state.analysisError;state.scanCompleted=true;state.issues=[];
     showResult();
     if(el("vl2-results")&&window.innerWidth<1000)el("vl2-results").scrollIntoView({behavior:"smooth",block:"start"});
-    notice(state.analysisError?"Leitura parcial: "+state.analysisError+" A imagem segue disponível.":"Leitura concluída em "+state.ocrPasses+" passagem(ns). Confira os alertas e a ordem de produção.",!!state.analysisError);
+    notice(state.analysisError?"Leitura parcial. Confira os campos pendentes.":"Leitura concluída.",!!state.analysisError);
    }catch(e){state.analysisError=e?.message||"Erro ao interpretar a etiqueta.";state.scanCompleted=false;showResult();notice(state.analysisError,true);}
   }
   if(progress)progress.hidden=true;
@@ -1081,11 +1099,11 @@ function clientChooser(){
  const active=state.identity.client;
  const candidates=distinct((state.detected?.codeClients||[]).map(catalogClient));
  const quick=!state.clientConfirmed&&candidates.length?'<div class="vl2-trace-review-actions">'+candidates.map(id=>'<button type="button" data-vl2-client="'+esc(id)+'" data-label="'+esc(norm(nameOf(clients,id)))+'">'+esc(nameOf(clients,id))+'</button>').join("")+'</div><small>'+esc(candidates.length>1?"EAN compartilhado: confirme apenas o cliente real.":"Cliente identificado pelo catálogo: confirme a ordem.")+'</small>':"";
- return '<div class="vl2-client-wrap"><div class="vl2-control-label">Cliente <small>seleção obrigatória</small></div>'+
+ return '<div class="vl2-client-wrap"><div class="vl2-control-label">Cliente</div>'+quick+
   '<details name="vl2-choice" class="vl2-client-combo" id="vl2-client-combo"><summary><span class="vl2-search-icon" aria-hidden="true">⌕</span><strong>'+esc(active?nameOf(clients,active):"Pesquisar ou selecionar cliente")+'</strong><em>'+esc(state.clientConfirmed?"Alterar":"Confirmar")+'</em></summary>'+
   '<div class="vl2-client-pop"><div class="vl2-popup-header"><strong>Selecionar cliente</strong><button type="button" data-vl2-close-lookup aria-label="Fechar seleção">✕</button></div><input id="vl2-client-search" type="search" autocomplete="off" aria-label="Pesquisar cliente" placeholder="Digite o nome do cliente…"><div class="vl2-client-options">'+
   sortedClients.map(c=>'<button type="button" data-vl2-client="'+esc(c[0])+'" data-label="'+esc(norm(c[1]))+'">'+esc(c[1])+'</button>').join("")+
-  '</div></div></details>'+quick+'<p class="vl2-help">'+(state.clientConfirmed?"Cliente confirmado. Você pode alterá-lo a qualquer momento.":active?"Identificação sugerida pela foto; toque para confirmar.":"Escolha o cliente para cruzar com a etiqueta.")+'</p></div>';
+  '</div></div></details>'+'<p class="vl2-help">'+(state.clientFromCatalog?"Cliente único no catálogo; confirme com a ordem ao salvar.":state.clientConfirmed?"Cliente confirmado.":active?"Confirme o cliente sugerido.":"Selecione o cliente.")+'</p></div>';
 }
 function lookupPicker(items,key,value,placeholder,attribute){
  const ordered=items.slice().sort((a,b)=>a[1].localeCompare(b[1],"pt-BR",{numeric:true,sensitivity:"base"}));
@@ -1108,13 +1126,13 @@ function traceBuilder(){
  const traceOk=Boolean(observed&&parseTrace(observed)&&!state.ocrConflicts.includes("rastreio"));
  return '<section class="vl2-trace" aria-label="Conferência da rastreabilidade"><div class="vl2-trace-title"><strong>Rastreabilidade</strong><span>Confira a leitura</span></div>'+
   '<div class="vl2-trace-found"><small>Reconhecida na fotografia</small><strong>'+esc(observed||"Não identificada")+'</strong></div>'+
-  '<div class="vl2-trace-review"><p>O código lido corresponde ao que está impresso?</p>'+
+  '<details class="vl2-trace-review"'+(state.traceVisualCheck==="no"?" open":"")+'><summary>Corrigir ou conferir leitura da foto</summary>'+
   '<div class="vl2-trace-review-actions"><button type="button" data-vl2-trace-check="yes" class="'+(state.traceVisualCheck==="yes"?"is-confirmed":"")+'" '+(!traceOk?'disabled title="Leitura incompleta ou conflitante"':'')+'>✓ Sim, confere</button>'+
   '<button type="button" data-vl2-trace-check="no" class="'+(state.traceVisualCheck==="no"?"is-correction":"")+'">Não, corrigir</button></div>'+
   (state.traceVisualCheck==="yes"?'<div class="vl2-trace-accepted">✓ Leitura confirmada visualmente · '+esc(observed)+'</div>':"")+
   (state.traceVisualCheck==="no"?'<label class="vl2-trace-correct">Código correto que aparece na etiqueta<input data-vl2-field="rastreio" type="text" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="70" value="'+esc(observed||"")+'" placeholder="R-26-0106B-2110-C-VI"></label>':"")+
-  '<small>Esta confirmação visual não substitui a ordem de produção ou a inspeção física.</small></div>'+
-  '<details class="vl2-trace-order"><summary>Comparar com a ordem de produção</summary>'+
+  '<small>Confirmação visual não substitui a ordem de produção.</small></details>'+
+  '<details class="vl2-trace-order"'+(!expected?" open":"")+'><summary>Comparar com a ordem de produção</summary>'+
   '<p>Preencha apenas quando for verificar a rastreabilidade contra a referência independente da produção.</p>'+
   '<label class="vl2-quick-trace">Rastreabilidade da ordem<input data-vl2-trace="raw" type="text" inputmode="text" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="70" value="'+esc(state.expected.raw||"")+'" placeholder="R-26-0106B-2110-C-VI"></label>'+
   '<details class="vl2-trace-manual"><summary>Não tem o código completo? Montar por partes</summary>'+
@@ -1261,7 +1279,7 @@ function diagnosticV4(){
     // A marca impressa, quando realmente lida, é evidência independente do EAN.
     const marcas=distinct((state.detected?.wordClients||[]).map(catalogClient).filter(Boolean));
     if(marcas.length===1&&selected&&state.clientConfirmed){
-      if(marcas[0]===catalogClient(selected))add("ok","Marca e cliente da ordem","Marca "+display+" reconhecida na foto e correspondente à ordem.");
+      if(marcas[0]===catalogClient(selected))add("ok","Marca e cliente","Marca "+display+" reconhecida na foto e correspondente "+(state.clientFromCatalog?"ao catálogo.":"à ordem."));
       else add("error","Marca divergente do cliente","Marca da fotografia: "+nameOf(clients,marcas[0])+" · cliente da ordem: "+display+". A divergência é da marca, não do compartilhamento de EAN.");
     }else if(marcas.length>1)add("pending","Marcas diferentes na foto","Há mais de uma marca identificada; confira as etiquetas antes da conclusão.");
    }
@@ -1435,6 +1453,7 @@ function diagnosticV4(){
 }
 function showResult(){
  const root=el("vl2-results");if(!root)return;
+ root.closest(".vl2")?.classList.toggle("vl2-has-result",Boolean(state.photo&&state.scanCompleted));
  if(!state.photo||!state.scanCompleted){
   root.innerHTML='<div class="vl2-welcome"><strong>'+esc(state.sourceFile?"Foto preparada para análise":"Comece pela fotografia")+'</strong><p>'+esc(state.sourceFile?"Toque em Analisar foto inteira para reconhecer os dados impressos, ou utilize o recorte opcional.":"Escolha uma fotografia ou abra a câmera traseira. O VITRA lê os dados da etiqueta; você informa apenas cliente e rastreabilidade da produção.")+'</p></div>';
   return;
@@ -1491,7 +1510,7 @@ function showResult(){
   (errors.length?'<div class="vl2-quick-items">'+errors.slice(0,6).map(x=>'<div><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p></div>').join("")+'</div>':"")+
   (pendings.length?'<div class="vl2-pending-short"><small>A confirmar</small><p>'+esc(pendings.slice(0,6).map(x=>x.title).join(" · "))+'</p></div>':"")+
   '<small>'+(report.ready?"Consulte as verificações completas abaixo.":"A análise é preliminar até confirmar os dados da ordem de produção.")+'</small></section>';
- const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados da ordem de produção</strong><small>Informe somente os dados que não constam no cadastro.</small></div></div>'+clientChooser()+traceBuilder()+
+ const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados a confirmar</strong></div></div>'+clientChooser()+traceBuilder()+
  (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>O código não possui uma classe única cadastrada. Informe a classificação correta da produção.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
  const visual=report.checks.slice().sort((a,b)=>({error:0,pending:1,ok:2}[a.status]-{error:0,pending:1,ok:2}[b.status]));
@@ -1502,14 +1521,14 @@ function showResult(){
   outcome='<section class="vl2-outcome"><section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>Conferência automática</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
    (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência nos campos verificados.</p>')+
    (passed.length?'<details class="vl2-passed"><summary>Ver '+passed.length+' itens conferidos</summary><div class="vl2-check-list">'+passed.map(item).join("")+'</div></details>':"")+'</section></section>'+
-   (report.ready?'<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate">Concluir conferência</button></section>':'<p class="vl2-not-ready">A conferência automática já está disponível. Para aprovar e registrar, confirme apenas as referências independentes da produção que faltam.</p>');
+   '<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?'disabled':'')+'>Concluir conferência</button></section>';
  }else{
   const title=report.status==="aprovado"?"Aprovado na conferência digital":report.status==="reprovado"?"Divergências identificadas":"Conferência inconclusiva";
   outcome='<section class="vl2-outcome" id="vl2-outcome">'+
   '<section class="vl2-diagnostic"><div class="vl2-diagnostic-title"><strong>'+esc(issues.length?"Itens para corrigir ou confirmar":"Itens conferidos")+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências</small></div>'+
   (issues.length?'<div class="vl2-check-list">'+issues.map(item).join("")+'</div>':'<p class="vl2-approved-msg">Nenhuma divergência encontrada nos dados que puderam ser verificados.</p>')+
   (passed.length?'<div class="vl2-confirmed-area"><div class="vl2-confirmed-head"><strong>'+passed.length+' itens conferidos</strong><small>Confirmados com a referência disponível</small></div><div class="vl2-check-list">'+passed.slice(0,10).map(item).join("")+'</div>'+(passed.length>10?'<details class="vl2-passed"><summary>Ver outros '+(passed.length-10)+' itens conferidos</summary><div class="vl2-check-list">'+passed.slice(10).map(item).join("")+'</div></details>':"")+'</div>':"")+'</section></section>';
-  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi a aplicação física e o modelo da etiqueta com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
+  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi o cliente, o modelo e a aplicação física com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
   else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
  }
  const deepRetry=state.photo&&state.scanCompleted?'<div class="vl2-read-actions"><button type="button" id="vl2-deep-read" class="vl2-retry-deep">Reexaminar foto em alta resolução</button><button type="button" id="vl2-pair-read" class="vl2-retry-deep">Comparar caixa e cumbuca da foto</button></div>':"";
@@ -1517,14 +1536,14 @@ function showResult(){
  '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
  const sampleOption=state.sampleSaved?'<p class="vl2-hint">Amostra registrada como pendente no histórico, sem aprovação.</p>':
   !state.saved&&report.status!=="aprovado"?'<details class="vl2-refine vl2-sample"><summary>Modelo diferente? Guardar foto para ampliar o catálogo</summary><p class="vl2-refine-hint">Registra a foto para estudo, sem aprovação nem criação automática de regras.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>':"";
- root.innerHTML=retry+concise+pairView+reading+reference+outcome+deepRetry+sampleOption+
+ root.innerHTML=retry+'<div class="vl2-compact-status vl2-summary-'+(errors.length?"error":checkDone?"ok":"pending")+'"><strong>'+esc(head)+'</strong><small>'+report.errors+' divergências · '+report.pending+' pendências · '+report.ok+' conferidos</small></div>'+pairView+reading+reference+outcome+'<details class="vl2-details-root"><summary>Outras opções de leitura</summary>'+deepRetry+sampleOption+'</details>'+
  '<details class="vl2-details-root"><summary>Dados técnicos reconhecidos (somente consulta)</summary><div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
  }));
  root.querySelectorAll("[data-vl2-close-lookup]").forEach(b=>b.addEventListener("click",()=>{b.closest("details").open=false;}));
  el("vl2-client-search")?.addEventListener("input",e=>{const q=norm(e.target.value);root.querySelectorAll("[data-vl2-client]").forEach(b=>b.hidden=!b.dataset.label.includes(q));});
- root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.reviewRequested=false;showResult();}));
+ root.querySelectorAll("[data-vl2-client]").forEach(b=>b.addEventListener("click",()=>{state.identity.client=b.dataset.vl2Client;state.clientConfirmed=true;state.clientFromCatalog=false;state.reviewRequested=false;showResult();}));
  root.querySelectorAll("[data-vl2-trace-check]").forEach(btn=>btn.addEventListener("click",()=>{
   const response=btn.dataset.vl2TraceCheck;
   if(response==="yes"){
@@ -1572,7 +1591,7 @@ function showResult(){
  el("vl2-retry-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto().finally(()=>{state.processing=false;});});
  el("vl2-deep-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.processing=true;readPhoto(true).finally(()=>{state.processing=false;});});
  el("vl2-pair-read")?.addEventListener("click",()=>{if(!state.photo||state.processing)return;state.pairRequested=true;state.processing=true;readPhoto(true).finally(()=>{state.processing=false;});});
- el("vl2-evaluate")?.addEventListener("click",()=>{state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
+ el("vl2-evaluate")?.addEventListener("click",()=>{if(!diagnosticV4().ready)return;state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
  el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
  el("vl2-save")?.addEventListener("click",saveReview);
@@ -1739,7 +1758,7 @@ async function saveReview(){
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
  const btn=el("vl2-save");if(btn)btn.disabled=true;
  const visualEvidence=await collectVisualEvidence(state.photo,state.text);
- const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,
+ const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,clientSource:state.clientFromCatalog?"catalogo_ean_unico_confirmado_no_encerramento":"ordem_informada",
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
@@ -1838,6 +1857,7 @@ function mount(adapter){
   (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+'</section><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">A conferência digital compara informações reconhecidas com o manual e os padrões cadastrados. Um campo ilegível ou sem referência confiável permanece pendente. A liberação física continua sob responsabilidade da equipe autorizada.</p></section>';
  el("vl2-back")?.addEventListener("click",()=>{releasePhoto();ctx.back();});
+ el("vl2-image")?.addEventListener("click",()=>{if(state.scanCompleted&&!state.cropActive)el("vl2-stage")?.classList.toggle("vl2-photo-expanded");});
  el("vl2-open-camera")?.addEventListener("click",openDeviceCamera);
  el("vl2-native-camera")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
  el("vl2-gallery")?.addEventListener("change",e=>{const file=e.target.files?.[0];e.target.value="";if(file)useFile(file);});
