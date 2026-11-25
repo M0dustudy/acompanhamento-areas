@@ -76,16 +76,17 @@ assert(!source.includes('id="vl2-trace-full"'));
 assert(source.includes('data-vl2-trace="raw"'));
 assert(source.includes('class="vl2-trace-manual"'));
 assert(source.includes('class="vl2-trace-grid"'));
-assert(source.includes("vl2-concise-result"));
+assert(source.includes('function visualLabel(report)'));
+assert(source.includes('vl3-verdict'));
 assert(source.includes('readPass(canvas,16000,"3")'),"A leitura principal deve ter limite explícito e segmentação automática.");
-assert(source.includes('focusLabelCanvas(photo,deep?3500:2900)'),"A região da etiqueta deve ser ampliada automaticamente.");
-assert(source.includes('await limitWork(run(),deep||state.pairRequested?110000:85000'),"O processamento total deve continuar limitado.");
+assert(source.includes('focusLabelCanvas(photo,deep?4200:3600)'),"A região da etiqueta deve ser ampliada automaticamente.");
+assert(source.includes('await limitWork(run(),localAIEnabled?390000:deep||state.pairRequested?135000:110000'),"O processamento total deve continuar limitado.");
 assert(source.includes('function interpretPairedText('));
 assert(source.includes('"qr_code"'));
 assert(source.includes('vl2-capture-full'));
 assert(source.includes('id="vl2-native-camera"'),"A câmera móvel precisa ter fallback nativo.");
 assert(source.includes('capture="environment"'),"O seletor deve solicitar a câmera traseira.");
-assert(source.includes('deep?3300:2400'),"A análise ampliada precisa reprocessar a foto inteira.");
+assert(source.includes('deep?4200:3200'),"A análise ampliada precisa reprocessar a foto inteira.");
 assert(source.includes('data-vl2-trace-check="yes"'),"Confirmação visual necessária.");
 assert(source.includes('data-vl2-trace-check="no"'),"Correção sob demanda necessária.");
 assert(source.includes('state.detected?.printedNameVariety'),"O nome impresso deve ser independente do catálogo e da sigla.");
@@ -145,7 +146,7 @@ readings=["PRODUZIDO POR FAZENDA TESTE\nCNPJ: 12345678000190","R-26-109A5-1611-5
 await t.readPhoto();
 assert.equal(calls,2,"A leitura parcial deve tentar uma única região complementar");
 assert.equal(t.state.fields.rastreio,"R-26-109A5-1611-5-VI");
-// Alta resolução repete a leitura completa em 3300 px e cruza regiões ampliadas.
+// Alta resolução repete a leitura completa em até 4200 px e cruza regiões ampliadas.
 t.state.photo={type:"image/jpeg"};t.state.ocrRawPassages=[fullRead];t.state.barcodeBars="";
 readings=[fullRead,fullRead,fullRead,fullRead];calls=0;
 await t.readPhoto(true);
