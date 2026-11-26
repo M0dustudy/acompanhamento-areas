@@ -139,10 +139,31 @@ function expectedVariety(){
  return code?varieties.find(x=>x[2]===code)?.[0]||"":"";
 }
 function getEAN(raw){
- const plain=str(raw).replace(/(?:GGN|GLN|GLOBALGAP|GLOBAL G A P)\s*:?\s*(\d[\d\s-]{11,20})/gi," ");
- const codes=(plain.match(/(?<!\d)(?:\d[\s-]*){13}(?!\d)/g)||[]).map(digits);
- const matches=codes.filter(x=>catalog.some(p=>p.barcode===x));
- return matches.find(eanValid)||codes.find(eanValid)||matches[0]||"";
+ const text=str(raw);
+ const excluded=new Set((state.entities||[]).flatMap(e=>[digits(e.ggn),digits(e.gln)]).filter(Boolean));
+ for(const m of text.matchAll(/\b(?:GGN|GLN|GLOBAL\s*G\.?A\.?P\.?|CNPJ|CPF)\s*[:#-]?\s*([0-9][0-9.\/ \t-]{10,25})/gi))excluded.add(digits(m[1]));
+ const explicit=[...text.matchAll(/\bEAN(?:\s*-?13)?\s*[:#-]?\s*([0-9][0-9 \t-]{12,23})/gi)].map(m=>digits(m[1])).filter(x=>eanValid(x)&&!excluded.has(x));
+ const plain=text.replace(/\b(?:GGN|GLN|GLOBAL\s*G\.?A\.?P\.?|CNPJ|CPF)\s*[:#-]?\s*[0-9][0-9.\/ \t-]{10,25}/gi," ");
+ const codes=distinct((plain.match(/(?<![\d.\/])(?:\d[ \t-]*){13}(?![\d.\/])/g)||[]).map(digits)).filter(x=>eanValid(x)&&!excluded.has(x));
+ const known=codes.filter(x=>catalog.some(p=>p.barcode===x));
+ const box=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|(?:MEI|EX)\s*-?\s*(?:PA|V|P)(?:50|80))\b/i.test(norm(text));
+ return explicit.length===1?explicit[0]:known.length===1?known[0]:!box&&codes.length===1?codes[0]:"";
+}
+function labelSections(raw){
+ const text=str(raw);
+ const part=(start,stop)=>text.match(start)?.[1]?.split(stop)[0]||"";
+ return {producer:part(/(?:PRODUZIDO\s+POR|PRODUTOR)\s*[:\-]?\s*([\s\S]*)/i,/COMERCIALIZADO\s+POR|RASTREABILIDADE/i),merchant:part(/COMERCIALIZADO\s+POR\s*[:\-]?\s*([\s\S]*)/i,/PRODUZIDO\s+POR|RASTREABILIDADE/i)};
+}
+function printedEntityName(part){
+ const value=str(part).split(/\b(?:CNPJ|CPF|GGN|GLN|ENDERE[CÇ]O|CEP|RODOVIA|BR\s*-?\s*\d|LOCALIZA[CÇ][AÃ]O|I\.?E\.?)\b/i)[0].replace(/\s+/g," ").trim();
+ return /[A-Za-zÀ-ÿ]{3}/.test(value)?value.slice(0,180):"";
+}
+function printedAddress(part){
+ const lines=str(part).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ return lines.filter(x=>/\b(?:BR\s*-?\s*\d{2,3}|KM\s*[:.-]?\s*\d+|RODOVIA|RUA|ESTRADA|ENDERE[CÇ]O|ZONA RURAL|CASA NOVA|PETROLINA|JUAZEIRO|IBIAPINA|SANTA MARIA DA BOA VISTA|PROJETO|LOTE)\b/i.test(x)&&!/^\s*(?:CNPJ|GGN|GLN|LOCALIZA[CÇ][AÃ]O)\b/i.test(x)).map(x=>x.split(/\b(?:CEP|CNPJ|GGN|GLN|LOCALIZA[CÇ][AÃ]O)\s*[:\-]?/i)[0].trim()).filter(Boolean).join(" · ").slice(0,240);
+}
+function printedGeo(part){
+ return str(part).match(/LOCALIZA[CÇ][AÃ]O\s+GEOGR[AÁ]FICA\s*[:\-]?\s*([0-9°º'’′"”“″\sSNWEO.,+-]{9,80})/i)?.[1]?.trim()||"";
 }
 function extract(raw,barcode){
  const n=norm(raw), b=barcode||getEAN(raw);
@@ -170,12 +191,12 @@ function extract(raw,barcode){
  if(/\bEXTRA\s*A\b|\bHAPPY\s*TREE\b/.test(n))klass="Happy Tree / Extra A";
  else if(/\bCAMPESITA\b/.test(n))klass="Campesita";
  else if(/\b(?:CLASSE|CLASSIFICACAO)\s*[:=-]?\s*EXTRA\b/.test(n))klass="Extra";
- else if(/\bSELECIONADA\b/.test(n))klass="Selecionada";
+ else if(/\b(?:CLASSE|CLASSIFICACAO)\s*[:=-]?\s*SELECIONAD[AO]S?\b/.test(n)||/\bSELECIONADA\b/.test(n))klass="Selecionada";
  else if(/\bSABOR\b/.test(n))klass="Sabor";
  else if(/\bEXPORTACAO\b/.test(n))klass="Exportação";
  else if(/\bEXTRA\b/.test(n))klass="Extra";
  // Classe não lida na foto permanece ausente, mesmo quando o catálogo possui uma referência.
- const printedWeight=str(raw).match(/\b(?:PESO\s*[:=]?\s*)?(\d{1,2}(?:[,.]\d{1,2})?)\s*(KG|G)\b/i);
+ const printedWeight=str(raw).match(/\b(?:PESO\s*(?:L[IÍ]QUIDO)?\s*[:=]?\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*(KG|G)\b/i);
  const codeWeights=distinct(group.map(x=>x.weight));
  const weightPhoto=printedWeight?printedWeight[1].replace(".",",")+" "+printedWeight[2].toLowerCase():"";
  const weightCatalog=codeWeights.length===1&&codeWeights[0]?codeWeights[0]+" g":"";
@@ -204,8 +225,7 @@ function extract(raw,barcode){
  const lot=str(raw).match(/\b(?:LOTE|LOT)\s*[:#-]?\s*([0-9A-Z./-]{2,24})\b/i)?.[1]||"";
  const cnpjPattern=/\bCNPJ\s*[:#-]?\s*([0-9][0-9.\/ \t-]{10,25})/gi;
  const candidates=[...str(raw).matchAll(cnpjPattern)].map(x=>digits(x[1]));
- const producedSection=str(raw).split(/PRODUZIDO POR/i)[1]?.split(/COMERCIALIZADO POR|RASTREABILIDADE/i)[0]||"";
- const companySection=str(raw).split(/COMERCIALIZADO POR/i)[1]?.split(/PRODUZIDO POR|RASTREABILIDADE/i)[0]||"";
+ const sections=labelSections(raw),producedSection=sections.producer,companySection=sections.merchant;
  const producerCnpj=digits(producedSection.match(cnpjPattern)?.[0]||"");
  const companyCnpj=digits(companySection.match(cnpjPattern)?.[0]||"");
  const numberAfter=(segment,label)=>{
@@ -227,7 +247,7 @@ function extract(raw,barcode){
  const boxModel=classCode?{market:classCode[1],color:classCode[2],weight:classCode[3],variety:classCode[4],package:classCode[5],code:classCode[0]}:null;
  return {
   detectedClient:foundClient,codeClients:candidateClients,wordClients:words,identity:{kind,variety,klass},
-  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||(!companySection?ggnNumber:""),ggnComercial,gln:glnProdutor,glnComercial,ieProdutor:ieOf(producedSection),ieComercial:ieOf(companySection),emailProdutor:emailOf(producedSection),emailComercial:emailOf(companySection),siteProdutor:siteOf(producedSection),siteComercial:siteOf(companySection),cepProdutor:cepOf(producedSection),cepComercial:cepOf(companySection),produtor:producer?.[0]||"",comercializado:commer?.[0]||""},
+  fields:{barcode:b,rastreio:trace,data:date,lote:lot,peso,produto:group.length===1?group[0].product:"",cnpj:cnpj?digits(cnpj):"",cnpjComercial:companyCnpj,ggn:ggnProdutor||(!companySection?ggnNumber:""),ggnComercial,gln:glnProdutor,glnComercial,ieProdutor:ieOf(producedSection),ieComercial:ieOf(companySection),emailProdutor:emailOf(producedSection),emailComercial:emailOf(companySection),siteProdutor:siteOf(producedSection),siteComercial:siteOf(companySection),cepProdutor:cepOf(producedSection),cepComercial:cepOf(companySection),produtor:printedEntityName(producedSection),comercializado:printedEntityName(companySection),enderecoProdutor:printedAddress(producedSection),enderecoComercial:printedAddress(companySection),geoProdutor:printedGeo(producedSection),geoComercial:printedGeo(companySection)},
   sources:{barcode:b?"Foto / código de barras":"",rastreio:trace?"Foto":"",peso:weightPhoto?"Foto":weightCatalog?"Catálogo":"",data:dateMatch?"Foto":track?"Código de rastreabilidade":"",cnpj:cnpj?"Foto":"",ggn:ggnNumber?"Foto":"",produto:group.length===1?"Catálogo":""},
   producer,commer,weightPhoto,weightCatalog,refWeight,boxModel,packedKindCode:classCode?.[5]||"",track,printedDate:dateMatch?date:"",matches,barcodeClients:candidateClients,clientAmbiguous:candidateClients.length>1&&agreed.length!==1,kindConfidence:shapeSuggestion?"low":"high",printedNameVariety:wordVar.length===1?wordVar[0][0]:"",varietySource
  };
@@ -275,7 +295,7 @@ function registryAudit(){
  const merchants=rows.filter(x=>x.kind==="commercial"||x.kind==="producer");
  const sameGGN=digits(f.ggn)?producers.filter(p=>p.ggn===digits(f.ggn)):[];
  const sameCNPJ=digits(f.cnpj)?producers.filter(p=>p.cnpj===digits(f.cnpj)):[];
- const named=produced?producers.filter(e=>entityName(produced,e)):[];
+ const named=f.produtor?producers.filter(e=>entityName(f.produtor,e)):[];
  const choose=(set)=>set.length===1?set[0]:null;
  const producer=choose(named)||choose(sameCNPJ)||choose(sameGGN)||null;
  const ref=e=>"DOC.CQ.056, p. "+e.source_page;
@@ -298,17 +318,17 @@ function registryAudit(){
   else if(!sameCNPJ.length)add("confirmar","CNPJ do produtor","Número lido, mas o cadastro consultado não permite confirmar o titular.");
  }
  if(producer){
-  add("ok","Produtor identificado",producer.name+" (referência documental).",ref(producer));
+  add(f.produtor?(entityName(f.produtor,producer)?"ok":"atencao"):"confirmar","Produtor identificado",f.produtor?"Impresso: "+f.produtor+" · cadastro: "+producer.name:"Nome não lido; identificador associado a "+producer.name+".",ref(producer));
   if(f.ggn&&producer.ggn&&producer.ggn!==digits(f.ggn)&&sameGGN.length>0)add("atencao","Produtor e GGN","O GGN encontrado pertence a outra referência, diferente do produtor identificado pelo CNPJ ou nome.",ref(producer));
  }
  const merchantByCnpj=digits(f.cnpjComercial)?merchants.filter(e=>e.cnpj===digits(f.cnpjComercial)):[];
- const namedMerchant=marketed?merchants.filter(e=>entityName(marketed,e)):[];
+ const namedMerchant=f.comercializado?merchants.filter(e=>entityName(f.comercializado,e)):[];
  const merchant=choose(namedMerchant)||choose(merchantByCnpj)||null;
  if(f.cnpjComercial){
   if(merchant?.cnpj)compare("cnpjComercial","CNPJ do comerciante",f.cnpjComercial,merchant.cnpj,merchant);
   else add("confirmar","CNPJ do comerciante","Número lido, mas não foi possível confirmar a empresa responsável na base.");
  }
- if(merchant)add("ok","Comercializado por",merchant.name+" · endereço cadastrado: "+(merchant.address||"sem endereço"),ref(merchant));
+ if(merchant)add(f.comercializado?(entityName(f.comercializado,merchant)?"ok":"atencao"):"confirmar","Comercializado por",f.comercializado?"Impresso: "+f.comercializado+" · cadastro: "+merchant.name:"Nome não lido; identificador associado a "+merchant.name+".",ref(merchant));
  if(producer){
   if(!f.cnpj&&/\bCNPJ\b/i.test(produced))add("confirmar","CNPJ do produtor","O CNPJ aparece impresso, mas o OCR não identificou os dígitos completos.",ref(producer));
   if(!f.ggn&&/\bGGN\b/i.test(produced))add("confirmar","GGN do produtor","O GGN aparece impresso, mas os dígitos não foram lidos com segurança.",ref(producer));
@@ -345,7 +365,7 @@ function registryAudit(){
   const geoPrinted=/LOCALIZA(?:C|Ç)(?:A|Ã)O\s+GEOGRAFICA/i.test(norm(block));
   if(!geoPrinted)continue;
   if(!entity?.geo_location){add("confirmar","Coordenadas do "+who,"A etiqueta contém coordenadas geográficas, mas o cadastro da empresa não possui uma referência para confirmá-las.",entity?ref(entity):"Cadastro institucional");continue;}
-  const read=geoContent(block),actual=canonicalCoordinates(read),reference=canonicalCoordinates(entity.geo_location);
+  const read=(who==="produtor"?f.geoProdutor:f.geoComercial)||geoContent(block),actual=canonicalCoordinates(read),reference=canonicalCoordinates(entity.geo_location);
   if(actual&&reference&&actual===reference)
    add("ok","Coordenadas do "+who,"Graus, minutos, segundos e hemisférios coincidem com a referência de "+entity.name+".",ref(entity));
   else if(actual&&reference)
@@ -356,7 +376,7 @@ function registryAudit(){
 
  const cep=v=>digits((str(v).match(/(?:CEP)\s*[:\-]?\s*(\d{5}[-\s]?\d{3})/i)||[])[1]||"");
  for(const [label,partText,entity] of [["CEP do produtor",produced,producer],["CEP do comerciante",marketed,merchant]]){
-  const read=cep(partText),reference=entity?cep(entity.address):"";
+  const read=(label.includes("produtor")?f.cepProdutor:f.cepComercial)||cep(partText),reference=entity?cep(entity.address):"";
   if(!reference||!read)continue;
   add(read===reference?"ok":"atencao",label,read===reference?"CEP "+read+" confere com o endereço de "+entity.name+".":"Lido: "+read+" · referência de "+entity.name+": "+reference+".",ref(entity));
  }
@@ -392,9 +412,11 @@ function registryAudit(){
    return norm(v).match(pattern)?.[1]||"";
   };
   const markers=[["KM","KM"],["LOTE","LOTE"],["N(?:UMERO|RO)?","N(?:UMERO|RO)?"]];
-  const discrepancy=markers.map(([label,pattern])=>({label,expected:taggedNumber(entity.address,pattern),observed:taggedNumber(printed,pattern)}))
+  const edited=title.includes("produtor")?f.enderecoProdutor:f.enderecoComercial;
+  const manual=state.sources?.[title.includes("produtor")?"enderecoProdutor":"enderecoComercial"]==="Confirmado visualmente pelo operador";
+  const discrepancy=markers.map(([label,pattern])=>({label,expected:taggedNumber(entity.address,pattern),observed:taggedNumber(manual?edited:printed,pattern)}))
    .find(x=>x.expected&&x.observed&&x.expected!==x.observed);
-  if(discrepancy){add("atencao",title,discrepancy.label+" impresso: "+discrepancy.observed+" · cadastro de "+entity.name+": "+discrepancy.expected+".",ref(entity));continue;}
+  if(discrepancy){const passages=(state.ocrRawPassages||[]).map(x=>labelSections(x)[title.includes("produtor")?"producer":"merchant"]);const corroborated=manual||passages.filter(x=>taggedNumber(x,discrepancy.label)===discrepancy.observed).length>=2;add(corroborated?"atencao":"confirmar",title,discrepancy.label+" lido: "+discrepancy.observed+" · "+discrepancy.label+" cadastrado: "+discrepancy.expected+(corroborated?".":". Confirme o número na foto."),ref(entity));continue;}
 
   if(!printed||!/(?:END|ENDERECO|CEP|RUA|RODOVIA|BR|LOTE|PROJETO|FAZENDA)/i.test(norm(printed))){
    add("confirmar",title,"O endereço não foi reconhecido integralmente na foto para comparação com o cadastro.",ref(entity));continue;
@@ -771,7 +793,7 @@ async function scanBarcode(file,token=state.sequence){
   const value=str(raw).trim().slice(0,800),label=str(format).toLowerCase();
   if(!value||codes.some(x=>x.value===value&&x.format===label))return;
   const digitsRead=digits(value),number=/upc.a/.test(label)&&digitsRead.length===12?"0"+digitsRead:digitsRead;
-  const ean=(/ean.13|upc.a/.test(label)||(/^\d{13}$/.test(value)&&!/qr|data.matrix/.test(label)))&&eanValid(number)?number:"";
+  const ean=(/ean.13|upc.a/.test(label)||label==="zxing"&&catalog.some(x=>x.barcode===number))&&eanValid(number)?number:"";
   codes.push({value,format:label||"desconhecido",ean});
   if(ean&&region&&token===state.sequence&&!state.barcodeRegion)
    state.barcodeRegion={x:region.x,y:region.y,w:region.width,h:region.height,iw:region.iw,ih:region.ih};
@@ -930,7 +952,7 @@ function ocrConflictKeys(passages){
  return Object.entries(values).filter(([key,list])=>list.length>1).map(([key])=>key);
 }
 function supplementExtractedFields(data,passages,barcode){
- const fields=["rastreio","cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial","lote","ieProdutor","ieComercial","emailProdutor","emailComercial","siteProdutor","siteComercial","cepProdutor","cepComercial"];
+ const fields=["rastreio","cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial","lote","ieProdutor","ieComercial","emailProdutor","emailComercial","siteProdutor","siteComercial","cepProdutor","cepComercial","produtor","comercializado","enderecoProdutor","enderecoComercial","geoProdutor","geoComercial"];
  const candidates=passages.map(text=>extract(text,barcode).fields);
  for(const key of fields){
   const readings=distinct(candidates.map(x=>x[key]).filter(Boolean));
@@ -939,7 +961,9 @@ function supplementExtractedFields(data,passages,barcode){
    data.sources[key]="Leitura ampliada da fotografia";
   }
  }
- const printed=distinct(passages.map(x=>extract(x,barcode).printedDate).filter(Boolean));
+ const readings=passages.map(x=>extract(x,barcode));
+ const klass=distinct(readings.map(x=>x.identity.klass));if(!data.identity.klass&&klass.length===1)data.identity.klass=klass[0];
+ const printed=distinct(readings.map(x=>x.printedDate).filter(Boolean));
  if(!data.printedDate&&printed.length===1){
   data.printedDate=printed[0];data.fields.data=printed[0];data.sources.data="Leitura ampliada da fotografia";
  }
@@ -1128,6 +1152,7 @@ async function readPhoto(deep=false){
    try{
     const codeForLabel=state.pairedEvidence?.detected?"":barcode;
     const data=supplementExtractedFields(extract(recognized,codeForLabel),passages,codeForLabel);
+    if([data.fields.ggn,data.fields.ggnComercial,data.fields.gln,data.fields.glnComercial].includes(data.fields.barcode)||((state.entities||[]).some(x=>[x.ggn,x.gln].includes(data.fields.barcode))&&!catalog.some(x=>x.barcode===data.fields.barcode))){data.fields.barcode="";data.sources.barcode="";}
     state.text=recognized;state.barcode=barcode||data.fields.barcode;
     state.barcodeBars=barcode;state.barcodePrinted=printedConflict?"":printedNumber||getEAN(recognized);
     state.detected=data;state.fields=data.fields;state.sources=data.sources;state.matches=data.matches;
@@ -1342,7 +1367,7 @@ function diagnosticV4(){
   }
  }else if(box){
   // Etiquetas de caixa não exigem código de barras.
-  if(f.barcode&&eanValid(f.barcode))add("ok","Código complementar","EAN encontrado na fotografia, mas não obrigatório para etiqueta de caixa.");
+  if(f.barcode&&eanValid(f.barcode)&&catalog.some(x=>x.barcode===f.barcode))add("ok","Código complementar","EAN consta no catálogo; não é obrigatório para etiqueta de caixa.","DOC.CQ.056 · catálogo EAN");
  }
  if(printed){
   if(!trace)add("error","Formato de rastreabilidade","O código impresso "+printed+" não segue o formato R-ANO-ÁREA/VÁLVULA-DDMM-MÉTODO-SIGLA.");
@@ -1527,20 +1552,22 @@ function visualLabel(report){
  add("Modelo",d.boxModel?.code||"",/modelo|tipo de etiqueta|embalagem|cor indicada|cor da caixa/i);
  add("Data impressa",d.printedDate,/data(?!.*cadastr)/i);
  add("Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i,"",true);
- if(unit||f.barcode)add("EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo|código complementar/i,"",true);
+ if(unit||f.barcode&&catalog.some(x=>x.barcode===f.barcode))add("EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo|código complementar/i,"",true);
  if(box){
   add("Produzido por",f.produtor||"",/produtor identificado|produtor da caixa|seção produzido por/i,"",true);
   add("CNPJ",f.cnpj?formatCnpj(f.cnpj):"",/cnpj do produtor/i,"cnpj");
   add("GGN",f.ggn,/ggn do produtor|produtor e ggn|ggn compartilhado|ggn sem referência/i);
   add("GLN",f.gln,/gln do produtor/i);
-  add("Endereço / CEP",f.cepProdutor,/endereç.*produtor|cep do produtor/i,"",true);
-  add("Coordenadas", "",/coordenadas do produtor/i,"",true);
+  add("Endereço",f.enderecoProdutor,/endereç.*produtor/i,"enderecoProdutor",true);
+  add("CEP",f.cepProdutor?f.cepProdutor.replace(/^(\d{5})(\d{3})$/,"$1-$2"):"",/cep do produtor/i,"cepProdutor");
+  add("Coordenadas", f.geoProdutor,/coordenadas do produtor/i,"geoProdutor",true);
   add("Comercializado por",f.comercializado||"",/comercializado por|comercializador da caixa|seção comercializado por/i,"",true);
   add("CNPJ comercial",f.cnpjComercial?formatCnpj(f.cnpjComercial):"",/cnpj.*comerci/i,"cnpjComercial");
   add("GGN comercial",f.ggnComercial,/ggn.*comerci/i);
   add("GLN comercial",f.glnComercial,/gln.*comerci/i);
-  add("Endereço / CEP comercial",f.cepComercial,/endereç.*comerci|cep.*comerci/i,"",true);
-  add("Coordenadas comerciais","",/coordenadas.*comerci/i,"",true);
+  add("Endereço comercial",f.enderecoComercial,/endereç.*comerci/i,"enderecoComercial",true);
+  add("CEP comercial",f.cepComercial?f.cepComercial.replace(/^(\d{5})(\d{3})$/,"$1-$2"):"",/cep.*comerci/i,"cepComercial");
+  add("Coordenadas comerciais",f.geoComercial,/coordenadas.*comerci/i,"geoComercial",true);
   add("Inscrição estadual",f.ieProdutor,/inscrição estadual do produtor/i);
   add("IE comercial",f.ieComercial,/inscrição estadual do comercializador/i);
   add("E-mail / site",[f.emailProdutor,f.siteProdutor].filter(Boolean).join(" · "),/e-mail do produtor|site do produtor/i,"",true);
@@ -1556,8 +1583,8 @@ function visualLabel(report){
  };
  const tile=(v,i)=>{
   const issue=v.rows.find(x=>x.status==="error")||v.rows.find(x=>x.status==="pending");
-  const status=issue?.status|| (v.rows.length?"ok":"neutral");
-  const candidate=v.key?candidateCnpj(v.key):"";
+  const status=issue?.status|| (!v.value?"pending":v.rows.length?"ok":"neutral");
+  const candidate=["cnpj","cnpjComercial"].includes(v.key)?candidateCnpj(v.key):"";
   const display=v.value||(candidate?formatCnpj(candidate)+" (sugestão)":"Não lido");
   const marker={error:"×",pending:"?",ok:"✓",neutral:"–"}[status];
   return '<div class="vl5-field vl5-'+status+(v.full?' vl5-wide':'')+'"><small>'+esc(v.label)+'</small><strong>'+esc(display)+'</strong>'+
