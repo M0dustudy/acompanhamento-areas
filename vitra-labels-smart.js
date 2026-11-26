@@ -54,8 +54,7 @@ const nameOf=(list,id)=>list.find(x=>x[0]===id)?.[1]||"A confirmar";
 const eanValid=v=>{const n=digits(v);if(n.length!==13)return false;let sum=0;for(let k=0;k<12;k++)sum+=Number(n[k])*(k%2?3:1);return (10-sum%10)%10===Number(n[12]);};
 const opts=(list,value,empty)=>'<option value="">'+esc(empty||"Selecione")+'</option>'+list.map(x=>'<option value="'+esc(x[0])+'"'+(x[0]===value?" selected":"")+'>'+esc(x[1])+'</option>').join("");
 function notice(message,error=false){
- const e=el("vl2-notice");if(!e)return;
- e.hidden=!message;e.className=error?"vl2-notice vl2-error":"vl2-notice";e.textContent=message;
+ for(const e of [el("vl2-notice"),el("vl5-notice")]){if(!e)continue;e.hidden=!message||(!error&&e.id==="vl5-notice"&&!state.saved&&!state.sampleSaved&&!state.saving&&!state.sampleSaving);e.className=error?"vl2-notice vl2-error":"vl2-notice";e.textContent=message;}
 }
 function stopCamera(){
  if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;}
@@ -601,7 +600,7 @@ async function analyzeGalleryFull(){
 }
 
 async function useFile(file){
- if(!file)return;
+ if(!file||state.saving||state.sampleSaving)return;
  if(!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>10*1024*1024){notice("Escolha imagem JPG, PNG ou WebP de até 10 MB.",true);return;}
  releasePhoto();resetScan();state.crop={cx:.5,cy:.5,scale:.92,ratio:1};state.cropActive=false;
  setGalleryPreview(file);showResult();
@@ -609,6 +608,7 @@ async function useFile(file){
  await analyzeGalleryFull();
 }
 function openDeviceCamera(){
+ if(state.saving||state.sampleSaving)return;
  const native=el("vl2-native-camera");
  if(native&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||"")||window.Capacitor?.isNativePlatform?.())){
   native.click();return;
@@ -1558,7 +1558,7 @@ function visualLabel(report){
   const issue=v.rows.find(x=>x.status==="error")||v.rows.find(x=>x.status==="pending");
   const status=issue?.status|| (v.rows.length?"ok":"neutral");
   const candidate=v.key?candidateCnpj(v.key):"";
-  const display=v.value||(candidate?formatCnpj(candidate):"Não lido");
+  const display=v.value||(candidate?formatCnpj(candidate)+" (sugestão)":"Não lido");
   const marker={error:"×",pending:"?",ok:"✓",neutral:"–"}[status];
   return '<div class="vl5-field vl5-'+status+(v.full?' vl5-wide':'')+'"><small>'+esc(v.label)+'</small><strong>'+esc(display)+'</strong>'+
    (v.rows.length?'<button type="button" class="vl5-mark" data-vl5-field="'+i+'" aria-label="'+esc(v.label+' · '+({error:"divergente",pending:"a conferir",ok:"conforme",neutral:"sem referência"}[status]))+'">'+marker+'</button>':'<span class="vl5-mark">'+marker+'</span>')+
@@ -1582,6 +1582,7 @@ function inspectVisualField(index){
 }
 function confirmVisualCandidate(e){
  const field=e.target.closest?.("[data-vl5-field]");if(field){inspectVisualField(Number(field.dataset.vl5Field));return;}
+ if(e.target.closest?.("[data-vl5-new]")){if(state.processing||state.saving||state.sampleSaving)return;const capture=el("vl2-results")?.closest(".vl2")?.querySelector(".vl2-capture");if(capture){capture.open=true;capture.scrollIntoView({block:"nearest",behavior:"smooth"});}return;}
  if(e.target.closest?.("[data-vl5-close]")){const p=el("vl5-inspect");if(p)p.hidden=true;return;}
  if(e.target.closest?.("[data-vl5-order]")){const p=el("vl5-order");if(p){p.hidden=!p.hidden;if(!p.hidden)p.scrollIntoView({block:"nearest",behavior:"smooth"});}return;}
  const order=e.target.closest?.("[data-vl4-order-class]");
@@ -1661,7 +1662,7 @@ function showResult(){
  const outcome='<div class="vl5-actions">'+
  (state.saved?'<button type="button" class="vl2-save" disabled>✓ Conferência registrada</button>':report.status==="aprovado"?'<button type="button" class="vl2-save" id="vl2-save">✓ Aprovar e registrar</button>':'<button type="button" class="vl2-save" disabled>✓ Aprovar e registrar</button>')+
  (report.status!=="aprovado"&&!state.sampleSaved?'<button type="button" id="vl2-save-sample" class="vl5-secondary">Registrar sem aprovação</button>':state.sampleSaved?'<small>Registro pendente salvo</small>':"")+
- '<button type="button" id="vl2-deep-read" class="vl5-secondary">Reler foto</button></div>';
+ '<button type="button" id="vl2-deep-read" class="vl5-secondary">Reler foto</button><button type="button" class="vl5-secondary" data-vl5-new>Nova etiqueta</button></div>';
  root.innerHTML='<div id="vl3-visual">'+visualLabel(report)+'</div>'+reference+pairView+outcome+'<details class="vl2-details-root vl5-audit"><summary>Auditoria completa</summary>'+reading+'<div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div><button type="button" id="vl2-pair-read" class="vl5-secondary">Comparar caixa e cumbuca</button></details>';
  root.addEventListener("click",confirmVisualCandidate);
  root.querySelectorAll("[data-vl5-ref]").forEach(input=>input.addEventListener("change",e=>{
@@ -1884,13 +1885,14 @@ async function saveSample(){
  finally{state.sampleSaving=false;}
 }
 async function saveReview(){
- if(!ctx?.canAccess?.()||state.saved)return;
+ if(!ctx?.canAccess?.()||state.saved||state.saving)return;
  const report=diagnosticV4();
  if(!state.reviewRequested||report.status!=="aprovado"||!report.referenceComplete||!state.reviewed){
   notice("Somente etiquetas aprovadas na conferência e confirmadas pelo responsável podem ser salvas.",true);return;
  }
  if(state.sources.barcode==="Corrigido manualmente"){notice("O EAN precisa ser reconhecido na fotografia para aprovação.",true);return;}
- const btn=el("vl2-save");if(btn)btn.disabled=true;
+ const btn=el("vl2-save");if(btn)btn.disabled=true;state.saving=true;
+ try{
  const visualEvidence=await collectVisualEvidence(state.photo,state.text);
  const fields={...state.fields,pairEvidence:state.pairedEvidence?.detected?state.pairedEvidence:null,codeEvidence:state.codeEvidence,ocrAnalysis:{passes:state.ocrPasses,conflicts:state.ocrConflicts,visualAI:state.aiUsed===true,visualModel:state.aiUsed?"Florence-2-base-ft":null,visualText:state.aiUsed?state.aiText.slice(0,4000):null},barcodeBarras:state.barcodeBars,barcodeImpresso:state.barcodePrinted,expectedRastreio:expectedCode(),expectedClass:effectiveClass(),classificationSource:classFromCatalog()?"catalogo_documentado":"ordem_informada",methodSource:modelMethod()&&!state.expected.method?"dois_codigos_conferidos":"ordem_informada",visualEvidence,clientConfirmed:state.clientConfirmed,clientSource:state.clientFromCatalog?"catalogo_ean_unico_confirmado_no_encerramento":"ordem_informada",
   sources:state.sources,barcodeMatched:catalog.some(x=>x.client===state.identity.client&&x.barcode===state.fields.barcode),
@@ -1904,11 +1906,11 @@ async function saveReview(){
   checklist:report.checks.filter(x=>x.status!=="ok").map(x=>[x.status==="error"?"atencao":"pendente",x.title,x.detail]),
   notes:state.notes||""};
  const form=new FormData();form.append("action","save");form.append("payload",JSON.stringify(payload));form.append("photo",state.photo,state.photo.name);
- try{
   notice("Registrando o diagnóstico aprovado e sua fotografia…");
   const outcome=await ctx.api("save",form);state.saved=true;showResult();await fetchHistory();
   notice(outcome.pattern_learned?"Conferência aprovada e salva. Referência adicionada ao catálogo.":"Conferência aprovada e salva no histórico.");
  }catch(e){notice(e?.message||"Não foi possível salvar o diagnóstico.",true);if(btn?.isConnected)btn.disabled=false;}
+ finally{state.saving=false;}
 }
 function setCropShape(active){
  for(const name of ["vl2-square","vl2-rectangle","vl2-portrait"])el(name)?.classList.toggle("active",name===active);
@@ -1987,7 +1989,7 @@ function mount(adapter){
   (ctx.isMaster?.()?'<label class="vl2-ai-opt" style="display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px"><input id="vl2-local-ai" type="checkbox" '+(localAIEnabled?'checked':'')+'> IA visual local</label><small class="vl2-help">Processamento no dispositivo · sem cobrança por análise.</small>':'')+
   '<div id="vl2-progress" class="vl2-progress" hidden>Reconhecendo dados…</div><div id="vl2-notice" class="vl2-notice" hidden></div>'+
   '</details>'+
-  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>Toque nos campos para conferir.</p></div></div><div id="vl2-results"></div></section></div>'+
+  '<section class="vl2-result"><div class="vl2-section-title"><span>02</span><div><h3>Análise e validação</h3><p>Toque nos campos para conferir.</p></div></div><div id="vl5-notice" class="vl2-notice" hidden></div><div id="vl2-results"></div></section></div>'+
   '<details class="vl2-recent vl3-history"><summary>Histórico de conferências</summary><div id="vl2-history">Carregando histórico…</div>'+
   (ctx.isMaster?.()?'<details class="vl2-archive" id="vl2-archive"><summary>Registros ocultados · apenas administrador</summary><div id="vl2-archived-list">Abra para consultar.</div></details>':"")+ '</details><div id="vl2-dialog-host"></div>'+
   '<p class="vl2-foot">Liberação física sujeita à confirmação da equipe autorizada.</p></section>';
