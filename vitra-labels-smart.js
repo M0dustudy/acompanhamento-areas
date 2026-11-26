@@ -155,7 +155,7 @@ function labelSections(raw){
  return {producer:part(/(?:PRODUZIDO\s+POR|PRODUTOR)\s*[:\-]?\s*([\s\S]*)/i,/COMERCIALIZADO\s+POR|RASTREABILIDADE/i),merchant:part(/COMERCIALIZADO\s+POR\s*[:\-]?\s*([\s\S]*)/i,/PRODUZIDO\s+POR|RASTREABILIDADE/i)};
 }
 function printedEntityName(part){
- const value=str(part).split(/\b(?:CNPJ|CPF|GGN|GLN|ENDERE[CÇ]O|CEP|RODOVIA|BR\s*-?\s*\d|LOCALIZA[CÇ][AÃ]O|I\.?E\.?)\b/i)[0].replace(/\s+/g," ").trim();
+ const value=str(part).split(/\b(?:CNPJ|CPF|GGN|GLN|ENDERE[CÇ]O|CEP|RODOVIA|BR\s*-?\s*\d{2,3}|KM\s*\d+|RUA|ESTRADA|ZONA RURAL|LOCALIZA[CÇ][AÃ]O|I\.?E\.?)\b/i)[0].replace(/\s+/g," ").trim();
  return /[A-Za-zÀ-ÿ]{3}/.test(value)?value.slice(0,180):"";
 }
 function printedAddress(part){
@@ -400,7 +400,11 @@ function registryAudit(){
   const addressPrinted=/\b(?:END|ENDERECO|CEP|RUA|RODOVIA|BR\s*[-]?\s*\d{2,3}|LOTE|PROJETO|ESTRADA)\b/i.test(norm(printed));
   if(!addressPrinted)continue;
   if(!entity?.address){add("confirmar",title,"O endereço está impresso na etiqueta, mas ainda não existe endereço de referência cadastrado para comparar.",entity?ref(entity):"Cadastro institucional");continue;}
-  const expected=normalizeAddress(entity.address),actual=normalizeAddress(printed);
+  const fieldKey=title.includes("produtor")?"enderecoProdutor":"enderecoComercial";
+  const editedAddress=state.sources?.[fieldKey]==="Confirmado visualmente pelo operador"?f[fieldKey]:"";
+  const postalKey=title.includes("produtor")?"cepProdutor":"cepComercial";
+  const addressEvidence=editedAddress?editedAddress+(f[postalKey]?" CEP "+f[postalKey]:""):printed;
+  const expected=normalizeAddress(entity.address),actual=normalizeAddress(addressEvidence);
   const normalizedStop=new Set(["DE","DO","DA","DAS","DOS","NO","NA","EM","S","N","END","ENDERECO","BRASIL","CEP"]);
   const tokens=distinct(expected.split(" ").filter(x=>x.length>=3&&!normalizedStop.has(x)));
   const common=tokens.filter(x=>actual.split(" ").includes(x));
@@ -418,13 +422,13 @@ function registryAudit(){
    .find(x=>x.expected&&x.observed&&x.expected!==x.observed);
   if(discrepancy){const passages=(state.ocrRawPassages||[]).map(x=>labelSections(x)[title.includes("produtor")?"producer":"merchant"]);const corroborated=manual||passages.filter(x=>taggedNumber(x,discrepancy.label)===discrepancy.observed).length>=2;add(corroborated?"atencao":"confirmar",title,discrepancy.label+" lido: "+discrepancy.observed+" · "+discrepancy.label+" cadastrado: "+discrepancy.expected+(corroborated?".":". Confirme o número na foto."),ref(entity));continue;}
 
-  if(!printed||!/(?:END|ENDERECO|CEP|RUA|RODOVIA|BR|LOTE|PROJETO|FAZENDA)/i.test(norm(printed))){
+  if(!addressEvidence||!/(?:END|ENDERECO|CEP|RUA|RODOVIA|BR|LOTE|PROJETO|FAZENDA)/i.test(norm(addressEvidence))){
    add("confirmar",title,"O endereço não foi reconhecido integralmente na foto para comparação com o cadastro.",ref(entity));continue;
   }
   if(matchedNums&&tokens.length>=3&&common.length===tokens.length){
    add("ok",title,"Endereço impresso compatível com a referência de "+entity.name+".",ref(entity));
   }else{
-   const postal=cep(printed),known=cep(entity.address);
+   const postal=cep(addressEvidence),known=cep(entity.address);
    if(postal&&known&&postal!==known)add("atencao",title,"CEP impresso "+postal+" difere de "+known+" no cadastro de "+entity.name+".",ref(entity));
    else add("confirmar",title,"O endereço não pôde ser conferido por completo. Confira rua/rodovia, número ou lote, localidade e CEP de "+entity.name+".",ref(entity));
   }
@@ -1127,7 +1131,7 @@ async function readPhoto(deep=false){
   const printedCandidates=distinct(passages.map(getEAN).filter(Boolean));
   printedConflict=printedCandidates.length>1;
   const likelyBox=/\b(?:PRODUZIDO\s+POR|COMERCIALIZADO\s+POR|CNPJ|GGN|GLN|LOCALIZACAO\s+GEOGRAFICA|CLASSE\s*:|PESO\s*:\s*[58][,.]?\d*\s*KG)\b/.test(norm(recognized));
-  update("Lendo códigos de barras e QR Code…");barcode=barcode||await limitWork(scanBarcode(photo,seq),9200,"Leitura dos códigos interrompida.").catch(()=>"");
+  if(!likelyBox||state.pairRequested||getEAN(recognized)||/\b(?:EAN|QR|CODIGO DE BARRAS)\b/.test(norm(recognized))||ocrTraceCandidates(recognized).length>1){update("Lendo códigos de barras e QR Code…");barcode=barcode||await limitWork(scanBarcode(photo,seq),9200,"Leitura dos códigos interrompida.").catch(()=>"");}
   if(seq!==state.sequence)return;
   printedNumber=printedNumber||getEAN(recognized);
   if(barcode&&worker&&!printedNumber){
@@ -1385,7 +1389,10 @@ function diagnosticV4(){
   }
  }else if(box){
   // Etiquetas de caixa não exigem código de barras.
-  if(f.barcode&&eanValid(f.barcode)&&catalog.some(x=>x.barcode===f.barcode))add("ok","Código complementar","EAN consta no catálogo; não é obrigatório para etiqueta de caixa.","DOC.CQ.056 · catálogo EAN");
+  if(f.barcode&&eanValid(f.barcode)&&catalog.some(x=>x.barcode===f.barcode)){
+   if(state.clientConfirmed&&selected&&!owners.includes(catalogClient(selected)))add("error","EAN incompatível com o cliente","Código "+f.barcode+" cadastrado para "+ownerNames.join(" / ")+", não para "+display+".","DOC.CQ.056 · catálogo EAN");
+   else add("ok","Código complementar","EAN consta no catálogo; não é obrigatório para etiqueta de caixa.","DOC.CQ.056 · catálogo EAN");
+  }
  }
  if(printed){
   if(!trace)add("error","Formato de rastreabilidade","O código impresso "+printed+" não segue o formato R-ANO-ÁREA/VÁLVULA-DDMM-MÉTODO-SIGLA.");
