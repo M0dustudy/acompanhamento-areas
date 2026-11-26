@@ -43,33 +43,77 @@ function alternative(error){
   }
   pages.appendChild(box);
 }
+let renderEpoch=0,observer=null,renderTasks=new Set();
+function stopRendering(){
+ renderEpoch++;
+ observer?.disconnect();observer=null;
+ for(const task of renderTasks)task.cancel();
+ renderTasks.clear();
+}
 async function render(){
   if(!pdf)return;
+  stopRendering();
+  const epoch=renderEpoch,doc=pdf;
   pages.replaceChildren();
-  status.textContent="Abrindo relatório · "+pdf.numPages+" página(s)…";
+  status.textContent="Abrindo relatório · "+doc.numPages+" página(s)…";
   const maxWidth=Math.max(280,Math.min(900,document.documentElement.clientWidth-20));
-  for(let n=1;n<=pdf.numPages;n++){
-    const page=await pdf.getPage(n);
-    const base=page.getViewport({scale:1});
-    const viewport=page.getViewport({scale:(maxWidth/base.width)*zoom});
-    const dpr=Math.min(window.devicePixelRatio||1,2);
-    const canvas=document.createElement("canvas");canvas.className="page";
-    canvas.width=Math.floor(viewport.width*dpr);
-    canvas.height=Math.floor(viewport.height*dpr);
-    canvas.style.width=Math.floor(viewport.width)+"px";
-    canvas.style.height=Math.floor(viewport.height)+"px";
-    pages.appendChild(canvas);
-    await page.render({canvasContext:canvas.getContext("2d"),viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null}).promise;
-    status.textContent=n===pdf.numPages?"Relatório exibido online · "+pdf.numPages+" página(s)":"Relatório aberto online · "+n+" de "+pdf.numPages+" página(s) carregada(s)";
+  const first=await doc.getPage(1);
+  if(epoch!==renderEpoch)return;
+  const base=first.getViewport({scale:1}),ratio=base.height/base.width;
+  const placeholders=[];
+  for(let n=1;n<=doc.numPages;n++){
+   const holder=document.createElement("div");
+   holder.style.cssText="width:"+Math.round(maxWidth*zoom)+"px;min-height:"+Math.round(maxWidth*zoom*ratio)+"px;max-width:100%;margin:0 auto;display:grid;place-items:start center;background:#fff";
+   holder.dataset.pdfPage=String(n);
+   pages.appendChild(holder);placeholders.push(holder);
   }
+  const draw=async(holder,n,cached)=>{
+   if(epoch!==renderEpoch||holder.dataset.rendered)return;
+   holder.dataset.rendered="loading";
+   try{
+    const page=cached||await doc.getPage(n);
+    if(epoch!==renderEpoch)return;
+    const original=page.getViewport({scale:1});
+    const viewport=page.getViewport({scale:(maxWidth/original.width)*zoom});
+    const dpr=Math.min(window.devicePixelRatio||1,1.5);
+    const canvas=document.createElement("canvas");canvas.className="page";
+    canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
+    canvas.style.width=Math.floor(viewport.width)+"px";canvas.style.height=Math.floor(viewport.height)+"px";
+    const task=page.render({canvasContext:canvas.getContext("2d"),viewport,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null});
+    renderTasks.add(task);
+    try{await task.promise;}finally{renderTasks.delete(task);}
+    if(epoch!==renderEpoch)return;
+    holder.style.minHeight="0";holder.replaceChildren(canvas);holder.dataset.rendered="yes";
+    if(n===1)status.textContent="Relatório aberto online · "+doc.numPages+" página(s)";
+   }catch(error){
+    if(epoch!==renderEpoch||error?.name==="RenderingCancelledException")return;
+    if(n===1)throw error;
+    delete holder.dataset.rendered;
+    const retry=document.createElement("button");retry.className="btn";retry.textContent="Recarregar página "+n;
+    retry.onclick=()=>{holder.replaceChildren();draw(holder,n).catch(console.warn);};holder.replaceChildren(retry);
+   }
+  };
+  await draw(placeholders[0],1,first);
+  if(epoch!==renderEpoch)return;
   zoomEl.textContent=Math.round(zoom*100)+"%";
+  if("IntersectionObserver" in window){
+   observer=new IntersectionObserver(entries=>{
+    for(const entry of entries)if(entry.isIntersecting){
+     observer?.unobserve(entry.target);
+     draw(entry.target,Number(entry.target.dataset.pdfPage)).catch(console.warn);
+    }
+   },{rootMargin:"350px 0px"});
+   for(const holder of placeholders.slice(1))observer.observe(holder);
+  }else{
+   for(let n=2;n<=doc.numPages&&epoch===renderEpoch;n++)await draw(placeholders[n-1],n);
+  }
 }
 (async()=>{
  try {
   if(!url)throw Error("Nome de relatório inválido");
   const pdfjsLib=await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
   pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
-  pdf=await pdfjsLib.getDocument(url).promise;
+  pdf=await pdfjsLib.getDocument({url,rangeChunkSize:262144}).promise;
   await render();
  } catch(e){alternative(e);}
 })();
