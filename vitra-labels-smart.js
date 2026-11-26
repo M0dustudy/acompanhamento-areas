@@ -1579,20 +1579,20 @@ function visualLabel(report){
  add("Peso líquido",d.weightPhoto,/peso/i);
  add("Modelo",d.boxModel?.code||"",/modelo|tipo de etiqueta|embalagem|cor indicada|cor da caixa/i);
  add("Data impressa",d.printedDate,/data(?!.*cadastr)/i);
- add("Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i,"rastreio",true);
+ add("Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado|leitura conferida na fotografia/i,"rastreio",true);
  if(unit||f.barcode&&catalog.some(x=>x.barcode===f.barcode))add("EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo|código complementar/i,"",true);
  if(box){
   add("Produzido por",f.produtor||"",/produtor identificado|produtor da caixa|seção produzido por/i,"produtor",true);
   add("CNPJ",f.cnpj?formatCnpj(f.cnpj):"",/cnpj do produtor/i,"cnpj");
-  add("GGN",f.ggn,/ggn do produtor|produtor e ggn|ggn compartilhado|ggn sem referência/i);
-  add("GLN",f.gln,/gln do produtor/i);
+  add("GGN",f.ggn,/ggn do produtor|produtor e ggn|ggn compartilhado|ggn sem referência/i,"ggn");
+  add("GLN",f.gln,/gln do produtor/i,"gln");
   add("Endereço",f.enderecoProdutor,/endereç.*produtor/i,"enderecoProdutor",true);
   add("CEP",f.cepProdutor?f.cepProdutor.replace(/^(\d{5})(\d{3})$/,"$1-$2"):"",/cep do produtor/i,"cepProdutor");
   add("Coordenadas", f.geoProdutor,/coordenadas do produtor/i,"geoProdutor",true);
   add("Comercializado por",f.comercializado||"",/comercializado por|comercializador da caixa|seção comercializado por/i,"comercializado",true);
   add("CNPJ comercial",f.cnpjComercial?formatCnpj(f.cnpjComercial):"",/cnpj.*comerci/i,"cnpjComercial");
-  add("GGN comercial",f.ggnComercial,/ggn.*comerci/i);
-  add("GLN comercial",f.glnComercial,/gln.*comerci/i);
+  add("GGN comercial",f.ggnComercial,/ggn.*comerci/i,"ggnComercial");
+  add("GLN comercial",f.glnComercial,/gln.*comerci/i,"glnComercial");
   add("Endereço comercial",f.enderecoComercial,/endereç.*comerci/i,"enderecoComercial",true);
   add("CEP comercial",f.cepComercial?f.cepComercial.replace(/^(\d{5})(\d{3})$/,"$1-$2"):"",/cep.*comerci/i,"cepComercial");
   add("Coordenadas comerciais",f.geoComercial,/coordenadas.*comerci/i,"geoComercial",true);
@@ -1617,7 +1617,7 @@ function visualLabel(report){
   const marker={error:"×",pending:"?",ok:"✓",neutral:"–"}[status];
   return '<div class="vl5-field vl5-'+status+(v.full?' vl5-wide':'')+'"><small>'+esc(v.label)+'</small><strong>'+esc(display)+'</strong>'+
    (v.rows.length||v.key?'<button type="button" class="vl5-mark" data-vl5-field="'+i+'" aria-label="'+esc(v.label+' · '+({error:"divergente",pending:"a conferir",ok:"conforme",neutral:"sem referência"}[status]))+'">'+marker+'</button>':'<span class="vl5-mark">'+marker+'</span>')+
-   (v.key==="rastreio"&&state.traceVisualCheck!=="yes"?'<span class="vl5-reason">Confirme na foto</span>':issue&&status==="error"?'<span class="vl5-reason">'+esc(compact(issue))+'</span>':'')+
+   (v.key==="rastreio"&&state.traceVisualCheck!=="yes"?'<span class="vl5-reason">Confirme na foto</span>':v.key==="rastreio"&&status==="ok"&&state.documental?'<span class="vl6-human">Conferido pelo operador</span>':issue&&status==="error"?'<span class="vl5-reason">'+esc(compact(issue))+'</span>':'')+
    (candidate?'<button type="button" class="vl5-fix" data-vl4-cnpj="'+v.key+'" data-value="'+esc(candidate)+'">Confere na foto?</button>':'')+'</div>';
  };
  const status=report.errors?"error":report.status==="aprovado"?"ok":"pending";
@@ -1632,7 +1632,7 @@ function visualLabel(report){
 function inspectVisualField(index){
  const v=state.visualRecords?.[index],p=el("vl5-inspect");if(!v||!p)return;
  p.hidden=false;
- const editable=["rastreio","klass","produtor","comercializado","cnpj","cnpjComercial","enderecoProdutor","enderecoComercial","cepProdutor","cepComercial","geoProdutor","geoComercial"].includes(v.key);
+ const editable=["rastreio","klass","produtor","comercializado","cnpj","cnpjComercial","enderecoProdutor","enderecoComercial","cepProdutor","cepComercial","geoProdutor","geoComercial","ggn","ggnComercial","gln","glnComercial"].includes(v.key);
  const controls=editable?'<div class="vl6-edit">'+(state.url?'<img class="vl6-original" src="'+esc(state.url)+'" alt="Fotografia original da etiqueta">':"")+'<label>Confira na etiqueta original'+(v.key==="klass"?'<select id="vl6-value">'+opts(classes.map(x=>[x,x]),state.identity.klass,"Selecione a classe lida")+'</select>':'<input id="vl6-value" value="'+esc(v.value||"")+'" autocomplete="off" spellcheck="false">')+'</label><button type="button" data-vl6-confirm="'+esc(v.key)+'">Confirmar leitura</button></div>':"";
  p.innerHTML='<div class="vl5-inspect-head"><b>'+esc(v.label)+'</b><button type="button" data-vl5-close aria-label="Fechar">×</button></div>'+v.rows.map(x=>'<div class="vl5-inspect-row"><b>'+({error:"×",pending:"?",ok:"✓"}[x.status]||"–")+' '+esc(x.title)+'</b><span>'+esc(x.detail)+'</span>'+(x.reference?'<small>'+esc(x.reference)+'</small>':'')+'</div>').join("")+controls;
  p.scrollIntoView({block:"nearest",behavior:"smooth"});
@@ -1644,6 +1644,8 @@ function confirmVisualCandidate(e){
   if(key==="rastreio"&&!parseTrace(raw)){notice("Confira o formato da rastreabilidade.",true);return;}
   if(key==="klass"&&!classes.includes(raw))return;
   if(/^cnpj/.test(key)&&!validCnpj(raw)){notice("CNPJ inválido; confira todos os dígitos.",true);return;}
+  if(/^(ggn|gln)/.test(key)&&digits(raw).length!==13){notice("Confira os 13 dígitos do identificador.",true);return;}
+  if(/^cep/.test(key)&&digits(raw).length!==8){notice("Confira os oito dígitos do CEP.",true);return;}
   const value=/^(cnpj|ggn|gln|cep)/.test(key)?digits(raw):key==="rastreio"?norm(raw).replace(/\s/g,""):raw;
   if(key==="klass"){state.identity.klass=value;state.classVisual=true;}else{state.fields[key]=value;state.sources[key]="Confirmado visualmente pelo operador";}
   if(key==="rastreio"){state.traceVisualCheck="yes";state.ocrConflicts=state.ocrConflicts.filter(x=>x!=="rastreio");const track=parseTrace(value);if(state.detected)state.detected.track=track;const variety=varieties.find(x=>x[2]===track?.variety)?.[0];if(variety&&!state.detected?.printedNameVariety)state.identity.variety=variety;}
@@ -1805,7 +1807,7 @@ function showResult(){
 function renderHistoryRows(rows,archive=false){
  return rows.map(x=>{
   const legacy=Number(x.fields?.verification?.workflowVersion||0)<5;
-  const status=x.fields?.sampleRecord?"Amostra pendente":x.review_status==="atencao"?"Divergência":x.review_status==="conferido"?(legacy?"Registro anterior":"Aprovado"):"Pendente";
+  const status=x.fields?.sampleRecord?"Amostra pendente":x.review_status==="atencao"?"Divergência":x.review_status==="conferido"?(legacy?"Registro anterior":x.fields?.verification?.scope==="documental"?"Aprovado documental":"Aprovado"):"Pendente";
   return '<div class="vl2-history-line"><button class="vl2-history-entry" type="button" data-history-id="'+esc(x.id)+'">'+
    '<span class="vl2-history-dot vl2-history-'+esc(x.review_status)+'"></span>'+
    '<span class="vl2-history-main"><strong>'+esc(nameOf(clients,x.client))+'</strong><small>'+esc(nameOf(kinds,x.label_kind))+' · '+esc(nameOf(varieties,x.variety))+'</small><small>Responsável: '+esc(x.reviewer_name||"Não identificado")+'</small></span>'+
@@ -1886,7 +1888,7 @@ async function openHistory(id){
   }
   const f=record.fields||{},saved=f.diagnostic||{},checks=Array.isArray(saved.checks)?saved.checks:[];
   const status=saved.status|| (record.review_status==="conferido"?"aprovado":record.review_status==="atencao"?"reprovado":"pendente");
-  const names={aprovado:record.review_status==="conferido"?"Aprovado na conferência":"Leitura sem divergências · inspeção pendente",reprovado:"Reprovado / divergência",pendente:"Pendente de confirmação"};
+  const names={aprovado:record.review_status==="conferido"?(f.verification?.scope==="documental"?"Aprovado documental · sem comparação da ordem":"Aprovado na conferência"):"Leitura sem divergências · inspeção pendente",reprovado:"Reprovado / divergência",pendente:"Pendente de confirmação"};
   const summaries=saved.summary||"Registro histórico. Consulte os itens encontrados e o texto reconhecido.";
   const items=checks.length?checks.map(x=>'<div class="vl2-check-item vl2-check-'+esc(x.status||"pending")+'"><span aria-hidden="true">'+(x.status==="ok"?"✓":x.status==="error"?"!":"?")+'</span><div><strong>'+esc(x.title)+'</strong><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':"")+'</div></div>').join(""):Array.isArray(record.checklist)?record.checklist.map(x=>'<div class="vl2-check-item vl2-check-'+(x[0]==="atencao"?"error":"pending")+'"><span aria-hidden="true">?</span><div><strong>'+esc(x[1])+'</strong><p>'+esc(x[2])+'</p></div></div>').join(""):"";
   const vals=[["Cliente",nameOf(clients,record.client)],["Tipo de etiqueta",nameOf(kinds,record.label_kind)],["Variedade",nameOf(varieties,record.variety)],["Classificação",record.label_class],["Rastreabilidade lida",f.rastreio],["Rastreabilidade de referência",f.expectedRastreio],["GGN",f.ggn],["CNPJ do produtor",f.cnpj],["CNPJ comercial",f.cnpjComercial],["GGN comercial",f.ggnComercial],["GLN do produtor",f.gln],["GLN do comercializador",f.glnComercial],["EAN nas barras",f.barcodeBarras],["EAN impresso",f.barcodeImpresso],["Produtor",f.producerReference||f.produtor],["Comercializado por",f.merchantReference||f.comercializado],["Lote",f.lote],["Data",f.data],["Peso",f.peso],["Código de barras",f.barcode]];
