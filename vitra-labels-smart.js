@@ -70,7 +70,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;state.clientFromCatalog=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
- state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";state.orderOpen=false;
+ state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";state.classVisual=false;state.orderOpen=false;
 }
 function formatCnpj(raw){
  const n=digits(raw);return n.length===14?n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,"$1.$2.$3/$4-$5"):str(raw);
@@ -1013,7 +1013,7 @@ async function readPhoto(deep=false){
  const existingPasses=deep?(state.ocrRawPassages||[]).slice():[];
  const existingBarcode=deep?state.barcodeBars:"";
  const existingPrinted=deep?state.barcodePrinted:"";
- state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;state.traceVisualCheck="";
+ state.barcodeRegion=null;state.analysisError="";state.scanCompleted=false;state.reviewRequested=false;state.reviewed=false;state.traceVisualCheck="";state.classVisual=false;
  state.ocrConflicts=[];state.ocrPasses=0;state.pairedEvidence=null;state.aiUsed=false;state.aiText="";state.aiError="";showResult();
  if(progress){progress.hidden=false;progress.textContent="Preparando a fotografia original…";}
  let worker=null,recognized=mergeOCRPassages(existingPasses),barcode=existingBarcode||"",printedNumber=existingPrinted||"",failure="",printedConflict=false;
@@ -1310,17 +1310,18 @@ function diagnosticV4(){
  const checks=[],f=state.fields||{},kind=state.identity.kind,unit=category()==="unit",box=category()==="box";
  const add=(status,title,detail,reference="")=>checks.push({status,title,detail,reference});
  const selected=state.identity.client,display=nameOf(clients,selected),matches=catalog.filter(x=>f.barcode&&x.barcode===digits(f.barcode));
+ const documental=state.documental===true,needsClient=!documental||unit||state.pairedEvidence?.detected||matches.length>0;
  const owners=distinct(matches.map(x=>x.client));
  const ownerNames=owners.map(k=>nameOf(clients,k)).sort((a,b)=>a.localeCompare(b,"pt-BR"));
  const expected=expectedCode(),printed=f.rastreio||"",trace=parseTrace(printed);
  const scanned=Boolean(state.scanCompleted&&state.photo);
  if(!scanned)return {status:"inicial",ready:false,checks:[],errors:0,pending:0,ok:0,summary:""};
- if(!state.clientConfirmed||!selected)add("pending","Cliente","Confirme o cliente da ordem de produção para cruzar os campos impressos com o modelo aprovado.");
+ if(needsClient&&(!state.clientConfirmed||!selected))add("pending","Cliente","Confirme o cliente aplicável ao código EAN.");
  if(state.traceVisualCheck==="yes"&&printed&&trace&&!state.ocrConflicts.includes("rastreio"))
   add("ok","Leitura conferida na fotografia","O operador confirmou visualmente a sequência impressa "+printed+". Isso não comprova a correspondência com a ordem de produção.");
  if(state.traceVisualCheck==="no")add("pending","Leitura de rastreabilidade corrigida","O código precisou de intervenção humana. A leitura automática não é uma evidência independente.");
 
- if(!expected&&state.traceVisualCheck!=="yes")add("pending","Rastreabilidade de referência","Toque na rastreabilidade e confirme o código da etiqueta. A ordem de produção não é inferida da fotografia.");
+ if(documental?state.traceVisualCheck!=="yes":!expected)add("pending","Rastreabilidade de referência","Toque na rastreabilidade e confirme o código da etiqueta. A ordem de produção não é inferida da fotografia.");
  if(!kind)add("pending","Tipo de etiqueta","Não foi possível identificar o modelo com segurança. Selecione o tipo em Ajustar leitura.");
  if(kind&&state.detected?.kindConfidence==="low"&&!state.kindConfirmed)add("pending","Modelo sugerido pela forma","O formato da imagem sugere "+nameOf(kinds,kind)+", mas não há dados suficientes para diferenciar cumbuca e caixa com segurança. Confirme o modelo antes de aprovar.");
  if(category()==="other")add("pending","Modelo da etiqueta","O modelo informado não é identificado como etiqueta de caixa ou de cumbuca; exige uma regra específica de validação.");
@@ -1435,7 +1436,9 @@ function diagnosticV4(){
   }else if(/\b(?:MEI|EX)\s*[-]?\s*[A-Z]{1,3}\d{2}[A-Z]{2,3}\d{2}\b/.test(norm(state.text)))
    add("pending","Código do modelo da caixa","Há um código de modelo, mas o texto não corresponde ao glossário. Confira a impressão ou refaça a leitura.");
   const chosenClass=effectiveClass(),readClass=state.identity.klass||"";
-  if(!chosenClass&&readClass&&classes.includes(readClass)&&readClass!=="Outra")add("ok","Classificação no padrão","Classe "+readClass+" reconhecida no glossário. A ordem não foi comparada.");
+  if(!chosenClass&&documental&&readClass&&classes.includes(readClass)&&readClass!=="Outra")add("ok","Classificação no padrão","Classe "+readClass+" reconhecida no glossário. A ordem não foi comparada.");
+  else if(!chosenClass&&!documental)add("pending","Classificação da ordem","Confirme a classificação da ordem.");
+  if(documental&&readClass==="Outra")add("pending","Classificação sem padrão","A classe precisa constar no padrão aprovado.");
   if(!readClass)add("pending","Classificação impressa","Classe ainda não identificada. Reexamine a fotografia.");
   
   else if(chosenClass&&readClass!==chosenClass)
@@ -1528,7 +1531,8 @@ function diagnosticV4(){
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
   if(state.sources[k]==="Corrigido manualmente")add("pending","Identificador ajustado","O campo "+k+" foi alterado manualmente. Uma nova leitura da foto é necessária para aprovação automática.");
  const critical=checks.filter(x=>x.status==="error"),pending=checks.filter(x=>x.status==="pending");
- const ready=Boolean(state.photo&&state.scanCompleted&&state.clientConfirmed&&expected&&kind&&(!box||effectiveClass()));
+ const ready=Boolean(state.photo&&state.scanCompleted&&(!needsClient||state.clientConfirmed)&&kind&&(documental?state.traceVisualCheck==="yes"&&trace&&(!box||readClassForDocumental()):expected&&(!box||effectiveClass())));
+ function readClassForDocumental(){return classes.includes(state.identity.klass)&&state.identity.klass!=="Outra";}
  const status=critical.length?"reprovado":!ready?"coleta":pending.length?"pendente":"aprovado";
  const summary=status==="coleta"?"Confirme as referências necessárias da ordem de produção"+(box&&!classFromCatalog()?", incluindo a classificação da caixa.":".")+" Só então será possível concluir a análise.":
  status==="reprovado"?"Foram identificadas "+critical.length+" divergência(s) entre a etiqueta e as referências consultadas.":
@@ -1540,7 +1544,7 @@ function diagnosticV4(){
 function visualLabel(report){
  const f=state.fields||{},d=state.detected||{},box=category()==="box",unit=category()==="unit";
  const checks=report.checks||[],used=new Set(),records=[];
- const production=/^(Cliente|Rastreabilidade de referência|Classificação da ordem)$/i;
+ const production=/^(Cliente|Classificação da ordem)$/i;
  const add=(label,value,pattern,key="",full=false)=>{
   const rows=checks.filter((x,i)=>!used.has(i)&&!production.test(x.title)&&pattern.test(x.title)&&(used.add(i),true));
   if(!value&&!rows.length)return;
@@ -1593,12 +1597,12 @@ function visualLabel(report){
    (candidate?'<button type="button" class="vl5-fix" data-vl4-cnpj="'+v.key+'" data-value="'+esc(candidate)+'">Confere na foto?</button>':'')+'</div>';
  };
  const status=report.errors?"error":report.status==="aprovado"?"ok":"pending";
- const title=status==="error"?"REPROVADA":status==="ok"?"APROVADA NA ANÁLISE":"A CONFERIR";
+ const title=status==="error"?"REPROVADA":status==="ok"?(state.documental?"APROVADA · DOCUMENTAL":"APROVADA NA ANÁLISE"):"A CONFERIR";
  const order=checks.filter(x=>production.test(x.title));
  return '<div class="vl3-verdict vl3-'+status+'" role="status"><div><strong>'+title+'</strong></div><span>'+report.errors+' erro(s) · '+report.pending+' pendência(s)</span></div>'+
  '<section class="vl3-label vl5-paper" aria-label="Reconstrução da etiqueta"><header><b>'+esc(box?"ETIQUETA DE CAIXA":unit?"ETIQUETA DE CUMBUCA / CINTA":"ETIQUETA · MODELO A CONFIRMAR")+'</b><small>VITRA</small></header><div class="vl5-fields">'+records.map(tile).join("")+'</div></section>'+
  '<div id="vl5-inspect" hidden></div>'+
- (order.length?'<button type="button" class="vl5-order-trigger" data-vl5-order>Conferir ordem de produção <span>'+order.length+' →</span></button>':'')+
+ (order.length?'<button type="button" class="vl5-order-trigger" data-vl5-order>Confirmar cliente <span>'+order.length+' →</span></button>':'')+
  '<div class="vl5-legend"><span>✓ Conforme</span><span>× Divergente</span><span>? A conferir</span><span>– Sem parecer</span></div>';
 }
 function inspectVisualField(index){
@@ -1696,8 +1700,8 @@ function showResult(){
   '<small>'+(report.ready?"Consulte as verificações completas abaixo.":"A análise é preliminar até confirmar os dados da ordem de produção.")+'</small></section>';
  const reference='<section id="vl5-order" class="vl5-order" hidden><div class="vl5-inspect-head"><b>Ordem de produção</b><button type="button" data-vl5-order aria-label="Fechar">×</button></div>'+
  (!state.clientConfirmed?'<label>Cliente<select data-vl5-ref="client">'+opts(sortedClients,state.identity.client,"Selecione o cliente")+'</select></label>':'<small>Cliente: '+esc(nameOf(clients,state.identity.client))+'</small>')+
- '<label>Rastreabilidade da ordem<input data-vl2-trace="raw" value="'+esc(state.expected.raw||"")+'" placeholder="Código da ordem" autocomplete="off" spellcheck="false"></label>'+
- (box&&!classFromCatalog()?'<label>Classe da ordem<select data-vl5-ref="klass">'+opts(classes.map(x=>[x,x]),state.expected.klass,"Selecione na ordem")+'</select></label>':"")+
+ (!state.documental?'<label>Rastreabilidade da ordem<input data-vl2-trace="raw" value="'+esc(state.expected.raw||"")+'" placeholder="Código da ordem" autocomplete="off" spellcheck="false"></label>':"")+
+ (box&&!state.documental&&!classFromCatalog()?'<label>Classe da ordem<select data-vl5-ref="klass">'+opts(classes.map(x=>[x,x]),state.expected.klass,"Selecione na ordem")+'</select></label>':"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<label>Modelo<select data-vl5-ref="kind">'+opts(kinds,kind,"Selecione o modelo")+'</select></label>':"")+
  '<button type="button" id="vl5-check-order" class="vl2-evaluate">Conferir</button></section>';
  const outcome='<div class="vl5-actions">'+
@@ -1940,12 +1944,13 @@ async function saveReview(){
   producerReference:state.referenceProducer?.name||"",merchantReference:state.referenceMerchant?.name||"",
   diagnostic:{status:"aprovado",summary:report.summary,checks:report.checks,workflowVersion:5},
   verification:{workflowVersion:5,validated:true,referenceComplete:true,barcodeOrigin:"photo",reviewedByHuman:true}};
+ if(state.documental){fields.diagnostic.workflowVersion=6;fields.verification={...fields.verification,workflowVersion:6,scope:"documental",traceHumanConfirmed:state.traceVisualCheck==="yes",orderCompared:!!expectedCode()};fields.classificationSource=classFromCatalog()?"catalogo_documentado":state.classVisual?"confirmacao_visual":"classe_impressa";}
  const payload={client:state.identity.client,variety:state.identity.variety||state.detected?.identity?.variety||expectedVariety(),
   label_kind:state.identity.kind,label_class:state.identity.klass||"",
   packaging:nameOf(kinds,state.identity.kind),review_status:"conferido",
   detected_text:state.text.slice(0,12000),fields,
   checklist:report.checks.filter(x=>x.status!=="ok").map(x=>[x.status==="error"?"atencao":"pendente",x.title,x.detail]),
-  notes:state.notes||""};
+  notes:state.documental?"Conferência documental; ordem de produção não comparada. "+(state.notes||""):state.notes||""};
  const form=new FormData();form.append("action","save");form.append("payload",JSON.stringify(payload));form.append("photo",state.photo,state.photo.name);
   notice("Registrando o diagnóstico aprovado e sua fotografia…");
   const outcome=await ctx.api("save",form);state.saved=true;showResult();await fetchHistory();
@@ -2015,7 +2020,7 @@ function bindFrame(){
 }
 function mount(adapter){
  ctx=adapter;if(!ctx?.canAccess?.())return;
- releasePhoto();resetScan();
+ releasePhoto();resetScan();state.documental=true;
  const p=el("panel");if(!p)return;
  p.innerHTML='<section class="vl2" aria-label="Conferência de etiquetas">'+
   '<header class="vl2-header"><div><span class="vl2-kicker">CONTROLE DE QUALIDADE · ETIQUETAS</span><h2>Conferência de etiquetas</h2></div><button id="vl2-back" class="vl2-back" type="button">Voltar ao painel</button></header>'+
