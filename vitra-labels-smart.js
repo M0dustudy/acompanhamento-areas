@@ -30,7 +30,7 @@ function localVisualRead(photo,update,deep=false){
   const cleanup=(reset)=>{clearTimeout(timer);localAIBusy=false;if(localAIWorker){localAIWorker.onmessage=null;localAIWorker.onerror=null;if(reset){localAIWorker.terminate();localAIWorker=null;}}};
   const fail=msg=>{cleanup(true);reject(Error(msg));};
   try{
-   localAIWorker??=new Worker(new URL("vitra-label-ai-worker.js?v=20261125regional2",document.baseURI),{type:"module"});
+   localAIWorker??=new Worker(new URL("vitra-label-ai-worker.js?v=20261126adaptive3",document.baseURI),{type:"module"});
    localAIWorker.onmessage=({data})=>{
     if(data.type==="progress")update("Preparando IA local · "+Math.max(0,Math.min(100,data.progress||0))+"% do arquivo");
     if(data.type==="reading")update("IA local interpretando a fotografia…");
@@ -1412,7 +1412,7 @@ function diagnosticV4(){
   const chosenClass=effectiveClass(),readClass=state.identity.klass||"";
   if(!chosenClass)add("pending","Classificação da ordem","Classe da etiqueta: "+(readClass||"não identificada")+". Confira com a ordem de produção.");
   if(!readClass)add("pending","Classificação impressa","Classe ainda não identificada. Reexamine a fotografia.");
-  else if(!chosenClass)add("ok","Classe lida na foto",readClass+" · leitura da etiqueta, sem comparação com a ordem.");
+  
   else if(chosenClass&&readClass!==chosenClass)
    add(state.ocrConflicts.includes("classificacao")?"pending":"error","Classificação divergente","Caixa impressa: "+readClass+" · ordem de produção: "+chosenClass+".");
   else if(chosenClass)add("ok","Classificação","A caixa indica "+readClass+", conforme a ordem de produção.");
@@ -1429,15 +1429,18 @@ function diagnosticV4(){
       (k==="cnpjComercial"&&name.includes("CNPJ"))||
       (k==="ggnComercial"&&name.includes("GGN"))||
       (k==="glnComercial"&&name.includes("GLN")));
-    if(row.type==="atencao")add(conflict?"pending":"error",row.title,row.body+(conflict?" · Leituras diferentes nas regiões da foto.":""),row.reference);
+    if(row.type==="atencao"){
+     const uncertainCnpj=/CNPJ/.test(name)&&(name.includes("COMERCI")?candidateCnpj("cnpjComercial"):candidateCnpj("cnpj"));
+     add(conflict||uncertainCnpj?"pending":"error",row.title,row.body+(conflict?" · Leituras diferentes nas regiões da foto.":uncertainCnpj?" · Possível troca de caracteres; confira na foto.":""),row.reference);
+    }
     else if(row.type==="confirmar")add("pending",row.title,row.body,row.reference);
     else if(row.type==="ok")add("ok",row.title,row.body,row.reference);
    }
    if(!ref.producer)add("pending","Produtor da caixa","Não foi possível identificar e validar o produtor com uma referência documental.");
    if(!ref.merchant)add("pending","Comercializador da caixa","Não foi possível identificar e validar a empresa responsável pela comercialização.");
   }
-  if(f.cnpj&&!validCnpj(f.cnpj))add(state.ocrConflicts.includes("cnpj")?"pending":"error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
-  if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add(state.ocrConflicts.includes("cnpjComercial")?"pending":"error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
+  if(f.cnpj&&!validCnpj(f.cnpj))add(state.ocrConflicts.includes("cnpj")||candidateCnpj("cnpj")?"pending":"error","CNPJ do produtor","CNPJ reconhecido: "+f.cnpj+". Confira o número completo e o dígito verificador.");
+  if(f.cnpjComercial&&!validCnpj(f.cnpjComercial))add(state.ocrConflicts.includes("cnpjComercial")||candidateCnpj("cnpjComercial")?"pending":"error","CNPJ comercial","CNPJ reconhecido: "+f.cnpjComercial+". Dígito verificador não confere.");
   if(f.ggn&&digits(f.ggn).length!==13)add(state.ocrConflicts.includes("ggn")?"pending":"error","GGN do produtor","Lidos "+digits(f.ggn).length+" dígitos; o manual registra 13.");
   if(f.ggnComercial&&digits(f.ggnComercial).length!==13)add(state.ocrConflicts.includes("ggnComercial")?"pending":"error","GGN do comerciante","Lidos "+digits(f.ggnComercial).length+" dígitos no campo comercial; confira os 13 dígitos.");
   if(/\bGLN\b/i.test(state.text)&&!f.gln&&!f.glnComercial)add("pending","GLN ilegível","Há indicação de GLN na etiqueta, mas os dígitos não foram reconhecidos com segurança.");
@@ -1516,7 +1519,7 @@ function visualLabel(report){
   ["Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i],
   ["Data de embalagem",d.printedDate,/data(?!.*cadastr)/i],
   ["Modelo / peso", [d.boxModel?.code,d.weightPhoto].filter(Boolean).join(" · "),/modelo|peso|embalagem|cor indicada|cor da caixa|tipo de etiqueta/i],
-  ...(box?[["Classificação",d.identity?.klass,/classifica|classe|padrão do cliente/i],["Produtor",f.cnpj?formatCnpj(f.cnpj):f.produtor,[/produtor|produzido/i]],["Comercializador",f.cnpjComercial?formatCnpj(f.cnpjComercial):f.comercializado,[/comerciante|comercializador|comercializado|comercial/i]]]:[]),
+  ...(box?[["Classificação",d.identity?.klass||state.identity.klass,/classifica(?!ção da ordem)|classe|padrão do cliente/i],["Produtor",f.cnpj?formatCnpj(f.cnpj):f.produtor,[/produtor|produzido/i]],["Comercializador",f.cnpjComercial?formatCnpj(f.cnpjComercial):f.comercializado,[/comerciante|comercializador|comercializado|comercial/i]]]:[]),
   ...(unit?[["EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo/i]]:[]),
   ["Cliente da ordem",state.clientConfirmed?nameOf(clients,state.identity.client):"",/^cliente$|marca|cliente da ordem/i]
  ];
@@ -1544,6 +1547,8 @@ function visualLabel(report){
  return '<div class="vl3-verdict vl3-'+status+'" role="status"><div><small>RESULTADO DIGITAL</small><strong>'+title+'</strong></div><span>'+report.errors+' erro(s) · '+report.pending+' pendência(s)</span></div><section class="vl3-label" aria-label="Reconstrução da etiqueta"><header><small>ETIQUETA RECONSTRUÍDA</small><b>'+esc(box?"Caixa":unit?"Cumbuca / cinta":"Modelo a confirmar")+'</b></header><div class="vl3-fields">'+tiles+'</div></section>';
 }
 function confirmVisualCandidate(e){
+ const order=e.target.closest?.("[data-vl4-order-class]");
+ if(order){const v=order.dataset.vl4OrderClass;if(v===state.identity.klass&&classes.includes(v)){state.expected.klass=v;state.reviewRequested=false;state.reviewed=false;showResult();}return;}
  const b=e.target.closest?.("[data-vl4-cnpj]");if(!b)return;
  const key=b.dataset.vl4Cnpj,value=b.dataset.value;
  if(!["cnpj","cnpjComercial"].includes(key)||candidateCnpj(key)!==value||!validCnpj(value))return;
@@ -1611,7 +1616,7 @@ function showResult(){
   (pendings.length?'<div class="vl2-pending-short"><small>A confirmar</small><p>'+esc(pendings.slice(0,6).map(x=>x.title).join(" · "))+'</p></div>':"")+
   '<small>'+(report.ready?"Consulte as verificações completas abaixo.":"A análise é preliminar até confirmar os dados da ordem de produção.")+'</small></section>';
  const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados a confirmar</strong></div></div>'+clientChooser()+traceBuilder()+
- (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>O código não possui uma classe única cadastrada. Informe a classificação correta da produção.</p>'+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
+ (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>Etiqueta: '+esc(state.identity.klass||"não identificada")+'</p>'+(state.identity.klass&&!state.expected.klass?'<button type="button" class="vl4-order-class" data-vl4-order-class="'+esc(state.identity.klass)+'">Confirmo '+esc(state.identity.klass)+' na ordem de produção</button>':"")+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
  let outcome="";
  if(!state.reviewRequested){
