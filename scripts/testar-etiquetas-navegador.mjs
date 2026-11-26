@@ -39,16 +39,24 @@ try{
   });
   if(await page.locator('.vl2-pair-grid article').count()!==2)throw Error('Duas etiquetas não exibidas lado a lado/empilhadas.');
   // A referência independente permanece acessível sem ocupar a tela inicial.
-  await page.locator('.vl2-trace-order > summary').click();
-  const referenceInput=page.locator('[data-vl2-trace="raw"]');
-  if(await referenceInput.count()!==1)throw Error('Rastreabilidade de referência em campo único não encontrada.');
-  await referenceInput.fill('R-26-0106B-2110-C-VI');
-  if(await page.evaluate(()=>window.__labelSmoke.state.expected.raw)!=='R-26-0106B-2110-C-VI')
-   throw Error('Campo de referência não preservou o código informado pelo operador.');
-
+  if(await page.locator('.vl2-capture').evaluate(d=>d.open))throw Error('Foto deve iniciar recolhida após leitura.');
+  if(await page.locator('#vl5-order').isVisible())throw Error('Ordem deve iniciar recolhida.');
+  if(await page.locator('.vl5-paper').count()!==1)throw Error('Deve existir uma única ficha visual.');
+  if(await page.locator('.vl3-field').count())throw Error('Cartões expansíveis antigos não devem aparecer.');
+  // No fluxo documental a rastreabilidade é confirmada na própria ficha.
+  const traceField=page.locator('.vl5-field').filter({has:page.locator('small', {hasText:/^Rastreabilidade$/})}).first();
+  await traceField.locator('button.vl5-mark').click();
+  if(await page.locator('#vl6-value').inputValue()!=='R-26-0106B-2110-C-VI')throw Error('Código impresso não aparece na revisão.');
+  await page.locator('[data-vl6-confirm="rastreio"]').click();
+  if(await page.evaluate(()=>window.__labelSmoke.state.traceVisualCheck)!=='yes')throw Error('Confirmação visual não foi preservada.');
+  if(await page.locator('[data-vl2-trace="raw"]').count())throw Error('Não exigir redigitação da ordem.');
   const evidence=await page.evaluate(()=>({errors:window.__labelSmoke.state.diag?.checks?.filter(x=>x.status==='error').length||0,summary:window.__labelSmoke.state.diag?.summary||''}));
-  if(!evidence.errors||!await page.locator('.vl2-summary-error').count())throw Error('A divergência do par precisa aparecer em vermelho na prévia.');
+  if(!evidence.errors||!await page.locator('.vl3-verdict.vl3-error').count())throw Error('A divergência do par precisa aparecer em vermelho na prévia.');
+  if(!await page.locator('.vl3-label').isVisible())throw Error('Etiqueta visual ausente.');
+  if(await page.locator('#vl5-inspect').isVisible())throw Error('Detalhes técnicos devem iniciar recolhidos.');
+  if(!await page.locator('#vl5-inspect').count())throw Error('Painel único de auditoria ausente.');
   const result=await page.locator('#vl2-results').innerText();
+  if(await page.locator('.vl5-field.vl5-ok').filter({hasText:'Não lido'}).count())throw Error('Campo não lido não pode estar verde.');
   if(!result.includes('R-28-000V4-1411-5-VI')||!result.includes('R-26-0106B-2110-C-VI'))throw Error('Identificadores das duas etiquetas ausentes.');
   const measured=await page.evaluate(()=>({sw:document.documentElement.scrollWidth,vw:window.innerWidth}));
   if(measured.sw>measured.vw+18)throw Error('Largura horizontal excede a tela: '+JSON.stringify(measured));
