@@ -38,7 +38,7 @@ function localVisualRead(photo,update,deep=false){
     if(data.type==="error")fail(data.message||"IA local indisponível.");
    };
    localAIWorker.onerror=()=>fail("Não foi possível iniciar a IA local.");
-   timer=setTimeout(()=>fail("Tempo limite da IA local atingido."),deep?150000:60000);
+   timer=setTimeout(()=>fail("Tempo limite da IA local atingido."),deep?150000:18000);
    localAIWorker.postMessage({photo,deep});
   }catch(e){fail(e.message);}
  });
@@ -814,7 +814,7 @@ async function scanBarcode(file,token=state.sequence){
     put(code.rawValue,code.format,b?.width?{x:b.x,y:b.y,width:b.width,height:b.height,iw:canvas.width,ih:canvas.height}:null);
    }
   }catch{}
-  if(!codes.some(x=>x.ean)||!codes.some(x=>/qr|data.matrix/.test(x.format)))try{
+  if(!codes.some(x=>x.ean)&&!codes.some(x=>/qr|data.matrix/.test(x.format)))try{
    const mod=await limitWork(import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/+esm"),3600,"ZXing indisponível");
    const reader=new mod.BrowserMultiFormatReader();
    for(const sample of [canvas,rotateBitmapCanvas(canvas,90,2300)]){
@@ -1096,7 +1096,7 @@ async function readPhoto(deep=false){
   if(seq!==state.sequence)return;
   // Modelo visual complementar: nunca substitui a decodificação independente das barras.
   // A presença de dados institucionais não indica duas etiquetas. A IA também examina caixas.
-  if(localAIEnabled&&globalThis.navigator?.gpu&&!state.pairRequested&&seq===state.sequence&&(deep||shouldScanOCRBands(recognized)||ocrConflictKeys(passages).length)){
+  if(localAIEnabled&&globalThis.navigator?.gpu&&!state.pairRequested&&seq===state.sequence&&(deep||!recognized||localAIWorker&&(shouldScanOCRBands(recognized)||ocrConflictKeys(passages).length))){
    try{
     update("Preparando IA visual local (primeiro uso pode baixar o modelo)…");
     const focus=await limitWork(focusLabelCanvas(photo,1800),4000,"Recorte indisponível").catch(()=>null);
@@ -1320,7 +1320,7 @@ function diagnosticV4(){
   add("ok","Leitura conferida na fotografia","O operador confirmou visualmente a sequência impressa "+printed+". Isso não comprova a correspondência com a ordem de produção.");
  if(state.traceVisualCheck==="no")add("pending","Leitura de rastreabilidade corrigida","O código precisou de intervenção humana. A leitura automática não é uma evidência independente.");
 
- if(!expected)add("pending","Rastreabilidade de referência","Informe o código correto da ordem de produção. O VITRA vai comparar com o código impresso, sem copiar um para o outro.");
+ if(!expected&&state.traceVisualCheck!=="yes")add("pending","Rastreabilidade de referência","Toque na rastreabilidade e confirme o código da etiqueta. A ordem de produção não é inferida da fotografia.");
  if(!kind)add("pending","Tipo de etiqueta","Não foi possível identificar o modelo com segurança. Selecione o tipo em Ajustar leitura.");
  if(kind&&state.detected?.kindConfidence==="low"&&!state.kindConfirmed)add("pending","Modelo sugerido pela forma","O formato da imagem sugere "+nameOf(kinds,kind)+", mas não há dados suficientes para diferenciar cumbuca e caixa com segurança. Confirme o modelo antes de aprovar.");
  if(category()==="other")add("pending","Modelo da etiqueta","O modelo informado não é identificado como etiqueta de caixa ou de cumbuca; exige uma regra específica de validação.");
@@ -1435,7 +1435,7 @@ function diagnosticV4(){
   }else if(/\b(?:MEI|EX)\s*[-]?\s*[A-Z]{1,3}\d{2}[A-Z]{2,3}\d{2}\b/.test(norm(state.text)))
    add("pending","Código do modelo da caixa","Há um código de modelo, mas o texto não corresponde ao glossário. Confira a impressão ou refaça a leitura.");
   const chosenClass=effectiveClass(),readClass=state.identity.klass||"";
-  if(!chosenClass)add("pending","Classificação da ordem","Classe da etiqueta: "+(readClass||"não identificada")+". Confira com a ordem de produção.");
+  if(!chosenClass&&readClass&&classes.includes(readClass)&&readClass!=="Outra")add("ok","Classificação no padrão","Classe "+readClass+" reconhecida no glossário. A ordem não foi comparada.");
   if(!readClass)add("pending","Classificação impressa","Classe ainda não identificada. Reexamine a fotografia.");
   
   else if(chosenClass&&readClass!==chosenClass)
@@ -1524,7 +1524,7 @@ function diagnosticV4(){
  if(/\bQR\s*(?:CODE|CODIGO)?\b/.test(norm(state.text))&&!(state.codeEvidence||[]).some(x=>/qr/.test(x.format)))
   add("pending","QR Code não decodificado","A foto menciona um QR Code, mas a câmera não conseguiu recuperar seu conteúdo.");
  if(state.ocrConflicts.length)add("pending","Leituras diferentes na fotografia","O reconhecimento encontrou valores conflitantes para: "+state.ocrConflicts.join(", ")+". É necessário conferir a foto antes de aprovar.");
- if(state.ocrFailed||!state.text)add("pending","Leitura incompleta","O processamento não terminou integralmente. Reexamine a mesma foto; não é possível atribuir a falha à iluminação sem evidência.");
+ if(state.ocrFailed||!state.text)add("pending","Leitura incompleta","Use Reler foto para complementar os dados reconhecidos.");
  for(const k of ["barcode","rastreio","cnpj","cnpjComercial","ggn"])
   if(state.sources[k]==="Corrigido manualmente")add("pending","Identificador ajustado","O campo "+k+" foi alterado manualmente. Uma nova leitura da foto é necessária para aprovação automática.");
  const critical=checks.filter(x=>x.status==="error"),pending=checks.filter(x=>x.status==="pending");
@@ -1547,21 +1547,21 @@ function visualLabel(report){
   records.push({label,value,rows,key,full});
  };
  add("Variedade",d.printedNameVariety?nameOf(varieties,d.printedNameVariety):d.track?.variety?d.track.variety:"",/variedade|sigla/i,"",true);
- add("Classe",state.identity.klass||d.identity?.klass,/classifica|classe|padrão do cliente/i);
+ add("Classe",state.identity.klass||d.identity?.klass,/classifica|classe|padrão do cliente/i,"klass");
  add("Peso líquido",d.weightPhoto,/peso/i);
  add("Modelo",d.boxModel?.code||"",/modelo|tipo de etiqueta|embalagem|cor indicada|cor da caixa/i);
  add("Data impressa",d.printedDate,/data(?!.*cadastr)/i);
- add("Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i,"",true);
+ add("Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i,"rastreio",true);
  if(unit||f.barcode&&catalog.some(x=>x.barcode===f.barcode))add("EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo|código complementar/i,"",true);
  if(box){
-  add("Produzido por",f.produtor||"",/produtor identificado|produtor da caixa|seção produzido por/i,"",true);
+  add("Produzido por",f.produtor||"",/produtor identificado|produtor da caixa|seção produzido por/i,"produtor",true);
   add("CNPJ",f.cnpj?formatCnpj(f.cnpj):"",/cnpj do produtor/i,"cnpj");
   add("GGN",f.ggn,/ggn do produtor|produtor e ggn|ggn compartilhado|ggn sem referência/i);
   add("GLN",f.gln,/gln do produtor/i);
   add("Endereço",f.enderecoProdutor,/endereç.*produtor/i,"enderecoProdutor",true);
   add("CEP",f.cepProdutor?f.cepProdutor.replace(/^(\d{5})(\d{3})$/,"$1-$2"):"",/cep do produtor/i,"cepProdutor");
   add("Coordenadas", f.geoProdutor,/coordenadas do produtor/i,"geoProdutor",true);
-  add("Comercializado por",f.comercializado||"",/comercializado por|comercializador da caixa|seção comercializado por/i,"",true);
+  add("Comercializado por",f.comercializado||"",/comercializado por|comercializador da caixa|seção comercializado por/i,"comercializado",true);
   add("CNPJ comercial",f.cnpjComercial?formatCnpj(f.cnpjComercial):"",/cnpj.*comerci/i,"cnpjComercial");
   add("GGN comercial",f.ggnComercial,/ggn.*comerci/i);
   add("GLN comercial",f.glnComercial,/gln.*comerci/i);
@@ -1583,13 +1583,13 @@ function visualLabel(report){
  };
  const tile=(v,i)=>{
   const issue=v.rows.find(x=>x.status==="error")||v.rows.find(x=>x.status==="pending");
-  const status=issue?.status|| (!v.value?"pending":v.rows.length?"ok":"neutral");
+  const status=issue?.status|| (!v.value?"pending":v.key==="rastreio"&&state.traceVisualCheck!=="yes"?"pending":v.rows.length?"ok":"neutral");
   const candidate=["cnpj","cnpjComercial"].includes(v.key)?candidateCnpj(v.key):"";
   const display=v.value||(candidate?formatCnpj(candidate)+" (sugestão)":"Não lido");
   const marker={error:"×",pending:"?",ok:"✓",neutral:"–"}[status];
   return '<div class="vl5-field vl5-'+status+(v.full?' vl5-wide':'')+'"><small>'+esc(v.label)+'</small><strong>'+esc(display)+'</strong>'+
-   (v.rows.length?'<button type="button" class="vl5-mark" data-vl5-field="'+i+'" aria-label="'+esc(v.label+' · '+({error:"divergente",pending:"a conferir",ok:"conforme",neutral:"sem referência"}[status]))+'">'+marker+'</button>':'<span class="vl5-mark">'+marker+'</span>')+
-   (issue&&status==="error"?'<span class="vl5-reason">'+esc(compact(issue))+'</span>':'')+
+   (v.rows.length||v.key?'<button type="button" class="vl5-mark" data-vl5-field="'+i+'" aria-label="'+esc(v.label+' · '+({error:"divergente",pending:"a conferir",ok:"conforme",neutral:"sem referência"}[status]))+'">'+marker+'</button>':'<span class="vl5-mark">'+marker+'</span>')+
+   (v.key==="rastreio"&&state.traceVisualCheck!=="yes"?'<span class="vl5-reason">Confirme na foto</span>':issue&&status==="error"?'<span class="vl5-reason">'+esc(compact(issue))+'</span>':'')+
    (candidate?'<button type="button" class="vl5-fix" data-vl4-cnpj="'+v.key+'" data-value="'+esc(candidate)+'">Confere na foto?</button>':'')+'</div>';
  };
  const status=report.errors?"error":report.status==="aprovado"?"ok":"pending";
@@ -1604,10 +1604,24 @@ function visualLabel(report){
 function inspectVisualField(index){
  const v=state.visualRecords?.[index],p=el("vl5-inspect");if(!v||!p)return;
  p.hidden=false;
- p.innerHTML='<div class="vl5-inspect-head"><b>'+esc(v.label)+'</b><button type="button" data-vl5-close aria-label="Fechar">×</button></div>'+v.rows.map(x=>'<div class="vl5-inspect-row"><b>'+({error:"×",pending:"?",ok:"✓"}[x.status]||"–")+' '+esc(x.title)+'</b><span>'+esc(x.detail)+'</span>'+(x.reference?'<small>'+esc(x.reference)+'</small>':'')+'</div>').join("");
+ const editable=["rastreio","klass","produtor","comercializado","cnpj","cnpjComercial","enderecoProdutor","enderecoComercial","cepProdutor","cepComercial","geoProdutor","geoComercial"].includes(v.key);
+ const controls=editable?'<div class="vl6-edit">'+(state.url?'<img class="vl6-original" src="'+esc(state.url)+'" alt="Fotografia original da etiqueta">':"")+'<label>Confira na etiqueta original'+(v.key==="klass"?'<select id="vl6-value">'+opts(classes.map(x=>[x,x]),state.identity.klass,"Selecione a classe lida")+'</select>':'<input id="vl6-value" value="'+esc(v.value||"")+'" autocomplete="off" spellcheck="false">')+'</label><button type="button" data-vl6-confirm="'+esc(v.key)+'">Confirmar leitura</button></div>':"";
+ p.innerHTML='<div class="vl5-inspect-head"><b>'+esc(v.label)+'</b><button type="button" data-vl5-close aria-label="Fechar">×</button></div>'+v.rows.map(x=>'<div class="vl5-inspect-row"><b>'+({error:"×",pending:"?",ok:"✓"}[x.status]||"–")+' '+esc(x.title)+'</b><span>'+esc(x.detail)+'</span>'+(x.reference?'<small>'+esc(x.reference)+'</small>':'')+'</div>').join("")+controls;
  p.scrollIntoView({block:"nearest",behavior:"smooth"});
 }
 function confirmVisualCandidate(e){
+ const confirmation=e.target.closest?.("[data-vl6-confirm]");
+ if(confirmation){const key=confirmation.dataset.vl6Confirm,raw=el("vl6-value")?.value?.trim()||"";if(!raw)return;
+  const record=state.visualRecords?.find(x=>x.key===key);if(!record)return;
+  if(key==="rastreio"&&!parseTrace(raw)){notice("Confira o formato da rastreabilidade.",true);return;}
+  if(key==="klass"&&!classes.includes(raw))return;
+  if(/^cnpj/.test(key)&&!validCnpj(raw)){notice("CNPJ inválido; confira todos os dígitos.",true);return;}
+  const value=/^(cnpj|ggn|gln|cep)/.test(key)?digits(raw):key==="rastreio"?norm(raw).replace(/\s/g,""):raw;
+  if(key==="klass"){state.identity.klass=value;state.classVisual=true;}else{state.fields[key]=value;state.sources[key]="Confirmado visualmente pelo operador";}
+  if(key==="rastreio"){state.traceVisualCheck="yes";state.ocrConflicts=state.ocrConflicts.filter(x=>x!=="rastreio");}
+  if(key==="klass")state.ocrConflicts=state.ocrConflicts.filter(x=>x!=="classificacao");
+  state.reviewRequested=false;state.reviewed=false;showResult();return;
+ }
  const field=e.target.closest?.("[data-vl5-field]");if(field){inspectVisualField(Number(field.dataset.vl5Field));return;}
  if(e.target.closest?.("[data-vl5-new]")){if(state.processing||state.saving||state.sampleSaving)return;const capture=el("vl2-results")?.closest(".vl2")?.querySelector(".vl2-capture");if(capture){capture.open=true;capture.scrollIntoView({block:"nearest",behavior:"smooth"});}return;}
  if(e.target.closest?.("[data-vl5-close]")){const p=el("vl5-inspect");if(p)p.hidden=true;return;}
