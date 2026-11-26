@@ -34,7 +34,7 @@ self.onmessage=async({data})=>{
   const full=await read(image),passages=full?[full]:[];
   // Só dividir rótulos densos. Não misturar as regiões como se fossem uma única leitura.
   const dense=/CNPJ|PRODUZIDO|COMERCIALIZADO|GGN|GLN|ENDERE[CÇ]O/i.test(full);
-  if(dense&&typeof OffscreenCanvas!=="undefined"){
+  if(data.deep&&dense&&typeof OffscreenCanvas!=="undefined"){
    let bmp;
    try{
     bmp=await createImageBitmap(data.photo);
