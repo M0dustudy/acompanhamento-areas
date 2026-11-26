@@ -824,3 +824,20 @@ min-height:45px;padding:9px 6px!important;white-space:normal}
 .vl2.vl2-has-result .vl2-capture:not([open]){padding:7px 10px!important}
 .vl2.vl2-has-result .vl2-recent:not([open]){padding:7px 10px!important}
 @media(max-width:800px){.vl2.vl2-has-result .vl2-result{padding:8px!important}.vl2 .vl5-field{padding:7px 8px}.vl2 .vl5-field>strong{font-size:12px}.vl2 .vl5-field>small{font-size:10px}.vl2 .vl5-paper>header{padding:8px 9px!important}.vl2 .vl3-verdict{padding:10px 11px!important}.vl2 .vl3-verdict strong{font-size:16px!important}}
+
+/* 26/11/2026 · etiqueta conforme modelo e revisão contextual */
+.vl2 .vl5-paper{--label-hue:140}
+.vl2 .vl5-paper>header{background:hsl(var(--label-hue) 28% 94%)!important;border-bottom:2px solid hsl(var(--label-hue) 32% 34%)!important;border-radius:0!important;box-shadow:none!important;min-height:0!important}
+.vl2 .vl5-paper>header b{color:hsl(var(--label-hue) 32% 22%)!important}
+.vl2 .vl5-field.vl5-wide{padding-block:7px}
+.vl2 .vl5-field>strong{font-variant-numeric:tabular-nums}
+.vl2 .vl5-field.vl5-pending .vl5-reason{color:#89601b}
+.vl2 .vl6-edit{display:grid;gap:8px;margin-top:8px}
+.vl2 .vl6-original{display:block;width:100%;max-height:220px;object-fit:contain;border:1px solid #dce6dc;border-radius:8px;background:#f7f8f5}
+.vl2 .vl6-edit label{display:grid;gap:4px;font-size:11px;font-weight:650;color:#365440}
+.vl2 .vl6-edit input,.vl2 .vl6-edit select{min-height:44px;width:100%;border:1px solid #c6d7ca;border-radius:8px;padding:9px;font-size:14px!important;color:#243c2c!important;background:#fff!important}
+.vl2 .vl6-edit button{min-height:44px;background:#1a644d!important;border:0!important;color:white!important;border-radius:8px;font-size:13px!important;font-weight:700!important}
+.vl2 #vl5-inspect[hidden],.vl2 #vl5-order[hidden]{display:none!important}
+.vl2 .vl5-paper>header{position:static!important;margin:0!important}
+.vl2 .vl5-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:480px){.vl2 .vl5-field>strong{font-size:12px!important}.vl2 .vl5-actions>.vl5-secondary{font-size:10px!important;line-height:1.25}.vl2 .vl5-legend{font-size:9px}}
