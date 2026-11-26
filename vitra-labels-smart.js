@@ -70,7 +70,7 @@ function resetScan(){
  state.fields={};state.sources={};state.issues=[];state.matches=[];state.referenceChecks=[];state.referenceProducer=null;state.referenceMerchant=null;state.diag=null;state.reviewed=false;state.saved=false;state.sampleSaved=false;state.sampleSaving=false;
  state.identity={client:"",kind:"",variety:"",klass:""};state.clientConfirmed=false;state.clientFromCatalog=false;
  state.expected={raw:"",year:String(new Date().getFullYear()).slice(-2),area:"",valve:"",day:"",month:"",method:"",variety:"",klass:""};
- state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";state.classVisual=false;state.orderOpen=false;
+ state.notes="";state.mode="empty";state.cropActive=false;state.imageAngle=0;state.analysisError="";state.barcodeRegion=null;state.photoAspect=0;state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.reviewRequested=false;state.kindConfirmed=false;state.traceVisualCheck="";state.classVisual=false;state.labelTint="";state.orderOpen=false;
 }
 function formatCnpj(raw){
  const n=digits(raw);return n.length===14?n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,"$1.$2.$3/$4-$5"):str(raw);
@@ -580,7 +580,7 @@ function invalidatePhotoReading(){
  state.detected=null;state.fields={};state.sources={};state.matches=[];state.referenceChecks=[];
  state.referenceProducer=null;state.referenceMerchant=null;
  state.scanCompleted=false;state.ocrFailed=false;state.ocrConflicts=[];state.ocrPasses=0;state.ocrRawPassages=[];state.analysisError="";
- state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;state.traceVisualCheck="";
+ state.reviewRequested=false;state.reviewed=false;state.saved=false;state.kindConfirmed=false;state.traceVisualCheck="";state.classVisual=false;state.labelTint="";
  state.identity.kind="";state.identity.variety="";state.identity.klass="";
 }
 function fitGalleryImage(){
@@ -764,6 +764,20 @@ async function focusLabelCanvas(file,maxSide=3000){
   const ctx=canvas.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(bmp,x,y,sw,sh,0,0,canvas.width,canvas.height);
   return canvas;
  }finally{bmp.close?.();}
+}
+function labelTint(canvas){
+ try{
+  const g=canvas.getContext("2d"),pixels=g.getImageData(0,0,canvas.width,canvas.height).data,counts=new Map();
+  const step=Math.max(1,Math.floor(canvas.width*canvas.height/3500));
+  for(let i=0;i<pixels.length/4;i+=step){
+   const a=i*4,r=pixels[a],v=pixels[a+1],b=pixels[a+2],max=Math.max(r,v,b),min=Math.min(r,v,b);
+   if(max<90||max-min<30||max-min>210&&min<15)continue;
+   const hue=Math.round((r>=v&&r>=b?(60*(v-b)/(max-min)+360)%360:v>=r&&v>=b?60*(b-r)/(max-min)+120:60*(r-v)/(max-min)+240)/20)*20;
+   counts.set(hue,(counts.get(hue)||0)+1);
+  }
+  const winner=[...counts].sort((a,b)=>b[1]-a[1])[0];
+  return winner&&winner[1]>350?String(winner[0]%360):"";
+ }catch{return "";}
 }
 function focusRegion(canvas,x,y,w,h){
  const out=document.createElement("canvas");out.width=Math.max(1,Math.round(canvas.width*w));out.height=Math.max(1,Math.round(canvas.height*h));
@@ -990,7 +1004,8 @@ function shouldScanOCRBands(raw,deep=false){
  if(/\bGGN\b/.test(text)&&!f.ggn&&!f.ggnComercial)return true;
  if(/\bGLN\b/.test(text)&&!f.gln&&!f.glnComercial)return true;
  if(/LOCALIZACAO\s+GEOGRAFICA/.test(text)&&!/[NS][\s\d°'".]*[EWO]/.test(text))return true;
- if(/\b(?:CLASSIFICACAO|CLASSIFICA[CÇ][AÃ]O)\b/.test(text)&&!scanned.identity.klass)return true;
+ if(/\b(?:CLASSE|CLASSIFICACAO)\b/.test(text)&&!scanned.identity.klass)return true;
+ if(state.documental&&["caixa","sacola","exportacao"].includes(scanned.identity.kind)&&(!scanned.identity.klass||!f.produtor||!f.comercializado))return true;
  return false;
 }
 function ocrEvidenceScore(value){
@@ -1032,6 +1047,7 @@ async function readPhoto(deep=false){
     update(deep?"Lendo novamente a fotografia com resolução ampliada…":"Lendo todas as informações da etiqueta…");
     const focus=await limitWork(focusLabelCanvas(photo,deep?4200:3600),4000,"Localização automática interrompida.").catch(()=>null);
      const canvas=focus||await limitWork(prepareOCRImage(photo,deep?4200:3200),deep?6500:3500,"Falha ao preparar foto.");
+     state.labelTint=labelTint(canvas);
     try{
       const original=await readPass(canvas,16000,"3");if(original)passages.push(original);
       if(focus&&seq===state.sequence&&(deep||shouldScanOCRBands(original))){
@@ -1066,8 +1082,8 @@ async function readPhoto(deep=false){
     const needTrace=!ocrTraceCandidates(passages.join("\n")).length;
     const regions=deep?
       [{a:0,b:.42,contrast:false,name:"superior"},{a:.30,b:.75,contrast:true,name:"central"},{a:.62,b:1,contrast:true,name:"inferior"}]:
-      needTrace?[{a:.34,b:1,contrast:true,name:"da rastreabilidade"}]:
-      [{a:0,b:.73,contrast:true,name:"dos dados cadastrais"}];
+      needTrace?[{a:.25,b:1,contrast:true,name:"da rastreabilidade"}]:
+      [{a:0,b:.85,contrast:true,name:"da classe e dos dados cadastrais"}];
     const bands=regions;
     for(const band of bands){
      if(seq!==state.sequence||!worker)break;
@@ -1150,6 +1166,7 @@ async function readPhoto(deep=false){
  finally{
   if(seq===state.sequence&&ctx?.canAccess?.()){
    try{
+    if(!state.pairedEvidence?.detected&&passages.length){recognized=mergeOCRPassages(passages);state.ocrRawPassages=passages.slice();state.ocrConflicts=ocrConflictKeys(passages);state.ocrPasses=passages.length;}
     const codeForLabel=state.pairedEvidence?.detected?"":barcode;
     const data=supplementExtractedFields(extract(recognized,codeForLabel),passages,codeForLabel);
     if([data.fields.ggn,data.fields.ggnComercial,data.fields.gln,data.fields.glnComercial].includes(data.fields.barcode)||((state.entities||[]).some(x=>[x.ggn,x.gln].includes(data.fields.barcode))&&!catalog.some(x=>x.barcode===data.fields.barcode))){data.fields.barcode="";data.sources.barcode="";}
@@ -1534,7 +1551,7 @@ function diagnosticV4(){
  const ready=Boolean(state.photo&&state.scanCompleted&&(!needsClient||state.clientConfirmed)&&kind&&(documental?state.traceVisualCheck==="yes"&&trace&&(!box||readClassForDocumental()):expected&&(!box||effectiveClass())));
  function readClassForDocumental(){return classes.includes(state.identity.klass)&&state.identity.klass!=="Outra";}
  const status=critical.length?"reprovado":!ready?"coleta":pending.length?"pendente":"aprovado";
- const summary=status==="coleta"?"Confirme as referências necessárias da ordem de produção"+(box&&!classFromCatalog()?", incluindo a classificação da caixa.":".")+" Só então será possível concluir a análise.":
+ const summary=status==="coleta"?(documental?"Confirme os campos sinalizados na etiqueta.":"Confirme as referências necessárias da ordem de produção."):
  status==="reprovado"?"Foram identificadas "+critical.length+" divergência(s) entre a etiqueta e as referências consultadas.":
  status==="pendente"?"A imagem ou o cadastro não permitem concluir a conferência com segurança. Revise os itens pendentes.":
  "Os identificadores lidos coincidem com as referências disponíveis. O resultado digital está apto para confirmação e registro.";
@@ -1587,7 +1604,7 @@ function visualLabel(report){
  };
  const tile=(v,i)=>{
   const issue=v.rows.find(x=>x.status==="error")||v.rows.find(x=>x.status==="pending");
-  const status=issue?.status|| (!v.value?"pending":v.key==="rastreio"&&state.traceVisualCheck!=="yes"?"pending":v.rows.length?"ok":"neutral");
+  const status=issue?.status==="error"?"error":!v.value||issue?.status==="pending"||v.key==="rastreio"&&state.traceVisualCheck!=="yes"?"pending":v.rows.length?"ok":"neutral";
   const candidate=["cnpj","cnpjComercial"].includes(v.key)?candidateCnpj(v.key):"";
   const display=v.value||(candidate?formatCnpj(candidate)+" (sugestão)":"Não lido");
   const marker={error:"×",pending:"?",ok:"✓",neutral:"–"}[status];
@@ -1598,11 +1615,11 @@ function visualLabel(report){
  };
  const status=report.errors?"error":report.status==="aprovado"?"ok":"pending";
  const title=status==="error"?"REPROVADA":status==="ok"?(state.documental?"APROVADA · DOCUMENTAL":"APROVADA NA ANÁLISE"):"A CONFERIR";
- const order=checks.filter(x=>production.test(x.title));
+ const order=checks.filter(x=>production.test(x.title)||/^(Tipo de etiqueta|Modelo sugerido pela forma)$/.test(x.title));
  return '<div class="vl3-verdict vl3-'+status+'" role="status"><div><strong>'+title+'</strong></div><span>'+report.errors+' erro(s) · '+report.pending+' pendência(s)</span></div>'+
- '<section class="vl3-label vl5-paper" aria-label="Reconstrução da etiqueta"><header><b>'+esc(box?"ETIQUETA DE CAIXA":unit?"ETIQUETA DE CUMBUCA / CINTA":"ETIQUETA · MODELO A CONFIRMAR")+'</b><small>VITRA</small></header><div class="vl5-fields">'+records.map(tile).join("")+'</div></section>'+
+ '<section class="vl3-label vl5-paper" aria-label="Reconstrução da etiqueta"'+(state.labelTint!==""&&state.labelTint!=null?' style="--label-hue:'+Number(state.labelTint)+'"':'')+'><header><b>'+esc(box?"ETIQUETA DE CAIXA":unit?"ETIQUETA DE CUMBUCA / CINTA":"ETIQUETA · MODELO A CONFIRMAR")+'</b><small>VITRA</small></header><div class="vl5-fields">'+records.map(tile).join("")+'</div></section>'+
  '<div id="vl5-inspect" hidden></div>'+
- (order.length?'<button type="button" class="vl5-order-trigger" data-vl5-order>Confirmar cliente <span>'+order.length+' →</span></button>':'')+
+ (order.length?'<button type="button" class="vl5-order-trigger" data-vl5-order>Confirmar identificação <span>'+order.length+' →</span></button>':'')+
  '<div class="vl5-legend"><span>✓ Conforme</span><span>× Divergente</span><span>? A conferir</span><span>– Sem parecer</span></div>';
 }
 function inspectVisualField(index){
@@ -1622,8 +1639,9 @@ function confirmVisualCandidate(e){
   if(/^cnpj/.test(key)&&!validCnpj(raw)){notice("CNPJ inválido; confira todos os dígitos.",true);return;}
   const value=/^(cnpj|ggn|gln|cep)/.test(key)?digits(raw):key==="rastreio"?norm(raw).replace(/\s/g,""):raw;
   if(key==="klass"){state.identity.klass=value;state.classVisual=true;}else{state.fields[key]=value;state.sources[key]="Confirmado visualmente pelo operador";}
-  if(key==="rastreio"){state.traceVisualCheck="yes";state.ocrConflicts=state.ocrConflicts.filter(x=>x!=="rastreio");}
+  if(key==="rastreio"){state.traceVisualCheck="yes";state.ocrConflicts=state.ocrConflicts.filter(x=>x!=="rastreio");const track=parseTrace(value);if(state.detected)state.detected.track=track;const variety=varieties.find(x=>x[2]===track?.variety)?.[0];if(variety&&!state.detected?.printedNameVariety)state.identity.variety=variety;}
   if(key==="klass")state.ocrConflicts=state.ocrConflicts.filter(x=>x!=="classificacao");
+  if(["cnpj","cnpjComercial","ggn","ggnComercial","gln","glnComercial"].includes(key))state.ocrConflicts=state.ocrConflicts.filter(x=>x!==key);
   state.reviewRequested=false;state.reviewed=false;showResult();return;
  }
  const field=e.target.closest?.("[data-vl5-field]");if(field){inspectVisualField(Number(field.dataset.vl5Field));return;}
@@ -1698,8 +1716,8 @@ function showResult(){
   (errors.length?'<div class="vl2-quick-items">'+errors.slice(0,6).map(x=>'<div><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p></div>').join("")+'</div>':"")+
   (pendings.length?'<div class="vl2-pending-short"><small>A confirmar</small><p>'+esc(pendings.slice(0,6).map(x=>x.title).join(" · "))+'</p></div>':"")+
   '<small>'+(report.ready?"Consulte as verificações completas abaixo.":"A análise é preliminar até confirmar os dados da ordem de produção.")+'</small></section>';
- const reference='<section id="vl5-order" class="vl5-order" hidden><div class="vl5-inspect-head"><b>Ordem de produção</b><button type="button" data-vl5-order aria-label="Fechar">×</button></div>'+
- (!state.clientConfirmed?'<label>Cliente<select data-vl5-ref="client">'+opts(sortedClients,state.identity.client,"Selecione o cliente")+'</select></label>':'<small>Cliente: '+esc(nameOf(clients,state.identity.client))+'</small>')+
+ const reference='<section id="vl5-order" class="vl5-order" hidden><div class="vl5-inspect-head"><b>Identificação da etiqueta</b><button type="button" data-vl5-order aria-label="Fechar">×</button></div>'+
+ (!state.clientConfirmed&&(unit||state.pairedEvidence?.detected||catalog.some(x=>x.barcode===f.barcode))?'<label>Cliente<select data-vl5-ref="client">'+opts(sortedClients,state.identity.client,"Selecione o cliente")+'</select></label>':state.clientConfirmed?'<small>Cliente: '+esc(nameOf(clients,state.identity.client))+'</small>':'')+
  (!state.documental?'<label>Rastreabilidade da ordem<input data-vl2-trace="raw" value="'+esc(state.expected.raw||"")+'" placeholder="Código da ordem" autocomplete="off" spellcheck="false"></label>':"")+
  (box&&!state.documental&&!classFromCatalog()?'<label>Classe da ordem<select data-vl5-ref="klass">'+opts(classes.map(x=>[x,x]),state.expected.klass,"Selecione na ordem")+'</select></label>':"")+
  ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<label>Modelo<select data-vl5-ref="kind">'+opts(kinds,kind,"Selecione o modelo")+'</select></label>':"")+
