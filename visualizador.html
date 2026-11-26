@@ -113,7 +113,7 @@ async function render(){
   if(!url)throw Error("Nome de relatório inválido");
   const pdfjsLib=await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
   pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
-  pdf=await pdfjsLib.getDocument({url,rangeChunkSize:262144}).promise;
+  pdf=await pdfjsLib.getDocument(url).promise;
   await render();
  } catch(e){alternative(e);}
 })();
