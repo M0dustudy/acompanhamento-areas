@@ -15,13 +15,21 @@ const context={
  createImageBitmap:async()=>({width:1600,height:1000,close(){}}),
  setTimeout,clearTimeout
 };
-const testHook='ctx={canAccess:()=>true};window.__test={ocrTraceCandidates,ocrConflictKeys,mergeOCRPassages,shouldScanOCRBands,canonicalCoordinates,extract,supplementExtractedFields,registryAudit,diagnosticV4,interpretPairedText,readPhoto,formatCnpj,cnpjVisualCandidate,candidateCnpj,state};'+marker;
+const testHook='ctx={canAccess:()=>true};window.__test={ocrTraceCandidates,ocrConflictKeys,mergeOCRPassages,shouldScanOCRBands,canonicalCoordinates,extract,supplementExtractedFields,registryAudit,diagnosticV4,interpretPairedText,readPhoto,formatCnpj,cnpjVisualCandidate,candidateCnpj,getEAN,state};'+marker;
 new Script(source.replace(marker,testHook)).runInNewContext(context);
 const t=context.window.__test;
 assert.equal(t.formatCnpj("03438392000163"),"03.438.392/0001-63");
 assert.equal(t.formatCnpj("03.438.392/0001-63"),"03.438.392/0001-63");
 assert.equal(t.cnpjVisualCandidate("CNPJ: O3.438.392/0001-63"),"03438392000163");
 assert.equal(t.cnpjVisualCandidate("CNPJ: O3.438.392/0001-64"),"");
+assert.equal(t.getEAN("PRODUZIDO POR FAZENDA TESTE\nGGN: 4069453004221"),"","GGN não é EAN");
+assert.equal(t.getEAN("COMERCIALIZADO POR FAZENDA TESTE\n4069453004221"),"","Número institucional sem rótulo não vira EAN");
+assert.equal(t.getEAN("UVA VITORIA\n7898366001754"),"7898366001754");
+const institutional=t.extract("PRODUZIDO POR FAZENDA TESTE\nCNPJ: 03.438.392/0001-63\nGGN: 4069453004221\nCOMERCIALIZADO POR EMPRESA TESTE\nBR-235 KM 50 CASA NOVA\nCEP: 47300-000","");
+assert.equal(institutional.fields.produtor,"FAZENDA TESTE");
+assert.equal(institutional.fields.comercializado,"EMPRESA TESTE");
+assert.equal(institutional.fields.cepComercial,"47300000");
+assert(institutional.fields.enderecoComercial.includes("KM 50"));
 const trace="R-26-109A5-1611-5-SR",other="R-27-109A5-1611-5-SR";
 const pair=t.interpretPairedText("BRS VITÓRIA\nMEI-PA50VI20\nCOMERCIALIZADO POR EXPOFRUT\nPRODUZIDO POR NOVO RUMO\nR-26-0106B-2110-C-VI",
 "UVA BRS VITÓRIA\nEmb 19/11/2026\nR-26-0106B-2110-5-VI\n7898366001754","7898366001754");
