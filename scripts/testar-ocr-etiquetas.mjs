@@ -15,9 +15,14 @@ const context={
  createImageBitmap:async()=>({width:1600,height:1000,close(){}}),
  setTimeout,clearTimeout
 };
-const testHook='ctx={canAccess:()=>true};window.__test={ocrTraceCandidates,ocrConflictKeys,mergeOCRPassages,shouldScanOCRBands,canonicalCoordinates,extract,supplementExtractedFields,registryAudit,diagnosticV4,interpretPairedText,readPhoto,state};'+marker;
+const testHook='ctx={canAccess:()=>true};window.__test={ocrTraceCandidates,ocrConflictKeys,mergeOCRPassages,shouldScanOCRBands,canonicalCoordinates,extract,supplementExtractedFields,registryAudit,diagnosticV4,interpretPairedText,readPhoto,formatCnpj,cnpjVisualCandidate,candidateCnpj,state};'+marker;
 new Script(source.replace(marker,testHook)).runInNewContext(context);
-const t=context.window.__test,trace="R-26-109A5-1611-5-SR",other="R-27-109A5-1611-5-SR";
+const t=context.window.__test;
+assert.equal(t.formatCnpj("03438392000163"),"03.438.392/0001-63");
+assert.equal(t.formatCnpj("03.438.392/0001-63"),"03.438.392/0001-63");
+assert.equal(t.cnpjVisualCandidate("CNPJ: O3.438.392/0001-63"),"03438392000163");
+assert.equal(t.cnpjVisualCandidate("CNPJ: O3.438.392/0001-64"),"");
+const trace="R-26-109A5-1611-5-SR",other="R-27-109A5-1611-5-SR";
 const pair=t.interpretPairedText("BRS VITÓRIA\nMEI-PA50VI20\nCOMERCIALIZADO POR EXPOFRUT\nPRODUZIDO POR NOVO RUMO\nR-26-0106B-2110-C-VI",
 "UVA BRS VITÓRIA\nEmb 19/11/2026\nR-26-0106B-2110-5-VI\n7898366001754","7898366001754");
 assert.equal(pair?.detected,true,"O par físico deve gerar duas leituras sem mesclar dados.");
@@ -80,7 +85,7 @@ assert(source.includes('function visualLabel(report)'));
 assert(source.includes('vl3-verdict'));
 assert(source.includes('readPass(canvas,16000,"3")'),"A leitura principal deve ter limite explícito e segmentação automática.");
 assert(source.includes('focusLabelCanvas(photo,deep?4200:3600)'),"A região da etiqueta deve ser ampliada automaticamente.");
-assert(source.includes('await limitWork(run(),localAIEnabled?390000:deep||state.pairRequested?135000:110000'),"O processamento total deve continuar limitado.");
+assert(source.includes('await limitWork(run(),deep||state.pairRequested?240000:localAIEnabled?115000:65000'),"O processamento total deve continuar limitado.");
 assert(source.includes('function interpretPairedText('));
 assert(source.includes('"qr_code"'));
 assert(source.includes('vl2-capture-full'));
