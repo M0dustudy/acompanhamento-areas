@@ -1511,42 +1511,79 @@ function diagnosticV4(){
  "Os identificadores lidos coincidem com as referências disponíveis. O resultado digital está apto para confirmação e registro.";
  return {status,summary,checks,errors:critical.length,pending:pending.length,ok:checks.filter(x=>x.status==="ok").length,ready,referenceComplete:ready&&status==="aprovado"};
 }
+// Painel único: valores da foto, não valores copiados do catálogo.
 function visualLabel(report){
  const f=state.fields||{},d=state.detected||{},box=category()==="box",unit=category()==="unit";
- const checks=report.checks||[],used=new Set();
- const groups=[
-  ["Variedade",d.printedNameVariety?nameOf(varieties,d.printedNameVariety):d.track?.variety?d.track.variety+" (sigla impressa)":"",/variedade|sigla/i],
-  ["Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i],
-  ["Data de embalagem",d.printedDate,/data(?!.*cadastr)/i],
-  ["Modelo / peso", [d.boxModel?.code,d.weightPhoto].filter(Boolean).join(" · "),/modelo|peso|embalagem|cor indicada|cor da caixa|tipo de etiqueta/i],
-  ...(box?[["Classificação",d.identity?.klass||state.identity.klass,/classifica(?!ção da ordem)|classe|padrão do cliente/i],["Produtor",f.cnpj?formatCnpj(f.cnpj):f.produtor,[/produtor|produzido/i]],["Comercializador",f.cnpjComercial?formatCnpj(f.cnpjComercial):f.comercializado,[/comerciante|comercializador|comercializado|comercial/i]]]:[]),
-  ...(unit?[["EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo/i]]:[]),
-  ["Cliente da ordem",state.clientConfirmed?nameOf(clients,state.identity.client):"",/^cliente$|marca|cliente da ordem/i]
- ];
- const card=(title,value,rows)=>{
-  const status=rows.some(x=>x.status==="error")?"error":rows.some(x=>x.status==="pending")?"pending":rows.length?"ok":"neutral";
-  const label={error:"Divergência",pending:"A confirmar",ok:"Conferido",neutral:"Sem parecer"}[status];
-  const detail=rows.map(x=>'<div class="vl3-detail"><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p>'+(x.reference?'<small>'+esc(x.reference)+'</small>':'')+'</div>').join("");
-  const warning=rows.find(x=>x.status==="error");
-  const key=title==="Produtor"?"cnpj":title==="Comercializador"?"cnpjComercial":"";
-  const candidate=key?candidateCnpj(key):"";
-  const correction=candidate?'<div class="vl4-confirm"><small>Possível leitura (confira na foto)</small><strong>'+esc(formatCnpj(candidate))+'</strong><button type="button" data-vl4-cnpj="'+key+'" data-value="'+esc(candidate)+'">Confirmar número impresso</button></div>':"";
-  const head='<span class="vl3-field-name">'+esc(title)+'</span><span class="vl3-mark vl3-'+status+'" aria-label="'+label+'">'+({error:"!",pending:"?",ok:"✓",neutral:"–"}[status])+'</span><strong>'+esc(value||"Não confirmado")+'</strong>'+(warning?'<small class="vl3-warning">'+esc(warning.title)+'</small>':"");
-  return rows.length?'<details class="vl3-field vl3-'+status+'"><summary>'+head+'</summary>'+correction+detail+'</details>':'<div class="vl3-field vl3-'+status+'">'+head+'</div>';
+ const checks=report.checks||[],used=new Set(),records=[];
+ const production=/^(Cliente|Rastreabilidade de referência|Classificação da ordem)$/i;
+ const add=(label,value,pattern,key="",full=false)=>{
+  const rows=checks.filter((x,i)=>!used.has(i)&&!production.test(x.title)&&pattern.test(x.title)&&(used.add(i),true));
+  if(!value&&!rows.length)return;
+  records.push({label,value,rows,key,full});
  };
- let tiles="";
- for(const [title,value,patterns] of groups){
-  const rx=Array.isArray(patterns)?patterns[0]:patterns;
-  const rows=checks.filter((x,i)=>!used.has(i)&&rx.test(x.title)&&(used.add(i),true));
-  if(value||rows.length)tiles+=card(title,value,rows);
+ add("Variedade",d.printedNameVariety?nameOf(varieties,d.printedNameVariety):d.track?.variety?d.track.variety:"",/variedade|sigla/i,"",true);
+ add("Classe",state.identity.klass||d.identity?.klass,/classifica|classe|padrão do cliente/i);
+ add("Peso líquido",d.weightPhoto,/peso/i);
+ add("Modelo",d.boxModel?.code||"",/modelo|tipo de etiqueta|embalagem|cor indicada|cor da caixa/i);
+ add("Data impressa",d.printedDate,/data(?!.*cadastr)/i);
+ add("Rastreabilidade",f.rastreio,/rastreabilidade|código impresso|identificador ajustado/i,"",true);
+ if(unit||f.barcode)add("EAN-13",state.barcodePrinted||f.barcode,/ean|barras|dígitos abaixo|código complementar/i,"",true);
+ if(box){
+  add("Produzido por",f.produtor||"",/produtor identificado|produtor da caixa|seção produzido por/i,"",true);
+  add("CNPJ",f.cnpj?formatCnpj(f.cnpj):"",/cnpj do produtor/i,"cnpj");
+  add("GGN",f.ggn,/ggn do produtor|produtor e ggn|ggn compartilhado|ggn sem referência/i);
+  add("GLN",f.gln,/gln do produtor/i);
+  add("Endereço / CEP",f.cepProdutor,/endereç.*produtor|cep do produtor/i,"",true);
+  add("Coordenadas", "",/coordenadas do produtor/i,"",true);
+  add("Comercializado por",f.comercializado||"",/comercializado por|comercializador da caixa|seção comercializado por/i,"",true);
+  add("CNPJ comercial",f.cnpjComercial?formatCnpj(f.cnpjComercial):"",/cnpj.*comerci/i,"cnpjComercial");
+  add("GGN comercial",f.ggnComercial,/ggn.*comerci/i);
+  add("GLN comercial",f.glnComercial,/gln.*comerci/i);
+  add("Endereço / CEP comercial",f.cepComercial,/endereç.*comerci|cep.*comerci/i,"",true);
+  add("Coordenadas comerciais","",/coordenadas.*comerci/i,"",true);
+  add("Inscrição estadual",f.ieProdutor,/inscrição estadual do produtor/i);
+  add("IE comercial",f.ieComercial,/inscrição estadual do comercializador/i);
+  add("E-mail / site",[f.emailProdutor,f.siteProdutor].filter(Boolean).join(" · "),/e-mail do produtor|site do produtor/i,"",true);
+  add("Contato comercial",[f.emailComercial,f.siteComercial].filter(Boolean).join(" · "),/e-mail comercial|site comercial/i,"",true);
  }
- const rest=checks.filter((x,i)=>!used.has(i));
- if(rest.length)tiles+=card("Outras verificações","",rest);
+ const remaining=checks.filter((x,i)=>!used.has(i)&&!production.test(x.title)&&x.status!=="ok");
+ for(const x of remaining)records.push({label:x.title,value:"",rows:[x],key:"",full:true});
+ state.visualRecords=records;
+ const compact=x=>{
+  if(!x)return "";
+  const m=x.detail.match(/(?:impresso|impressa|lido|etiqueta)\s*:\s*([^·;]+)\s*[·;]\s*(?:cadastro[^:]*|referência[^:]*|ordem[^:]*|cadastrado[^:]*)\s*:\s*([^.;]+)/i);
+  return m?m[1].trim()+" ≠ "+m[2].trim():x.title;
+ };
+ const tile=(v,i)=>{
+  const issue=v.rows.find(x=>x.status==="error")||v.rows.find(x=>x.status==="pending");
+  const status=issue?.status|| (v.rows.length?"ok":"neutral");
+  const candidate=v.key?candidateCnpj(v.key):"";
+  const display=v.value||(candidate?formatCnpj(candidate):"Não lido");
+  const marker={error:"×",pending:"?",ok:"✓",neutral:"–"}[status];
+  return '<div class="vl5-field vl5-'+status+(v.full?' vl5-wide':'')+'"><small>'+esc(v.label)+'</small><strong>'+esc(display)+'</strong>'+
+   (v.rows.length?'<button type="button" class="vl5-mark" data-vl5-field="'+i+'" aria-label="'+esc(v.label+' · '+({error:"divergente",pending:"a conferir",ok:"conforme",neutral:"sem referência"}[status]))+'">'+marker+'</button>':'<span class="vl5-mark">'+marker+'</span>')+
+   (issue&&status==="error"?'<span class="vl5-reason">'+esc(compact(issue))+'</span>':'')+
+   (candidate?'<button type="button" class="vl5-fix" data-vl4-cnpj="'+v.key+'" data-value="'+esc(candidate)+'">Confere na foto?</button>':'')+'</div>';
+ };
  const status=report.errors?"error":report.status==="aprovado"?"ok":"pending";
  const title=status==="error"?"REPROVADA":status==="ok"?"APROVADA NA ANÁLISE":"A CONFERIR";
- return '<div class="vl3-verdict vl3-'+status+'" role="status"><div><small>RESULTADO DIGITAL</small><strong>'+title+'</strong></div><span>'+report.errors+' erro(s) · '+report.pending+' pendência(s)</span></div><section class="vl3-label" aria-label="Reconstrução da etiqueta"><header><small>ETIQUETA RECONSTRUÍDA</small><b>'+esc(box?"Caixa":unit?"Cumbuca / cinta":"Modelo a confirmar")+'</b></header><div class="vl3-fields">'+tiles+'</div></section>';
+ const order=checks.filter(x=>production.test(x.title));
+ return '<div class="vl3-verdict vl3-'+status+'" role="status"><div><strong>'+title+'</strong></div><span>'+report.errors+' erro(s) · '+report.pending+' pendência(s)</span></div>'+
+ '<section class="vl3-label vl5-paper" aria-label="Reconstrução da etiqueta"><header><b>'+esc(box?"ETIQUETA DE CAIXA":unit?"ETIQUETA DE CUMBUCA / CINTA":"ETIQUETA · MODELO A CONFIRMAR")+'</b><small>VITRA</small></header><div class="vl5-fields">'+records.map(tile).join("")+'</div></section>'+
+ '<div id="vl5-inspect" hidden></div>'+
+ (order.length?'<button type="button" class="vl5-order-trigger" data-vl5-order>Conferir ordem de produção <span>'+order.length+' →</span></button>':'')+
+ '<div class="vl5-legend"><span>✓ Conforme</span><span>× Divergente</span><span>? A conferir</span><span>– Sem parecer</span></div>';
+}
+function inspectVisualField(index){
+ const v=state.visualRecords?.[index],p=el("vl5-inspect");if(!v||!p)return;
+ p.hidden=false;
+ p.innerHTML='<div class="vl5-inspect-head"><b>'+esc(v.label)+'</b><button type="button" data-vl5-close aria-label="Fechar">×</button></div>'+v.rows.map(x=>'<div class="vl5-inspect-row"><b>'+({error:"×",pending:"?",ok:"✓"}[x.status]||"–")+' '+esc(x.title)+'</b><span>'+esc(x.detail)+'</span>'+(x.reference?'<small>'+esc(x.reference)+'</small>':'')+'</div>').join("");
+ p.scrollIntoView({block:"nearest",behavior:"smooth"});
 }
 function confirmVisualCandidate(e){
+ const field=e.target.closest?.("[data-vl5-field]");if(field){inspectVisualField(Number(field.dataset.vl5Field));return;}
+ if(e.target.closest?.("[data-vl5-close]")){const p=el("vl5-inspect");if(p)p.hidden=true;return;}
+ if(e.target.closest?.("[data-vl5-order]")){const p=el("vl5-order");if(p){p.hidden=!p.hidden;if(!p.hidden)p.scrollIntoView({block:"nearest",behavior:"smooth"});}return;}
  const order=e.target.closest?.("[data-vl4-order-class]");
  if(order){const v=order.dataset.vl4OrderClass;if(v===state.identity.klass&&classes.includes(v)){state.expected.klass=v;state.reviewRequested=false;state.reviewed=false;showResult();}return;}
  const b=e.target.closest?.("[data-vl4-cnpj]");if(!b)return;
@@ -1615,25 +1652,26 @@ function showResult(){
   (errors.length?'<div class="vl2-quick-items">'+errors.slice(0,6).map(x=>'<div><b>'+esc(x.title)+'</b><p>'+esc(x.detail)+'</p></div>').join("")+'</div>':"")+
   (pendings.length?'<div class="vl2-pending-short"><small>A confirmar</small><p>'+esc(pendings.slice(0,6).map(x=>x.title).join(" · "))+'</p></div>':"")+
   '<small>'+(report.ready?"Consulte as verificações completas abaixo.":"A análise é preliminar até confirmar os dados da ordem de produção.")+'</small></section>';
- const reference='<section class="vl2-reference-section"><div class="vl2-reading-head"><div><strong>Dados a confirmar</strong></div></div>'+clientChooser()+traceBuilder()+
- (box?(classFromCatalog()?'<div class="vl2-order-class vl2-class-from-catalog"><strong>Classificação identificada no cadastro</strong><p>'+esc(classFromCatalog())+' · única referência para o EAN e o cliente. Será comparada separadamente com a classe lida na foto.</p></div>':'<div class="vl2-order-class"><strong>Classificação da ordem de produção</strong><p>Etiqueta: '+esc(state.identity.klass||"não identificada")+'</p>'+(state.identity.klass&&!state.expected.klass?'<button type="button" class="vl4-order-class" data-vl4-order-class="'+esc(state.identity.klass)+'">Confirmo '+esc(state.identity.klass)+' na ordem de produção</button>':"")+lookupPicker(classes.map(v=>[v,v]),"klass",state.expected.klass||"","Selecionar classificação","trace")+'</div>'):"")+
- ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<div class="vl2-type-choice"><strong>Modelo de etiqueta</strong><p>Confirme o tipo indicado pela fotografia antes da conferência.</p>'+lookupPicker(kinds,"kind",kind,"Selecionar modelo","identity")+(kind?'<button type="button" class="vl2-confirm-kind" id="vl2-confirm-kind">Confirmar este modelo</button>':"")+'</div>':"")+'</section>';
- let outcome="";
- if(!state.reviewRequested){
-  outcome='<section class="vl2-decision-prompt"><button type="button" id="vl2-evaluate" class="vl2-evaluate" '+(!report.ready?'disabled':'')+'>Concluir conferência</button></section>';
- }else{
-  outcome='<section class="vl2-outcome" id="vl2-outcome"></section>';
-  if(report.status==="aprovado")outcome+='<section class="vl2-closeout"><div class="vl2-reading-head"><div><strong>Salvar conferência</strong><small>Última etapa, após o parecer aprovado</small></div></div><label class="vl2-checked"><input id="vl2-verified" type="checkbox" '+(state.reviewed?"checked":"")+'><span>Conferi o cliente, o modelo e a aplicação física com a ordem de produção.</span></label><textarea id="vl2-notes" rows="2" placeholder="Observação (opcional)">'+esc(state.notes)+'</textarea><button id="vl2-save" type="button" class="vl2-save" '+(!state.reviewed||state.saved?"disabled":"")+'>'+(state.saved?"Registro salvo":"Aprovar e salvar no histórico")+'</button></section>';
-  else outcome+='<p class="vl2-not-ready">Há itens que impedem a aprovação. Corrija a etiqueta ou refaça a fotografia para executar uma nova conferência.</p>';
- }
- const deepRetry=state.photo&&state.scanCompleted?'<div class="vl2-read-actions"><button type="button" id="vl2-deep-read" class="vl2-retry-deep">Reexaminar foto em alta resolução</button><button type="button" id="vl2-pair-read" class="vl2-retry-deep">Comparar caixa e cumbuca da foto</button></div>':"";
- const retry=state.analysisError?
- '<section class="vl2-reading-failure" role="status"><strong>Leitura incompleta</strong><p>'+esc(state.analysisError)+'</p><button type="button" id="vl2-retry-read">Tentar ler a mesma foto novamente</button></section>':"";
- const sampleOption=state.sampleSaved?'<p class="vl2-hint">Amostra registrada como pendente no histórico, sem aprovação.</p>':
-  !state.saved&&report.status!=="aprovado"?'<details class="vl2-refine vl2-sample"><summary>Modelo diferente? Guardar foto para ampliar o catálogo</summary><p class="vl2-refine-hint">Registra a foto para estudo, sem aprovação nem criação automática de regras.</p><button type="button" id="vl2-save-sample" class="vl2-evaluate">Registrar amostra sem aprovação</button></details>':"";
- root.innerHTML='<div id="vl3-visual">'+visualLabel(report)+'</div>'+pairView+'<details class="vl2-details-root vl3-order"'+(state.orderOpen?' open':'')+'><summary>Ordem de produção'+(!report.ready?' · confirmar':'')+'</summary>'+reference+'</details>'+outcome+'<details class="vl2-details-root"><summary>Leitura e auditoria</summary>'+retry+reading+deepRetry+sampleOption+'<div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div></details>';
- root.querySelector(".vl3-order")?.addEventListener("toggle",e=>{state.orderOpen=e.target.open;});
+ const reference='<section id="vl5-order" class="vl5-order" hidden><div class="vl5-inspect-head"><b>Ordem de produção</b><button type="button" data-vl5-order aria-label="Fechar">×</button></div>'+
+ (!state.clientConfirmed?'<label>Cliente<select data-vl5-ref="client">'+opts(sortedClients,state.identity.client,"Selecione o cliente")+'</select></label>':'<small>Cliente: '+esc(nameOf(clients,state.identity.client))+'</small>')+
+ '<label>Rastreabilidade da ordem<input data-vl2-trace="raw" value="'+esc(state.expected.raw||"")+'" placeholder="Código da ordem" autocomplete="off" spellcheck="false"></label>'+
+ (box&&!classFromCatalog()?'<label>Classe da ordem<select data-vl5-ref="klass">'+opts(classes.map(x=>[x,x]),state.expected.klass,"Selecione na ordem")+'</select></label>':"")+
+ ((!kind||state.detected?.kindConfidence==="low"&&!state.kindConfirmed)?'<label>Modelo<select data-vl5-ref="kind">'+opts(kinds,kind,"Selecione o modelo")+'</select></label>':"")+
+ '<button type="button" id="vl5-check-order" class="vl2-evaluate">Conferir</button></section>';
+ const outcome='<div class="vl5-actions">'+
+ (state.saved?'<button type="button" class="vl2-save" disabled>✓ Conferência registrada</button>':report.status==="aprovado"?'<button type="button" class="vl2-save" id="vl2-save">✓ Aprovar e registrar</button>':'<button type="button" class="vl2-save" disabled>✓ Aprovar e registrar</button>')+
+ (report.status!=="aprovado"&&!state.sampleSaved?'<button type="button" id="vl2-save-sample" class="vl5-secondary">Registrar sem aprovação</button>':state.sampleSaved?'<small>Registro pendente salvo</small>':"")+
+ '<button type="button" id="vl2-deep-read" class="vl5-secondary">Reler foto</button></div>';
+ root.innerHTML='<div id="vl3-visual">'+visualLabel(report)+'</div>'+reference+pairView+outcome+'<details class="vl2-details-root vl5-audit"><summary>Auditoria completa</summary>'+reading+'<div class="vl2-details-body">'+detailsView()+correctionPanel()+'</div><button type="button" id="vl2-pair-read" class="vl5-secondary">Comparar caixa e cumbuca</button></details>';
  root.addEventListener("click",confirmVisualCandidate);
+ root.querySelectorAll("[data-vl5-ref]").forEach(input=>input.addEventListener("change",e=>{
+  const k=e.target.dataset.vl5Ref,v=e.target.value;
+  if(k==="client"){state.identity.client=v;state.clientConfirmed=!!v;state.clientFromCatalog=false;}
+  if(k==="klass")state.expected.klass=v;
+  if(k==="kind"){state.identity.kind=v;state.kindConfirmed=!!v;}
+  state.reviewRequested=false;state.reviewed=false;
+ }));
+ el("vl5-check-order")?.addEventListener("click",()=>{state.reviewRequested=false;showResult();});
  root.querySelectorAll('details[name="vl2-choice"]').forEach(d=>d.addEventListener("toggle",()=>{
   if(d.open){root.querySelectorAll('details[name="vl2-choice"]').forEach(v=>{if(v!==d)v.open=false;});d.querySelector('input[type="search"]')?.focus({preventScroll:true});}
  }));
@@ -1667,7 +1705,7 @@ function showResult(){
      el("vl2-recheck")?.addEventListener("click",()=>{if(!diagnosticV4().ready)return;state.reviewRequested=true;showResult();});
     }
    }
-   const next=diagnosticV4(),action=el("vl2-evaluate");state.diag=next;if(action)action.disabled=!next.ready;const view=el("vl3-visual");if(view)view.innerHTML=visualLabel(next);
+   const next=diagnosticV4();state.diag=next;const view=el("vl3-visual");if(view)view.innerHTML=visualLabel(next);const save=el("vl2-save");if(save)save.disabled=true;
   };
   inp.addEventListener("input",update);inp.addEventListener("change",update);
  });
@@ -1690,7 +1728,7 @@ function showResult(){
  el("vl2-evaluate")?.addEventListener("click",()=>{if(!diagnosticV4().ready)return;state.reviewRequested=true;showResult();el("vl2-outcome")?.scrollIntoView({behavior:"smooth",block:"start"});});
  el("vl2-verified")?.addEventListener("change",e=>{state.reviewed=e.target.checked;const btn=el("vl2-save");if(btn)btn.disabled=!state.reviewed||state.saved;});
  el("vl2-notes")?.addEventListener("input",e=>state.notes=e.target.value);
- el("vl2-save")?.addEventListener("click",saveReview);
+ el("vl2-save")?.addEventListener("click",()=>{if(diagnosticV4().status!=="aprovado")return;state.reviewRequested=true;state.reviewed=true;saveReview();});
  el("vl2-save-sample")?.addEventListener("click",saveSample);
 }
 function renderHistoryRows(rows,archive=false){
