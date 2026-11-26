@@ -39,6 +39,9 @@ try{
   });
   if(await page.locator('.vl2-pair-grid article').count()!==2)throw Error('Duas etiquetas não exibidas lado a lado/empilhadas.');
   // A referência independente permanece acessível sem ocupar a tela inicial.
+  if(await page.locator('.vl2-capture').evaluate(d=>d.open))throw Error('Foto deve iniciar recolhida após leitura.');
+  if(await page.locator('.vl3-order').evaluate(d=>d.open))throw Error('Ordem deve iniciar recolhida.');
+  await page.locator('.vl3-order > summary').click();
   if(!await page.locator('.vl2-trace-order').evaluate(d=>d.open))await page.locator('.vl2-trace-order > summary').click();
   const referenceInput=page.locator('[data-vl2-trace="raw"]');
   if(await referenceInput.count()!==1)throw Error('Rastreabilidade de referência em campo único não encontrada.');
