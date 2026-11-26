@@ -507,6 +507,14 @@ async function loadPatterns(){
  }catch{state.catalogLoaded=false;notice("Catálogo complementar temporariamente indisponível. A consulta local continua ativa.",true);}
  if(state.photo)showResult();
 }
+async function loadNotebookReferences(){
+ if(!ctx?.canAccess?.())return;
+ try{
+  const response=await ctx.api("notebook_references");
+  state.notebookReferences=(Array.isArray(response.rows)?response.rows:[]).filter(x=>x.status==="historical_candidate"&&eanValid(x.barcode));
+ }catch{state.notebookReferences=[];}
+ if(state.photo&&state.scanCompleted)showResult();
+}
 async function loadEntities(){
  if(!ctx?.canAccess?.())return;
  try{const response=await ctx.api("references");state.entities=Array.isArray(response.rows)?response.rows:[];state.refsLoaded=state.entities.length>0;}
@@ -1337,6 +1345,10 @@ function diagnosticV4(){
  const expected=expectedCode(),printed=f.rastreio||"",trace=parseTrace(printed);
  const scanned=Boolean(state.scanCompleted&&state.photo);
  if(!scanned)return {status:"inicial",ready:false,checks:[],errors:0,pending:0,ok:0,summary:""};
+ const historical=(state.notebookReferences||[]).filter(x=>f.barcode&&digits(f.barcode)===x.barcode);
+ if(historical.length&&!matches.length&&!unit){
+  for(const h of historical)add("pending","Referência fotográfica do livro",h.description+" · GTIN "+h.barcode+" · "+h.varieties+". Confira na fotografia atual e confirme o modelo; o livro não substitui o cadastro oficial.","Livro de etiquetas aprovadas · "+h.source);
+ }
  if(needsClient&&(!state.clientConfirmed||!selected))add("pending","Cliente","Confirme o cliente aplicável ao código EAN.");
  if(state.traceVisualCheck==="yes"&&printed&&trace&&!state.ocrConflicts.includes("rastreio"))
   add("ok","Leitura conferida na fotografia","O operador confirmou visualmente a sequência impressa "+printed+". Isso não comprova a correspondência com a ordem de produção.");
@@ -1373,7 +1385,10 @@ function diagnosticV4(){
     add("ok","Classe e EAN","A classe impressa "+readClass+" confere com o catálogo do código.");
    if(selected?.startsWith("cia-"))add("pending","Padrão regional da CIA PA","O manual apresenta as unidades SP, RJ, PE e CE, mas o catálogo disponível não especifica a autorização do código por filial.");
    if(matches.length&&!state.clientConfirmed)add("ok","EAN cadastrado","EAN-13 "+ean+" consta no catálogo para "+ownerNames.join(" / ")+". A confirmação do destinatário real é independente.","DOC.CQ.056 · códigos por cliente");
-    if(!matches.length)add("pending","EAN sem padrão aprovado","EAN-13 "+ean+" válido, mas não localizado no catálogo de clientes ou produtores autorizados.");
+    if(!matches.length){
+     if(historical.length){for(const h of historical)add("pending","Referência fotográfica do livro",h.description+" · GTIN "+h.barcode+" · "+h.varieties+". Confirme os números na etiqueta atual, o modelo e o destinatário. Evidência histórica, não autorização automática.","Livro de etiquetas aprovadas · "+h.source);}
+     else add("pending","EAN sem padrão aprovado","EAN-13 "+ean+" válido, mas não localizado no catálogo de clientes ou produtores autorizados.");
+    }
    else if(selected&&state.clientConfirmed&&!owners.includes(catalogClient(selected))){
     add("error","EAN incompatível com o cliente","EAN-13 "+ean+" consta para "+ownerNames.join(", ")+", não para "+display+". Verifique se existe autorização expressa para uso do EAN da fazenda.");
    }else if(selected&&state.clientConfirmed){
@@ -2089,7 +2104,7 @@ function mount(adapter){
  el("vl2-center")?.addEventListener("click",()=>{state.crop.cx=.5;state.crop.cy=.5;drawCrop();});
  el("vl2-zoom")?.addEventListener("input",e=>{state.crop.scale=Number(e.target.value)/100;drawCrop();});
  el("vl2-archive")?.addEventListener("toggle",e=>{if(e.target.open)fetchArchived();});
- bindFrame();showResult();loadPatterns();loadEntities();fetchHistory();
+ bindFrame();showResult();loadPatterns();loadEntities();loadNotebookReferences();fetchHistory();
  Promise.resolve().then(async()=>{if(!ctx?.canAccess?.())return;await ensureOCR();await getOCRWorker();}).catch(()=>{});
 }
 window.VITRA_LABEL_SMART={mount,catalogCount:catalog.length,reference:"DOC.CQ.056"};
